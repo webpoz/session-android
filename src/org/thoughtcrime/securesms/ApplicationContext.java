@@ -39,7 +39,6 @@ import org.thoughtcrime.securesms.components.TypingStatusSender;
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil;
 import org.thoughtcrime.securesms.crypto.MasterSecretUtil;
 import org.thoughtcrime.securesms.crypto.ProfileKeyUtil;
-import org.thoughtcrime.securesms.crypto.storage.TextSecureSessionStore;
 import org.thoughtcrime.securesms.database.Address;
 import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.GroupDatabase;
@@ -71,7 +70,6 @@ import org.thoughtcrime.securesms.loki.database.LokiThreadDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiUserDatabase;
 import org.thoughtcrime.securesms.loki.database.SharedSenderKeysDatabase;
 import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocol;
-import org.thoughtcrime.securesms.loki.protocol.SessionRequestMessageSendJob;
 import org.thoughtcrime.securesms.loki.protocol.SessionResetImplementation;
 import org.thoughtcrime.securesms.loki.utilities.Broadcaster;
 import org.thoughtcrime.securesms.loki.utilities.UiModeUtilities;
@@ -97,10 +95,8 @@ import org.webrtc.PeerConnectionFactory;
 import org.webrtc.PeerConnectionFactory.InitializationOptions;
 import org.webrtc.voiceengine.WebRtcAudioManager;
 import org.webrtc.voiceengine.WebRtcAudioUtils;
-import org.whispersystems.libsignal.SignalProtocolAddress;
 import org.whispersystems.libsignal.logging.SignalProtocolLoggerProvider;
 import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope;
-import org.whispersystems.signalservice.api.push.SignalServiceAddress;
 import org.whispersystems.signalservice.api.util.StreamDetails;
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos;
 import org.whispersystems.signalservice.loki.api.Poller;
@@ -626,26 +622,7 @@ public class ApplicationContext extends MultiDexApplication implements Dependenc
 
   @Override
   public void sendSessionRequestIfNeeded(@NotNull String publicKey) {
-    // It's never necessary to establish a session with self
-    String userPublicKey = TextSecurePreferences.getLocalNumber(this);
-    if (publicKey.equals(userPublicKey)) { return; }
-    // Check that we don't already have a session
-    SignalProtocolAddress address = new SignalProtocolAddress(publicKey, SignalServiceAddress.DEFAULT_DEVICE_ID);
-    boolean hasSession = new TextSecureSessionStore(this).containsSession(address);
-    if (hasSession) { return; }
-    // Check that we didn't already send a session request
-    LokiAPIDatabase apiDB = DatabaseFactory.getLokiAPIDatabase(this);
-    boolean hasSentSessionRequest = (apiDB.getSessionRequestSentTimestamp(publicKey) != null);
-    boolean hasSentSessionRequestExpired = hasSentSessionRequestExpired(publicKey);
-    if (hasSentSessionRequestExpired) {
-      apiDB.setSessionRequestSentTimestamp(publicKey, 0);
-    }
-    if (hasSentSessionRequest && !hasSentSessionRequestExpired) { return; }
-    // Send the session request
-    long timestamp = new Date().getTime();
-    apiDB.setSessionRequestSentTimestamp(publicKey, timestamp);
-    SessionRequestMessageSendJob job = new SessionRequestMessageSendJob(publicKey, timestamp);
-    jobManager.add(job);
+    
   }
 
   @Override
