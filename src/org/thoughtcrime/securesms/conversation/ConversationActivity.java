@@ -215,7 +215,6 @@ import org.thoughtcrime.securesms.util.DateUtils;
 import org.thoughtcrime.securesms.util.Dialogs;
 import org.thoughtcrime.securesms.util.DynamicLanguage;
 import org.thoughtcrime.securesms.util.ExpirationUtil;
-import org.thoughtcrime.securesms.util.GroupUtil;
 import org.thoughtcrime.securesms.util.IdentityUtil;
 import org.thoughtcrime.securesms.util.MediaUtil;
 import org.thoughtcrime.securesms.util.ServiceUtil;
@@ -230,7 +229,6 @@ import org.thoughtcrime.securesms.util.views.Stub;
 import org.whispersystems.libsignal.InvalidMessageException;
 import org.whispersystems.libsignal.util.guava.Optional;
 import org.whispersystems.signalservice.loki.api.opengroups.PublicChat;
-import org.whispersystems.signalservice.loki.api.opengroups.PublicChatAPI;
 import org.whispersystems.signalservice.loki.protocol.mentions.Mention;
 import org.whispersystems.signalservice.loki.protocol.mentions.MentionsManager;
 import org.whispersystems.signalservice.loki.protocol.meta.SessionMetaProtocol;
@@ -789,11 +787,13 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
 
     inflater.inflate(R.menu.conversation, menu);
 
+    /*
     if (isSingleConversation() && isSecureText) {
       inflater.inflate(R.menu.conversation_secure, menu);
     } else if (isSingleConversation()) {
       inflater.inflate(R.menu.conversation_insecure, menu);
     }
+     */
 
     if (recipient != null && recipient.isMuted()) inflater.inflate(R.menu.conversation_muted, menu);
     else                                          inflater.inflate(R.menu.conversation_unmuted, menu);
@@ -884,7 +884,7 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
     case R.id.menu_add_shortcut:              handleAddShortcut();                               return true;
     case R.id.menu_search:                    handleSearch();                                    return true;
 //    case R.id.menu_add_to_contacts:           handleAddToContacts();                             return true;
-    case R.id.menu_reset_secure_session:      handleResetSecureSession();                        return true;
+//    case R.id.menu_reset_secure_session:      handleResetSecureSession();                        return true;
 //    case R.id.menu_group_recipients:          handleDisplayGroupRecipients();                    return true;
     case R.id.menu_distribution_broadcast:    handleDistributionBroadcastEnabled(item);          return true;
     case R.id.menu_distribution_conversation: handleDistributionConversationEnabled(item);       return true;
