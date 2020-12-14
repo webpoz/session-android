@@ -1,8 +1,10 @@
 package org.thoughtcrime.securesms.loki.utilities
 
 import android.content.Context
+import android.util.Log
 import com.goterl.lazycode.lazysodium.LazySodiumAndroid
 import com.goterl.lazycode.lazysodium.SodiumAndroid
+import com.goterl.lazycode.lazysodium.utils.Key
 import com.goterl.lazycode.lazysodium.utils.KeyPair
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil
 import org.thoughtcrime.securesms.util.Base64
@@ -11,6 +13,7 @@ import org.whispersystems.curve25519.Curve25519
 import org.whispersystems.libsignal.ecc.DjbECPrivateKey
 import org.whispersystems.libsignal.ecc.DjbECPublicKey
 import org.whispersystems.libsignal.ecc.ECKeyPair
+import org.whispersystems.signalservice.loki.utilities.toHexString
 
 object KeyPairUtilities {
 
@@ -48,5 +51,13 @@ object KeyPairUtilities {
 
     fun hasV2KeyPair(context: Context): Boolean {
         return (IdentityKeyUtil.retrieve(context, IdentityKeyUtil.ED25519_SECRET_KEY) != null)
+    }
+
+    fun getUserED25519KeyPair(context: Context): KeyPair? {
+        val hexEncodedED25519PublicKey = IdentityKeyUtil.retrieve(context, IdentityKeyUtil.ED25519_PUBLIC_KEY) ?: return null
+        val hexEncodedED25519SecretKey = IdentityKeyUtil.retrieve(context, IdentityKeyUtil.ED25519_SECRET_KEY) ?: return null
+        val ed25519PublicKey = Key.fromBase64String(hexEncodedED25519PublicKey)
+        val ed25519SecretKey = Key.fromBase64String(hexEncodedED25519SecretKey)
+        return KeyPair(ed25519PublicKey, ed25519SecretKey)
     }
 }
