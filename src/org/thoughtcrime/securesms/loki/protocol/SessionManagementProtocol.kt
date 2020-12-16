@@ -23,6 +23,7 @@ object SessionManagementProtocol {
 
     @JvmStatic
     fun startSessionReset(context: Context, publicKey: String) {
+        /*
         val recipient = recipient(context, publicKey)
         if (recipient.isGroupRecipient) { return }
         val lokiThreadDB = DatabaseFactory.getLokiThreadDatabase(context)
@@ -39,6 +40,7 @@ object SessionManagementProtocol {
             smsDB.markAsSentLokiSessionRestorationRequest(infoMessageID)
         }
         lokiThreadDB.removeAllSessionRestoreDevices(threadID)
+         */
     }
 
     @JvmStatic
@@ -65,6 +67,7 @@ object SessionManagementProtocol {
 
     @JvmStatic
     fun handlePreKeyBundleMessageIfNeeded(context: Context, content: SignalServiceContent) {
+        /*
         val preKeyBundleMessage = content.preKeyBundleMessage.orNull() ?: return
         val publicKey = content.sender
         if (recipient(context, publicKey).isGroupRecipient) { return } // Should never occur
@@ -80,10 +83,12 @@ object SessionManagementProtocol {
         DatabaseFactory.getLokiAPIDatabase(context).setSessionRequestProcessedTimestamp(publicKey, Date().time)
         val job = NullMessageSendJob(publicKey)
         ApplicationContext.getInstance(context).jobManager.add(job)
+         */
     }
 
     @JvmStatic
     fun handleEndSessionMessageIfNeeded(context: Context, content: SignalServiceContent) {
+        /*
         if (!content.dataMessage.isPresent || !content.dataMessage.get().isEndSession) { return }
         val sessionStore = TextSecureSessionStore(context)
         val lokiThreadDB = DatabaseFactory.getLokiThreadDatabase(context)
@@ -94,10 +99,12 @@ object SessionManagementProtocol {
         val job = NullMessageSendJob(content.sender)
         ApplicationContext.getInstance(context).jobManager.add(job)
         SecurityEvent.broadcastSecurityUpdateEvent(context)
+         */
     }
 
     @JvmStatic
     fun triggerSessionRestorationUI(context: Context, publicKey: String, errorTimestamp: Long) {
+        /*
         val masterDevicePublicKey = MultiDeviceProtocol.shared.getMasterDevice(publicKey) ?: publicKey
         val masterDeviceAsRecipient = recipient(context, masterDevicePublicKey)
         if (masterDeviceAsRecipient.isGroupRecipient) { return }
@@ -106,5 +113,6 @@ object SessionManagementProtocol {
         }
         val threadID = DatabaseFactory.getThreadDatabase(context).getOrCreateThreadIdFor(masterDeviceAsRecipient)
         DatabaseFactory.getLokiThreadDatabase(context).addSessionRestoreDevice(threadID, publicKey)
+         */
     }
 }

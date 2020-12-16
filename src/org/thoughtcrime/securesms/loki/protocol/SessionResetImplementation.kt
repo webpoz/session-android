@@ -21,6 +21,7 @@ class SessionResetImplementation(private val context: Context) : SessionResetPro
     }
 
     override fun onNewSessionAdopted(publicKey: String, oldSessionResetStatus: SessionResetStatus) {
+        /*
         if (oldSessionResetStatus == SessionResetStatus.IN_PROGRESS) {
             val job = NullMessageSendJob(publicKey)
             ApplicationContext.getInstance(context).jobManager.add(job)
@@ -33,6 +34,7 @@ class SessionResetImplementation(private val context: Context) : SessionResetPro
         if (infoMessageID > -1) {
             smsDB.markAsLokiSessionRestorationDone(infoMessageID)
         }
+         */
     }
 
     override fun validatePreKeySignalMessage(publicKey: String, message: PreKeySignalMessage) {
