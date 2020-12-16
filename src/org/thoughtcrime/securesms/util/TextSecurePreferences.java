@@ -1350,5 +1350,13 @@ public class TextSecurePreferences {
   public static void setLastKeyPairMigrationNudge(Context context, long newValue) {
     setLongPreference(context, "last_key_pair_migration_nudge", newValue);
   }
+
+  public static boolean getIsMigratingKeyPair(Context context) {
+    return getBooleanPreference(context, "is_migrating_key_pair", false);
+  }
+
+  public static void setIsMigratingKeyPair(Context context, boolean newValue) {
+    setBooleanPreference(context, "is_migrating_key_pair", newValue);
+  }
   // endregion
 }

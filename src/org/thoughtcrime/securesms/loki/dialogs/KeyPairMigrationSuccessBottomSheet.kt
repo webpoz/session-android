@@ -2,28 +2,40 @@ package org.thoughtcrime.securesms.loki.dialogs
 
 import android.app.AlertDialog
 import android.app.Dialog
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import android.widget.Toast
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import kotlinx.android.synthetic.main.fragment_key_pair_migration_bottom_sheet.*
+import kotlinx.android.synthetic.main.fragment_key_pair_migration_success_bottom_sheet.*
 import network.loki.messenger.R
 import org.thoughtcrime.securesms.ApplicationContext
+import org.thoughtcrime.securesms.util.TextSecurePreferences
+import org.whispersystems.signalservice.loki.utilities.hexEncodedPublicKey
 
-class KeyPairMigrationBottomSheet : BottomSheetDialogFragment() {
+class KeyPairMigrationSuccessBottomSheet : BottomSheetDialogFragment() {
+
+    private val sessionID by lazy {
+        TextSecurePreferences.getLocalNumber(requireContext())
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        return inflater.inflate(R.layout.fragment_key_pair_migration_bottom_sheet, container, false)
+        return inflater.inflate(R.layout.fragment_key_pair_migration_success_bottom_sheet, container, false)
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        upgradeNowButton.setOnClickListener { upgradeNow() }
-        upgradeLaterButton.setOnClickListener { dismiss() }
+        sessionIDTextView.text = sessionID
+        copyButton.setOnClickListener { copySessionID() }
+        okButton.setOnClickListener { dismiss() }
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
@@ -37,17 +49,10 @@ class KeyPairMigrationBottomSheet : BottomSheetDialogFragment() {
         return dialog
     }
 
-    private fun upgradeNow() {
-        val applicationContext = requireContext().applicationContext as ApplicationContext
-        dismiss()
-        val dialog = AlertDialog.Builder(requireContext())
-        dialog.setMessage("You’re upgrading to a new Session ID. This will give you improved privacy and security, but it will clear ALL app data. Contacts and conversations will be lost. Proceed?")
-        dialog.setPositiveButton(R.string.yes) { _, _ ->
-            applicationContext.clearAllData(true)
-        }
-        dialog.setNegativeButton(R.string.cancel) { _, _ ->
-            // Do nothing
-        }
-        dialog.create().show()
+    private fun copySessionID() {
+        val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Session ID", sessionID)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(requireContext(), R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
     }
 }

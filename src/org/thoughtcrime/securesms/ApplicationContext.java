@@ -588,14 +588,19 @@ public class ApplicationContext extends MultiDexApplication implements Dependenc
     });
   }
 
-  public void clearAllData() {
+  public void clearAllData(boolean isMigratingToV2KeyPair) {
     String token = TextSecurePreferences.getFCMToken(this);
     if (token != null && !token.isEmpty()) {
       LokiPushNotificationManager.unregister(token, this);
     }
-    boolean wasUnlinked = TextSecurePreferences.getWasUnlinked(this);
+    String displayName = TextSecurePreferences.getProfileName(this);
+    boolean isUsingFCM = TextSecurePreferences.isUsingFCM(this);
     TextSecurePreferences.clearAll(this);
-    TextSecurePreferences.setWasUnlinked(this, wasUnlinked);
+    if (isMigratingToV2KeyPair) {
+      TextSecurePreferences.setIsMigratingKeyPair(this, true);
+      TextSecurePreferences.setIsUsingFCM(this, isUsingFCM);
+      TextSecurePreferences.setProfileName(this, displayName);
+    }
     MasterSecretUtil.clear(this);
     if (!deleteDatabase("signal.db")) {
       Log.d("Loki", "Failed to delete database.");

@@ -169,11 +169,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
         }
         this.broadcastReceiver = broadcastReceiver
         LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver, IntentFilter("blockedContactsChanged"))
-        // Clear all data if this is a secondary device
-        if (TextSecurePreferences.getMasterHexEncodedPublicKey(this) != null) {
-            TextSecurePreferences.setWasUnlinked(this, true)
-            ApplicationContext.getInstance(this).clearAllData()
-        }
     }
 
     override fun onResume() {
@@ -185,7 +180,11 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
         if (hasViewedSeed || !isMasterDevice) {
             seedReminderView.visibility = View.GONE
         }
-        // Show key pair migration sheet if needed
+        showKeyPairMigrationSheetIfNeeded()
+        showKeyPairMigrationSuccessSheetIfNeeded()
+    }
+
+    private fun showKeyPairMigrationSheetIfNeeded() {
         if (KeyPairUtilities.hasV2KeyPair(this)) { return }
         val lastNudge = TextSecurePreferences.getLastKeyPairMigrationNudge(this)
         val nudgeInterval: Long = 3 * 24 * 60 * 60 * 1000 // 3 days
@@ -194,6 +193,13 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
         val keyPairMigrationSheet = KeyPairMigrationBottomSheet()
         keyPairMigrationSheet.show(supportFragmentManager, keyPairMigrationSheet.tag)
         TextSecurePreferences.setLastKeyPairMigrationNudge(this, Date().time)
+    }
+
+    private fun showKeyPairMigrationSuccessSheetIfNeeded() {
+        if (!KeyPairUtilities.hasV2KeyPair(this) || !TextSecurePreferences.getIsMigratingKeyPair(this)) { return }
+        val keyPairMigrationSuccessSheet = KeyPairMigrationSuccessBottomSheet()
+        keyPairMigrationSuccessSheet.show(supportFragmentManager, keyPairMigrationSuccessSheet.tag)
+        TextSecurePreferences.setIsMigratingKeyPair(this, false)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

@@ -305,7 +305,7 @@ class SettingsActivity : PassphraseRequiredActionBarActivity() {
         val dialog = AlertDialog.Builder(this)
         dialog.setMessage("You’re upgrading to a new Session ID. This will give you improved privacy and security, but it will clear ALL app data. Contacts and conversations will be lost. Proceed?")
         dialog.setPositiveButton(R.string.yes) { _, _ ->
-            applicationContext.clearAllData()
+            applicationContext.clearAllData(true)
         }
         dialog.setNegativeButton(R.string.cancel) { _, _ ->
             // Do nothing
