@@ -6,8 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.database.Cursor
-import android.net.Uri
-import android.os.AsyncTask
 import android.os.Bundle
 import android.text.Spannable
 import android.text.SpannableString
@@ -31,14 +29,9 @@ import org.thoughtcrime.securesms.ApplicationContext
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
 import org.thoughtcrime.securesms.conversation.ConversationActivity
 import org.thoughtcrime.securesms.database.DatabaseFactory
-import org.thoughtcrime.securesms.database.ThreadDatabase
 import org.thoughtcrime.securesms.database.model.ThreadRecord
-import org.thoughtcrime.securesms.groups.GroupManager
 import org.thoughtcrime.securesms.jobs.MultiDeviceBlockedUpdateJob
-import org.thoughtcrime.securesms.loki.dialogs.ConversationOptionsBottomSheet
-import org.thoughtcrime.securesms.loki.dialogs.LightThemeFeatureIntroBottomSheet
-import org.thoughtcrime.securesms.loki.dialogs.MultiDeviceRemovalBottomSheet
-import org.thoughtcrime.securesms.loki.dialogs.UserDetailsBottomSheet
+import org.thoughtcrime.securesms.loki.dialogs.*
 import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocol
 import org.thoughtcrime.securesms.loki.protocol.SessionResetImplementation
 import org.thoughtcrime.securesms.loki.utilities.*
@@ -57,6 +50,7 @@ import org.whispersystems.signalservice.loki.protocol.shelved.multidevice.MultiD
 import org.whispersystems.signalservice.loki.protocol.shelved.syncmessages.SyncMessagesProtocol
 import org.whispersystems.signalservice.loki.utilities.toHexString
 import java.io.IOException
+import java.util.*
 
 class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListener, SeedReminderViewDelegate, NewConversationButtonSetViewDelegate {
     private lateinit var glide: GlideRequests
@@ -178,7 +172,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
         // Clear all data if this is a secondary device
         if (TextSecurePreferences.getMasterHexEncodedPublicKey(this) != null) {
             TextSecurePreferences.setWasUnlinked(this, true)
-            ApplicationContext.getInstance(this).clearData()
+            ApplicationContext.getInstance(this).clearAllData()
         }
     }
 
@@ -191,36 +185,15 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
         if (hasViewedSeed || !isMasterDevice) {
             seedReminderView.visibility = View.GONE
         }
-
-        // Multi device removal sheet
-        if (!TextSecurePreferences.getHasSeenMultiDeviceRemovalSheet(this)) {
-            TextSecurePreferences.setHasSeenMultiDeviceRemovalSheet(this)
-            val userPublicKey = TextSecurePreferences.getLocalNumber(this)
-            val deviceLinks = DatabaseFactory.getLokiAPIDatabase(this).getDeviceLinks(userPublicKey)
-            if (deviceLinks.isNotEmpty()) {
-                val bottomSheet = MultiDeviceRemovalBottomSheet()
-                bottomSheet.onOKTapped = {
-                    bottomSheet.dismiss()
-                }
-                bottomSheet.onLinkTapped = {
-                    bottomSheet.dismiss()
-                    val url = "https://getsession.org/faq"
-                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
-                    startActivity(intent)
-                }
-                bottomSheet.show(supportFragmentManager, bottomSheet.tag)
-                return
-            }
-        }
-
-        // Light theme introduction sheet
-        if (!TextSecurePreferences.hasSeenLightThemeIntroSheet(this) &&
-                UiModeUtilities.isDayUiMode(this)) {
-            TextSecurePreferences.setHasSeenLightThemeIntroSheet(this)
-            val bottomSheet = LightThemeFeatureIntroBottomSheet()
-            bottomSheet.show(supportFragmentManager, bottomSheet.tag)
-            return
-        }
+        // Show key pair migration sheet if needed
+        if (KeyPairUtilities.hasV2KeyPair(this)) { return }
+        val lastNudge = TextSecurePreferences.getLastKeyPairMigrationNudge(this)
+        val nudgeInterval: Long = 3 * 24 * 60 * 60 * 1000 // 3 days
+        val nudge = (Date().time - lastNudge > nudgeInterval)
+        if (!nudge) { return }
+        val keyPairMigrationSheet = KeyPairMigrationBottomSheet()
+        keyPairMigrationSheet.show(supportFragmentManager, keyPairMigrationSheet.tag)
+        TextSecurePreferences.setLastKeyPairMigrationNudge(this, Date().time)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {

@@ -1342,5 +1342,13 @@ public class TextSecurePreferences {
   public static void setLastSnodePoolRefreshDate(Context context, Date date) {
     setLongPreference(context, "last_snode_pool_refresh_date", date.getTime());
   }
+
+  public static long getLastKeyPairMigrationNudge(Context context) {
+    return getLongPreference(context, "last_key_pair_migration_nudge", 0);
+  }
+
+  public static void setLastKeyPairMigrationNudge(Context context, long newValue) {
+    setLongPreference(context, "last_key_pair_migration_nudge", newValue);
+  }
   // endregion
 }
