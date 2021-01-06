@@ -10,6 +10,10 @@ import org.thoughtcrime.securesms.database.Database
 import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper
 import org.thoughtcrime.securesms.loki.utilities.*
 import org.thoughtcrime.securesms.util.TextSecurePreferences
+import org.whispersystems.libsignal.IdentityKeyPair
+import org.whispersystems.libsignal.ecc.DjbECPrivateKey
+import org.whispersystems.libsignal.ecc.DjbECPublicKey
+import org.whispersystems.libsignal.ecc.ECKeyPair
 import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope
 import org.whispersystems.signalservice.loki.api.Snode
 import org.whispersystems.signalservice.loki.database.LokiAPIDatabaseProtocol
@@ -390,6 +394,31 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
 
     override fun setLastSnodePoolRefreshDate(date: Date) {
         TextSecurePreferences.setLastSnodePoolRefreshDate(context, date)
+    }
+
+    override fun getUserX25519KeyPair(): ECKeyPair {
+        val keyPair = IdentityKeyUtil.getIdentityKeyPair(context)
+        return ECKeyPair(DjbECPublicKey(keyPair.publicKey.serialize()), DjbECPrivateKey(keyPair.privateKey.serialize()))
+    }
+
+    override fun getClosedGroupEncryptionKeyPairs(groupPublicKey: String): List<ECKeyPair> {
+        return listOf()
+    }
+
+    fun getLatestClosedGroupEncryptionKeyPair(groupPublicKey: String): ECKeyPair? {
+        return null
+    }
+
+    fun addClosedGroupPublicKey(groupPublicKey: String) {
+
+    }
+
+    fun addClosedGroupEncryptionKeyPair(encryptionKeyPair: ECKeyPair, groupPublicKey: String) {
+
+    }
+
+    fun removeAllClosedGroupEncryptionKeyPairs(groupPublicKey: String) {
+
     }
 
     // region Deprecated
