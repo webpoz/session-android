@@ -10,6 +10,7 @@ import org.thoughtcrime.securesms.database.Address
 import org.thoughtcrime.securesms.database.DatabaseFactory
 import org.thoughtcrime.securesms.loki.api.LokiPushNotificationManager
 import org.thoughtcrime.securesms.loki.api.LokiPushNotificationManager.ClosedGroupOperation
+import org.thoughtcrime.securesms.loki.api.SessionProtocolImpl
 import org.thoughtcrime.securesms.loki.utilities.recipient
 import org.thoughtcrime.securesms.mms.OutgoingGroupMediaMessage
 import org.thoughtcrime.securesms.recipients.Recipient
@@ -185,16 +186,45 @@ object ClosedGroupsProtocolV2 {
     }
 
     fun generateAndSendNewEncryptionKeyPair(context: Context, groupPublicKey: String, targetMembers: Collection<String>) {
-
+        // Prepare
+        val userPublicKey = TextSecurePreferences.getLocalNumber(context)
+        val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
+        val groupDB = DatabaseFactory.getGroupDatabase(context)
+        val groupID = doubleEncodeGroupID(groupPublicKey)
+        val group = groupDB.getGroup(groupID).orNull()
+        if (group == null) {
+            Log.d("Loki", "Can't update nonexistent closed group.")
+            return
+        }
+        if (!group.admins.map { it.toPhoneString() }.contains(userPublicKey)) {
+            Log.d("Loki", "Can't distribute new encryption key pair as non-admin.")
+            return
+        }
+        // Generate the new encryption key pair
+        val newKeyPair = Curve.generateKeyPair()
+        // Distribute it
+        val proto = SignalServiceProtos.ClosedGroupUpdateV2.KeyPair.newBuilder()
+        proto.publicKey = ByteString.copyFrom(newKeyPair.publicKey.serialize())
+        proto.privateKey = ByteString.copyFrom(newKeyPair.privateKey.serialize())
+        val plaintext = proto.build().toByteArray()
+        val wrappers = targetMembers.mapNotNull { publicKey ->
+            val ciphertext = SessionProtocolImpl(context).encrypt(plaintext, publicKey)
+            ClosedGroupUpdateMessageSendJobV2.KeyPairWrapper(publicKey, ciphertext)
+        }
+        val job = ClosedGroupUpdateMessageSendJobV2(groupPublicKey, ClosedGroupUpdateMessageSendJobV2.Kind.EncryptionKeyPair(wrappers))
+        job.setContext(context)
+        job.onRun() // Run the job immediately
+        // Store it * after * having sent out the message to the group
+        apiDB.addClosedGroupEncryptionKeyPair(newKeyPair, groupPublicKey)
     }
 
     @JvmStatic
-    public fun handleSharedSenderKeysUpdate(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, senderPublicKey: String) {
+    public fun handleSharedSenderKeysUpdate(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, groupPublicKey: String, senderPublicKey: String) {
         if (!isValid(closedGroupUpdate)) { return; }
         when (closedGroupUpdate.type) {
             SignalServiceProtos.ClosedGroupUpdateV2.Type.NEW -> handleNewClosedGroup(context, closedGroupUpdate, senderPublicKey)
-            SignalServiceProtos.ClosedGroupUpdateV2.Type.UPDATE -> handleClosedGroupUpdate(context, closedGroupUpdate, senderPublicKey)
-            SignalServiceProtos.ClosedGroupUpdateV2.Type.ENCRYPTION_KEY_PAIR -> handleGroupEncryptionKeyPair(context, closedGroupUpdate, senderPublicKey)
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.UPDATE -> handleClosedGroupUpdate(context, closedGroupUpdate, groupPublicKey, senderPublicKey)
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.ENCRYPTION_KEY_PAIR -> handleGroupEncryptionKeyPair(context, closedGroupUpdate, groupPublicKey, senderPublicKey)
             else -> {
                 // Do nothing
             }
@@ -249,12 +279,11 @@ object ClosedGroupsProtocolV2 {
         LokiPushNotificationManager.performOperation(context, ClosedGroupOperation.Subscribe, groupPublicKey, userPublicKey)
     }
 
-    public fun handleClosedGroupUpdate(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, senderPublicKey: String) {
+    public fun handleClosedGroupUpdate(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, groupPublicKey: String, senderPublicKey: String) {
         // Prepare
         val userPublicKey = TextSecurePreferences.getLocalNumber(context)
         val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
         // Unwrap the message
-        val groupPublicKey = closedGroupUpdate.publicKey.toByteArray().toHexString()
         val name = closedGroupUpdate.name
         val members = closedGroupUpdate.membersList.map { it.toByteArray().toHexString() }
         val groupDB = DatabaseFactory.getGroupDatabase(context)
@@ -300,8 +329,33 @@ object ClosedGroupsProtocolV2 {
         insertIncomingInfoMessage(context, senderPublicKey, groupID, type0, type1, name, members, group.admins.map { it.toPhoneString() })
     }
 
-    private fun handleGroupEncryptionKeyPair(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, senderPublicKey: String) {
-
+    private fun handleGroupEncryptionKeyPair(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, groupPublicKey: String, senderPublicKey: String) {
+        // Prepare
+        val userPublicKey = TextSecurePreferences.getLocalNumber(context)
+        val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
+        val userKeyPair = apiDB.getUserX25519KeyPair()
+        // Unwrap the message
+        val groupDB = DatabaseFactory.getGroupDatabase(context)
+        val groupID = doubleEncodeGroupID(groupPublicKey)
+        val group = groupDB.getGroup(groupID).orNull()
+        if (group == null) {
+            Log.d("Loki", "Ignoring closed group encryption key pair message for nonexistent group.")
+            return
+        }
+        if (!group.admins.map { it.toPhoneString() }.contains(senderPublicKey)) {
+            Log.d("Loki", "Ignoring closed group encryption key pair from non-admin.")
+            return
+        }
+        // Find our wrapper and decrypt it if possible
+        val wrapper = closedGroupUpdate.wrappersList.firstOrNull { it.publicKey.toByteArray().toHexString() == userPublicKey } ?: return
+        val encryptedKeyPair = wrapper.encryptedKeyPair.toByteArray()
+        val plaintext = SessionProtocolImpl(context).decrypt(encryptedKeyPair, userKeyPair).first
+        // Parse it
+        val proto = SignalServiceProtos.ClosedGroupUpdateV2.KeyPair.parseFrom(plaintext)
+        val keyPair = ECKeyPair(DjbECPublicKey(proto.publicKey.toByteArray()), DjbECPrivateKey(proto.privateKey.toByteArray()))
+        // Store it
+        apiDB.addClosedGroupEncryptionKeyPair(keyPair, groupPublicKey)
+        Log.d("Loki", "Received a new closed group encryption key pair")
     }
 
     private fun insertIncomingInfoMessage(context: Context, senderPublicKey: String, groupID: String, type0: GroupContext.Type, type1: SignalServiceGroup.Type,
