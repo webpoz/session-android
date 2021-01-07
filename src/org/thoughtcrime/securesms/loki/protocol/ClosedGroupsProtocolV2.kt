@@ -35,6 +35,7 @@ import org.whispersystems.signalservice.loki.protocol.closedgroups.ClosedGroupSe
 import org.whispersystems.signalservice.loki.protocol.closedgroups.SharedSenderKeysImplementation
 import org.whispersystems.signalservice.loki.utilities.hexEncodedPrivateKey
 import org.whispersystems.signalservice.loki.utilities.hexEncodedPublicKey
+import org.whispersystems.signalservice.loki.utilities.removing05PrefixIfNeeded
 import org.whispersystems.signalservice.loki.utilities.toHexString
 import java.io.IOException
 import java.util.*
@@ -205,7 +206,7 @@ object ClosedGroupsProtocolV2 {
         val newKeyPair = Curve.generateKeyPair()
         // Distribute it
         val proto = SignalServiceProtos.ClosedGroupUpdateV2.KeyPair.newBuilder()
-        proto.publicKey = ByteString.copyFrom(newKeyPair.publicKey.serialize())
+        proto.publicKey = ByteString.copyFrom(newKeyPair.publicKey.serialize().removing05PrefixIfNeeded())
         proto.privateKey = ByteString.copyFrom(newKeyPair.privateKey.serialize())
         val plaintext = proto.build().toByteArray()
         val wrappers = targetMembers.mapNotNull { publicKey ->
@@ -272,7 +273,7 @@ object ClosedGroupsProtocolV2 {
         // Add the group to the user's set of public keys to poll for
         apiDB.addClosedGroupPublicKey(groupPublicKey)
         // Store the encryption key pair
-        val encryptionKeyPair = ECKeyPair(DjbECPublicKey(encryptionKeyPairAsProto.publicKey.toByteArray()), DjbECPrivateKey(encryptionKeyPairAsProto.privateKey.toByteArray()))
+        val encryptionKeyPair = ECKeyPair(DjbECPublicKey(encryptionKeyPairAsProto.publicKey.toByteArray().removing05PrefixIfNeeded()), DjbECPrivateKey(encryptionKeyPairAsProto.privateKey.toByteArray()))
         apiDB.addClosedGroupEncryptionKeyPair(encryptionKeyPair, groupPublicKey)
         // Notify the user
         insertIncomingInfoMessage(context, senderPublicKey, groupID, GroupContext.Type.UPDATE, SignalServiceGroup.Type.UPDATE, name, members, admins)
@@ -354,7 +355,7 @@ object ClosedGroupsProtocolV2 {
         val plaintext = SessionProtocolImpl(context).decrypt(encryptedKeyPair, userKeyPair).first
         // Parse it
         val proto = SignalServiceProtos.ClosedGroupUpdateV2.KeyPair.parseFrom(plaintext)
-        val keyPair = ECKeyPair(DjbECPublicKey(proto.publicKey.toByteArray()), DjbECPrivateKey(proto.privateKey.toByteArray()))
+        val keyPair = ECKeyPair(DjbECPublicKey(proto.publicKey.toByteArray().removing05PrefixIfNeeded()), DjbECPrivateKey(proto.privateKey.toByteArray()))
         // Store it
         apiDB.addClosedGroupEncryptionKeyPair(keyPair, groupPublicKey)
         Log.d("Loki", "Received a new closed group encryption key pair")

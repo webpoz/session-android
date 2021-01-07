@@ -24,6 +24,7 @@ import org.whispersystems.signalservice.api.push.SignalServiceAddress
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos
 import org.whispersystems.signalservice.loki.protocol.closedgroups.ClosedGroupSenderKey
 import org.whispersystems.signalservice.loki.protocol.meta.TTLUtilities
+import org.whispersystems.signalservice.loki.utilities.removing05PrefixIfNeeded
 import org.whispersystems.signalservice.loki.utilities.toHexString
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -77,7 +78,7 @@ class ClosedGroupUpdateMessageSendJobV2 private constructor(parameters: Paramete
                 builder.putString("kind", "New")
                 builder.putByteArray("publicKey", kind.publicKey)
                 builder.putString("name", kind.name)
-                builder.putByteArray("encryptionKeyPairPublicKey", kind.encryptionKeyPair.publicKey.serialize())
+                builder.putByteArray("encryptionKeyPairPublicKey", kind.encryptionKeyPair.publicKey.serialize().removing05PrefixIfNeeded())
                 builder.putByteArray("encryptionKeyPairPrivateKey", kind.encryptionKeyPair.privateKey.serialize())
                 val members = kind.members.joinToString(" - ") { it.toHexString() }
                 builder.putString("members", members)
@@ -141,7 +142,7 @@ class ClosedGroupUpdateMessageSendJobV2 private constructor(parameters: Paramete
                 closedGroupUpdate.publicKey = ByteString.copyFrom(kind.publicKey)
                 closedGroupUpdate.name = kind.name
                 val encryptionKeyPair = SignalServiceProtos.ClosedGroupUpdateV2.KeyPair.newBuilder()
-                encryptionKeyPair.publicKey = ByteString.copyFrom(kind.encryptionKeyPair.publicKey.serialize())
+                encryptionKeyPair.publicKey = ByteString.copyFrom(kind.encryptionKeyPair.publicKey.serialize().removing05PrefixIfNeeded())
                 encryptionKeyPair.privateKey = ByteString.copyFrom(kind.encryptionKeyPair.privateKey.serialize())
                 closedGroupUpdate.encryptionKeyPair =  encryptionKeyPair.build()
                 closedGroupUpdate.addAllMembers(kind.members.map { ByteString.copyFrom(it) })
