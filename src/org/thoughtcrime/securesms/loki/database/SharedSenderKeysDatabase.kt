@@ -3,6 +3,7 @@ package org.thoughtcrime.securesms.loki.database
 import android.content.ContentValues
 import android.content.Context
 import org.thoughtcrime.securesms.database.Database
+import org.thoughtcrime.securesms.database.DatabaseFactory
 import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper
 import org.thoughtcrime.securesms.loki.utilities.*
 import org.thoughtcrime.securesms.util.Hex
@@ -123,11 +124,14 @@ class SharedSenderKeysDatabase(context: Context, helper: SQLCipherOpenHelper) : 
 
     override fun getAllClosedGroupPublicKeys(): Set<String> {
         val database = databaseHelper.readableDatabase
-        return database.getAll(closedGroupPrivateKeyTable, null, null) { cursor ->
+        val result = mutableSetOf<String>()
+        result.addAll(database.getAll(closedGroupPrivateKeyTable, null, null) { cursor ->
             cursor.getString(Companion.closedGroupPublicKey)
         }.filter {
             PublicKeyValidation.isValid(it)
-        }.toSet()
+        })
+        result.addAll(DatabaseFactory.getLokiAPIDatabase(context).getAllClosedGroupPublicKeys())
+        return result
     }
     // endregion
 

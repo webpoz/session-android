@@ -149,6 +149,7 @@ object ClosedGroupsProtocolV2 {
             if (isUserLeaving) {
                 // Remove the group private key and unsubscribe from PNs
                 apiDB.removeAllClosedGroupEncryptionKeyPairs(groupPublicKey)
+                apiDB.removeClosedGroupPublicKey(groupPublicKey)
                 // Mark the group as inactive
                 groupDB.setActive(groupID, false)
                 groupDB.removeMember(groupID, Address.fromSerialized(userPublicKey))
@@ -304,6 +305,7 @@ object ClosedGroupsProtocolV2 {
         val wasCurrentUserRemoved = !members.contains(userPublicKey)
         if (wasCurrentUserRemoved) {
             apiDB.removeAllClosedGroupEncryptionKeyPairs(groupPublicKey)
+            apiDB.removeClosedGroupPublicKey(groupPublicKey)
             // Mark the group as inactive
             groupDB.setActive(groupID, false)
             groupDB.removeMember(groupID, Address.fromSerialized(userPublicKey))

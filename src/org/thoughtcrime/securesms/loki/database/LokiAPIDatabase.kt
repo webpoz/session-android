@@ -9,6 +9,7 @@ import org.thoughtcrime.securesms.crypto.IdentityKeyUtil
 import org.thoughtcrime.securesms.database.Database
 import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper
 import org.thoughtcrime.securesms.loki.utilities.*
+import org.thoughtcrime.securesms.util.Hex
 import org.thoughtcrime.securesms.util.TextSecurePreferences
 import org.whispersystems.libsignal.IdentityKeyPair
 import org.whispersystems.libsignal.ecc.DjbECPrivateKey
@@ -85,6 +86,17 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
         private val openGroupProfilePictureTable = "open_group_avatar_cache"
         private val openGroupProfilePicture = "open_group_avatar"
         @JvmStatic val createOpenGroupProfilePictureTableCommand = "CREATE TABLE $openGroupProfilePictureTable ($publicChatID STRING PRIMARY KEY, $openGroupProfilePicture TEXT NULLABLE DEFAULT NULL);"
+        // Closed groups (V2)
+        private val closedGroupEncryptionKeyPairsTable = "closed_group_encryption_key_pairs_table"
+        private val closedGroupsEncryptionKeyPairIndex = "closed_group_encryption_key_pair_index"
+        private val encryptionKeyPairPublicKey = "encryption_key_pair_public_key"
+        private val encryptionKeyPairPrivateKey = "encryption_key_pair_private_key"
+        @JvmStatic
+        val createClosedGroupEncryptionKeyPairsTable = "CREATE TABLE $closedGroupEncryptionKeyPairsTable ($closedGroupsEncryptionKeyPairIndex STRING PRIMARY KEY $encryptionKeyPairPublicKey STRING $encryptionKeyPairPrivateKey STRING)"
+        private val closedGroupPublicKeysTable = "closed_group_public_keys_table"
+        private val groupPublicKey = "group_public_key"
+        @JvmStatic
+        val createClosedGroupPublicKeysTable = "CREATE TABLE $closedGroupPublicKeysTable ($groupPublicKey STRING PRIMARY KEY $groupPublicKey STRING)"
 
         // region Deprecated
         private val deviceLinkCache = "loki_pairing_authorisation_cache"
@@ -401,24 +413,54 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
         return ECKeyPair(DjbECPublicKey(keyPair.publicKey.serialize()), DjbECPrivateKey(keyPair.privateKey.serialize()))
     }
 
+    fun addClosedGroupEncryptionKeyPair(encryptionKeyPair: ECKeyPair, groupPublicKey: String) {
+        val database = databaseHelper.writableDatabase
+        val index = "$groupPublicKey-$timestamp"
+        val timestamp = Date().time.toString()
+        val encryptionKeyPairPublicKey = encryptionKeyPair.publicKey.serialize().toHexString()
+        val encryptionKeyPairPrivateKey = encryptionKeyPair.privateKey.serialize().toHexString()
+        val row = wrap(mapOf( Companion.closedGroupsEncryptionKeyPairIndex to index, Companion.encryptionKeyPairPublicKey to encryptionKeyPairPublicKey,
+            Companion.encryptionKeyPairPrivateKey to encryptionKeyPairPrivateKey ))
+        database.insertOrUpdate(closedGroupEncryptionKeyPairsTable, row, "${Companion.closedGroupsEncryptionKeyPairIndex} = ?", wrap(index))
+    }
+
     override fun getClosedGroupEncryptionKeyPairs(groupPublicKey: String): List<ECKeyPair> {
-        return listOf()
+        val database = databaseHelper.readableDatabase
+        val timestampsAndKeyPairs = database.getAll(closedGroupEncryptionKeyPairsTable, "${Companion.closedGroupsEncryptionKeyPairIndex} LIKE ?", wrap(groupPublicKey)) { cursor ->
+            val timestamp = cursor.getString(cursor.getColumnIndexOrThrow(Companion.closedGroupsEncryptionKeyPairIndex)).split("-").last()
+            val encryptionKeyPairPublicKey = cursor.getString(cursor.getColumnIndexOrThrow(Companion.encryptionKeyPairPublicKey))
+            val encryptionKeyPairPrivateKey = cursor.getString(cursor.getColumnIndexOrThrow(Companion.encryptionKeyPairPrivateKey))
+            val keyPair = ECKeyPair(DjbECPublicKey(Hex.fromStringCondensed(encryptionKeyPairPublicKey)), DjbECPrivateKey(Hex.fromStringCondensed(encryptionKeyPairPrivateKey)))
+            Pair(timestamp, keyPair)
+        }
+        return timestampsAndKeyPairs.sortedBy { it.first.toLong() }.map { it.second }
     }
 
     fun getLatestClosedGroupEncryptionKeyPair(groupPublicKey: String): ECKeyPair? {
-        return null
-    }
-
-    fun addClosedGroupPublicKey(groupPublicKey: String) {
-
-    }
-
-    fun addClosedGroupEncryptionKeyPair(encryptionKeyPair: ECKeyPair, groupPublicKey: String) {
-
+        return getClosedGroupEncryptionKeyPairs(groupPublicKey).lastOrNull()
     }
 
     fun removeAllClosedGroupEncryptionKeyPairs(groupPublicKey: String) {
+        val database = databaseHelper.writableDatabase
+        database.delete(closedGroupEncryptionKeyPairsTable, "${Companion.closedGroupsEncryptionKeyPairIndex} LIKE ?", wrap(groupPublicKey))
+    }
 
+    fun addClosedGroupPublicKey(groupPublicKey: String) {
+        val database = databaseHelper.writableDatabase
+        val row = wrap(mapOf( Companion.groupPublicKey to groupPublicKey, Companion.groupPublicKey to groupPublicKey ))
+        database.insertOrUpdate(closedGroupPublicKeysTable, row, "${Companion.groupPublicKey} = ?", wrap(groupPublicKey))
+    }
+
+    fun getAllClosedGroupPublicKeys(): Set<String> {
+        val database = databaseHelper.readableDatabase
+        return database.getAll(closedGroupPublicKeysTable, null, null) { cursor ->
+            cursor.getString(cursor.getColumnIndexOrThrow(Companion.groupPublicKey))
+        }.toSet()
+    }
+
+    fun removeClosedGroupPublicKey(groupPublicKey: String) {
+        val database = databaseHelper.writableDatabase
+        database.delete(closedGroupPublicKeysTable, "${Companion.groupPublicKey} = ?", wrap(groupPublicKey))
     }
 
     // region Deprecated

@@ -23,6 +23,7 @@ import org.thoughtcrime.securesms.database.DatabaseFactory
 import org.thoughtcrime.securesms.database.ThreadDatabase
 import org.thoughtcrime.securesms.groups.GroupManager
 import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocol
+import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocolV2
 import org.thoughtcrime.securesms.loki.utilities.fadeIn
 import org.thoughtcrime.securesms.loki.utilities.fadeOut
 import org.thoughtcrime.securesms.mms.GlideApp
@@ -122,7 +123,7 @@ class CreateClosedGroupActivity : PassphraseRequiredActionBarActivity(), LoaderM
         val userPublicKey = TextSecurePreferences.getLocalNumber(this)
         isLoading = true
         loader.fadeIn()
-        ClosedGroupsProtocol.createClosedGroup(this, name.toString(), selectedMembers + setOf( userPublicKey )).successUi { groupID ->
+        ClosedGroupsProtocolV2.createClosedGroup(this, name.toString(), selectedMembers + setOf( userPublicKey )).successUi { groupID ->
             loader.fadeOut()
             isLoading = false
             val threadID = DatabaseFactory.getThreadDatabase(this).getOrCreateThreadIdFor(Recipient.from(this, Address.fromSerialized(groupID), false))

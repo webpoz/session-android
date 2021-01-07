@@ -70,6 +70,7 @@ import org.thoughtcrime.securesms.loki.database.LokiAPIDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiMessageDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiThreadDatabase;
 import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocol;
+import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocolV2;
 import org.thoughtcrime.securesms.loki.protocol.SessionManagementProtocol;
 import org.thoughtcrime.securesms.loki.protocol.SessionMetaProtocol;
 import org.thoughtcrime.securesms.loki.protocol.SessionResetImplementation;
@@ -288,6 +289,10 @@ public class PushDecryptJob extends BaseJob implements InjectableType {
 
           if (message.getClosedGroupUpdate().isPresent()) {
             ClosedGroupsProtocol.handleSharedSenderKeysUpdate(context, message.getClosedGroupUpdate().get(), content.getSender());
+          }
+
+          if (message.getClosedGroupUpdateV2().isPresent()) {
+            ClosedGroupsProtocolV2.handleSharedSenderKeysUpdate(context, message.getClosedGroupUpdateV2().get(), envelope.getSource(), content.getSender());
           }
 
           if (message.isEndSession()) {
