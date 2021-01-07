@@ -418,7 +418,7 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
         val database = databaseHelper.writableDatabase
         val timestamp = Date().time.toString()
         val index = "$groupPublicKey-$timestamp"
-        val encryptionKeyPairPublicKey = encryptionKeyPair.publicKey.serialize().toHexString()
+        val encryptionKeyPairPublicKey = encryptionKeyPair.publicKey.serialize().toHexString().removing05PrefixIfNeeded()
         val encryptionKeyPairPrivateKey = encryptionKeyPair.privateKey.serialize().toHexString()
         val row = wrap(mapOf( Companion.closedGroupsEncryptionKeyPairIndex to index, Companion.encryptionKeyPairPublicKey to encryptionKeyPairPublicKey,
             Companion.encryptionKeyPairPrivateKey to encryptionKeyPairPrivateKey ))
