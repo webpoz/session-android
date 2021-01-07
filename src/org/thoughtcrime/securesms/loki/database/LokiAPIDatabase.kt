@@ -422,12 +422,14 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
         val encryptionKeyPairPrivateKey = encryptionKeyPair.privateKey.serialize().toHexString()
         val row = wrap(mapOf( Companion.closedGroupsEncryptionKeyPairIndex to index, Companion.encryptionKeyPairPublicKey to encryptionKeyPairPublicKey,
             Companion.encryptionKeyPairPrivateKey to encryptionKeyPairPrivateKey ))
+        Log.d("Test", "index: $index")
         database.insertOrUpdate(closedGroupEncryptionKeyPairsTable, row, "${Companion.closedGroupsEncryptionKeyPairIndex} = ?", wrap(index))
     }
 
     override fun getClosedGroupEncryptionKeyPairs(groupPublicKey: String): List<ECKeyPair> {
         val database = databaseHelper.readableDatabase
-        val timestampsAndKeyPairs = database.getAll(closedGroupEncryptionKeyPairsTable, "${Companion.closedGroupsEncryptionKeyPairIndex} LIKE ?", wrap(groupPublicKey)) { cursor ->
+        Log.d("Test", "groupPublicKey: $groupPublicKey")
+        val timestampsAndKeyPairs = database.getAll(closedGroupEncryptionKeyPairsTable, "${Companion.closedGroupsEncryptionKeyPairIndex} LIKE ?", wrap("'$groupPublicKey/%'")) { cursor ->
             val timestamp = cursor.getString(cursor.getColumnIndexOrThrow(Companion.closedGroupsEncryptionKeyPairIndex)).split("-").last()
             val encryptionKeyPairPublicKey = cursor.getString(cursor.getColumnIndexOrThrow(Companion.encryptionKeyPairPublicKey))
             val encryptionKeyPairPrivateKey = cursor.getString(cursor.getColumnIndexOrThrow(Companion.encryptionKeyPairPrivateKey))
@@ -443,7 +445,7 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
 
     fun removeAllClosedGroupEncryptionKeyPairs(groupPublicKey: String) {
         val database = databaseHelper.writableDatabase
-        database.delete(closedGroupEncryptionKeyPairsTable, "${Companion.closedGroupsEncryptionKeyPairIndex} LIKE ?", wrap(groupPublicKey))
+        database.delete(closedGroupEncryptionKeyPairsTable, "${Companion.closedGroupsEncryptionKeyPairIndex} LIKE ?", wrap("'$groupPublicKey/%'"))
     }
 
     fun addClosedGroupPublicKey(groupPublicKey: String) {
