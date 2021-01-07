@@ -220,7 +220,7 @@ object ClosedGroupsProtocolV2 {
     }
 
     @JvmStatic
-    public fun handleSharedSenderKeysUpdate(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, groupPublicKey: String, senderPublicKey: String) {
+    public fun handleMessage(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, groupPublicKey: String, senderPublicKey: String) {
         if (!isValid(closedGroupUpdate)) { return; }
         when (closedGroupUpdate.type) {
             SignalServiceProtos.ClosedGroupUpdateV2.Type.NEW -> handleNewClosedGroup(context, closedGroupUpdate, senderPublicKey)

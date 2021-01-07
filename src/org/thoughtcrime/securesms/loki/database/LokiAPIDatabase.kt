@@ -19,6 +19,7 @@ import org.whispersystems.signalservice.api.messages.SignalServiceEnvelope
 import org.whispersystems.signalservice.loki.api.Snode
 import org.whispersystems.signalservice.loki.database.LokiAPIDatabaseProtocol
 import org.whispersystems.signalservice.loki.protocol.shelved.multidevice.DeviceLink
+import org.whispersystems.signalservice.loki.utilities.removing05PrefixIfNeeded
 import org.whispersystems.signalservice.loki.utilities.toHexString
 import java.util.*
 
@@ -92,11 +93,11 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
         private val encryptionKeyPairPublicKey = "encryption_key_pair_public_key"
         private val encryptionKeyPairPrivateKey = "encryption_key_pair_private_key"
         @JvmStatic
-        val createClosedGroupEncryptionKeyPairsTable = "CREATE TABLE $closedGroupEncryptionKeyPairsTable ($closedGroupsEncryptionKeyPairIndex STRING PRIMARY KEY $encryptionKeyPairPublicKey STRING $encryptionKeyPairPrivateKey STRING)"
+        val createClosedGroupEncryptionKeyPairsTable = "CREATE TABLE $closedGroupEncryptionKeyPairsTable ($closedGroupsEncryptionKeyPairIndex STRING PRIMARY KEY, $encryptionKeyPairPublicKey STRING, $encryptionKeyPairPrivateKey STRING)"
         private val closedGroupPublicKeysTable = "closed_group_public_keys_table"
         private val groupPublicKey = "group_public_key"
         @JvmStatic
-        val createClosedGroupPublicKeysTable = "CREATE TABLE $closedGroupPublicKeysTable ($groupPublicKey STRING PRIMARY KEY $groupPublicKey STRING)"
+        val createClosedGroupPublicKeysTable = "CREATE TABLE $closedGroupPublicKeysTable ($groupPublicKey STRING PRIMARY KEY)"
 
         // region Deprecated
         private val deviceLinkCache = "loki_pairing_authorisation_cache"
@@ -410,13 +411,13 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
 
     override fun getUserX25519KeyPair(): ECKeyPair {
         val keyPair = IdentityKeyUtil.getIdentityKeyPair(context)
-        return ECKeyPair(DjbECPublicKey(keyPair.publicKey.serialize()), DjbECPrivateKey(keyPair.privateKey.serialize()))
+        return ECKeyPair(DjbECPublicKey(keyPair.publicKey.serialize().removing05PrefixIfNeeded()), DjbECPrivateKey(keyPair.privateKey.serialize()))
     }
 
     fun addClosedGroupEncryptionKeyPair(encryptionKeyPair: ECKeyPair, groupPublicKey: String) {
         val database = databaseHelper.writableDatabase
-        val index = "$groupPublicKey-$timestamp"
         val timestamp = Date().time.toString()
+        val index = "$groupPublicKey-$timestamp"
         val encryptionKeyPairPublicKey = encryptionKeyPair.publicKey.serialize().toHexString()
         val encryptionKeyPairPrivateKey = encryptionKeyPair.privateKey.serialize().toHexString()
         val row = wrap(mapOf( Companion.closedGroupsEncryptionKeyPairIndex to index, Companion.encryptionKeyPairPublicKey to encryptionKeyPairPublicKey,
@@ -447,7 +448,7 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
 
     fun addClosedGroupPublicKey(groupPublicKey: String) {
         val database = databaseHelper.writableDatabase
-        val row = wrap(mapOf( Companion.groupPublicKey to groupPublicKey, Companion.groupPublicKey to groupPublicKey ))
+        val row = wrap(mapOf( Companion.groupPublicKey to groupPublicKey ))
         database.insertOrUpdate(closedGroupPublicKeysTable, row, "${Companion.groupPublicKey} = ?", wrap(groupPublicKey))
     }
 

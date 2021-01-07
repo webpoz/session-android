@@ -95,8 +95,9 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
   private static final int lokiV16                          = 37;
   private static final int lokiV17                          = 38;
   private static final int lokiV18_CLEAR_BG_POLL_JOBS       = 39;
+  private static final int lokiV19                          = 40;
 
-  private static final int    DATABASE_VERSION = lokiV18_CLEAR_BG_POLL_JOBS; // Loki - onUpgrade(...) must be updated to use Loki version numbers if Signal makes any database changes
+  private static final int    DATABASE_VERSION = lokiV19;
   private static final String DATABASE_NAME    = "signal.db";
 
   private final Context        context;
@@ -159,6 +160,8 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
     db.execSQL(LokiAPIDatabase.getCreateSessionRequestProcessedTimestampTableCommand());
     db.execSQL(LokiAPIDatabase.getCreateOpenGroupPublicKeyTableCommand());
     db.execSQL(LokiAPIDatabase.getCreateOpenGroupProfilePictureTableCommand());
+    db.execSQL(LokiAPIDatabase.getCreateClosedGroupEncryptionKeyPairsTable());
+    db.execSQL(LokiAPIDatabase.getCreateClosedGroupPublicKeysTable());
     db.execSQL(LokiPreKeyBundleDatabase.getCreateTableCommand());
     db.execSQL(LokiPreKeyRecordDatabase.getCreateTableCommand());
     db.execSQL(LokiMessageDatabase.getCreateMessageIDTableCommand());
@@ -649,6 +652,11 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
         // BackgroundPollJob was replaced with BackgroundPollWorker. Clear all the scheduled job records.
         db.execSQL("DELETE FROM job_spec WHERE factory_key = 'BackgroundPollJob'");
         db.execSQL("DELETE FROM constraint_spec WHERE factory_key = 'BackgroundPollJob'");
+      }
+
+      if (oldVersion < lokiV19) {
+        db.execSQL(LokiAPIDatabase.getCreateClosedGroupEncryptionKeyPairsTable());
+        db.execSQL(LokiAPIDatabase.getCreateClosedGroupPublicKeysTable());
       }
 
       db.setTransactionSuccessful();
