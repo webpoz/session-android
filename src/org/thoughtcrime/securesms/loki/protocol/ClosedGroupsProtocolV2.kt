@@ -248,7 +248,7 @@ object ClosedGroupsProtocolV2 {
                     && !(closedGroupUpdate.encryptionKeyPair.publicKey ?: ByteString.copyFrom(ByteArray(0))).isEmpty && closedGroupUpdate.membersCount > 0 && closedGroupUpdate.adminsCount > 0
             }
             SignalServiceProtos.ClosedGroupUpdateV2.Type.UPDATE -> {
-                return !closedGroupUpdate.name.isNullOrEmpty() && closedGroupUpdate.membersCount > 0
+                return !closedGroupUpdate.name.isNullOrEmpty()
             }
             SignalServiceProtos.ClosedGroupUpdateV2.Type.ENCRYPTION_KEY_PAIR -> return true
             else -> return false
@@ -309,11 +309,17 @@ object ClosedGroupsProtocolV2 {
             Log.d("Loki", "Ignoring closed group info message from non-member.")
             return
         }
+        // Check that the admin wasn't removed unless the group was destroyed entirely
+        if (!members.contains(group.admins.first().toPhoneString()) && members.isNotEmpty()) {
+            Log.d("Loki", "Ignoring invalid closed group update message.")
+            return
+        }
         // Remove the group from the user's set of public keys to poll for if the current user was removed
         val wasCurrentUserRemoved = !members.contains(userPublicKey)
         if (wasCurrentUserRemoved) {
-            apiDB.removeAllClosedGroupEncryptionKeyPairs(groupPublicKey)
             apiDB.removeClosedGroupPublicKey(groupPublicKey)
+            // Remove the key pairs
+            apiDB.removeAllClosedGroupEncryptionKeyPairs(groupPublicKey)
             // Mark the group as inactive
             groupDB.setActive(groupID, false)
             groupDB.removeMember(groupID, Address.fromSerialized(userPublicKey))
