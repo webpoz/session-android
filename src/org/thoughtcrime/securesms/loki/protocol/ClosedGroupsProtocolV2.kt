@@ -93,19 +93,25 @@ object ClosedGroupsProtocolV2 {
     }
 
     @JvmStatic
-    public fun leave(context: Context, groupPublicKey: String) {
+    public fun leave(context: Context, groupPublicKey: String): Promise<Unit, Exception> {
         val userPublicKey = TextSecurePreferences.getLocalNumber(context)
         val groupDB = DatabaseFactory.getGroupDatabase(context)
         val groupID = doubleEncodeGroupID(groupPublicKey)
         val group = groupDB.getGroup(groupID).orNull()
         if (group == null) {
             Log.d("Loki", "Can't leave nonexistent closed group.")
-            return
+            return Promise.ofFail(Error.NoThread)
         }
         val name = group.title
         val oldMembers = group.members.map { it.serialize() }.toSet()
-        val newMembers = oldMembers.minus(userPublicKey)
-        return update(context, groupPublicKey, newMembers, name).get()
+        val newMembers: Set<String>
+        val isCurrentUserAdmin = group.admins.map { it.toPhoneString() }.contains(userPublicKey)
+        if (!isCurrentUserAdmin) {
+            newMembers = oldMembers.minus(userPublicKey)
+        } else {
+            newMembers = setOf() // If the admin leaves the group is destroyed
+        }
+        return update(context, groupPublicKey, newMembers, name)
     }
 
     public fun update(context: Context, groupPublicKey: String, members: Collection<String>, name: String): Promise<Unit, Exception> {
@@ -131,14 +137,16 @@ object ClosedGroupsProtocolV2 {
                 return@Thread deferred.reject(Error.NoKeyPair)
             }
             val removedMembers = oldMembers.minus(members)
-            if (removedMembers.contains(admins.first())) {
-                Log.d("Loki", "Can't remove admin from closed group.")
+            if (removedMembers.contains(admins.first()) && members.isNotEmpty()) {
+                Log.d("Loki", "Can't remove admin from closed group unless the group is destroyed entirely.")
                 return@Thread deferred.reject(Error.InvalidUpdate)
             }
             val isUserLeaving = removedMembers.contains(userPublicKey)
-            if (isUserLeaving && (removedMembers.count() != 1 || newMembers.isNotEmpty())) {
-                Log.d("Loki", "Can't remove self and add or remove others simultaneously.")
-                return@Thread deferred.reject(Error.InvalidUpdate)
+            if (isUserLeaving && members.isNotEmpty()) {
+                if (removedMembers.count() != 1 || newMembers.isNotEmpty()) {
+                    Log.d("Loki", "Can't remove self and add or remove others simultaneously.")
+                    return@Thread deferred.reject(Error.InvalidUpdate)
+                }
             }
             // Send the update to the group
             @Suppress("NAME_SHADOWING")

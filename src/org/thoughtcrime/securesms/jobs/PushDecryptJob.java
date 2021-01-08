@@ -287,10 +287,6 @@ public class PushDecryptJob extends BaseJob implements InjectableType {
           MultiDeviceProtocol.handleUnlinkingRequestIfNeeded(context, content);
         } else {
 
-          if (message.getClosedGroupUpdate().isPresent()) {
-            ClosedGroupsProtocol.handleSharedSenderKeysUpdate(context, message.getClosedGroupUpdate().get(), content.getSender());
-          }
-
           if (message.getClosedGroupUpdateV2().isPresent()) {
             ClosedGroupsProtocolV2.handleMessage(context, message.getClosedGroupUpdateV2().get(), envelope.getSource(), content.getSender());
           }

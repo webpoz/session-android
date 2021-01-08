@@ -20,6 +20,7 @@ import kotlinx.android.synthetic.main.activity_edit_closed_group.*
 import kotlinx.android.synthetic.main.activity_edit_closed_group.loader
 import kotlinx.android.synthetic.main.activity_linked_devices.recyclerView
 import network.loki.messenger.R
+import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.ui.failUi
 import nl.komponents.kovenant.ui.successUi
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
@@ -162,8 +163,8 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
         this.members.addAll(members)
         memberListAdapter.setMembers(members)
 
-        val userPublicKey = TextSecurePreferences.getLocalNumber(this)
-        memberListAdapter.setLockedMembers(arrayListOf(userPublicKey))
+        val admins = DatabaseFactory.getGroupDatabase(this).getGroup(groupID).get().admins.map { it.toPhoneString() }
+        memberListAdapter.setLockedMembers(admins)
 
         mainContentContainer.visibility = if (members.isEmpty()) View.GONE else View.VISIBLE
         emptyStateContainer.visibility = if (members.isEmpty()) View.VISIBLE else View.GONE
@@ -212,7 +213,7 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
     }
 
     private fun commitChanges() {
-        val hasMemberListChanges = members != originalMembers
+        val hasMemberListChanges = (members != originalMembers)
 
         if (!hasNameChanged && !hasMemberListChanges) {
             return finish()
@@ -246,10 +247,24 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
             return Toast.makeText(this, R.string.activity_edit_closed_group_too_many_group_members_error, Toast.LENGTH_LONG).show()
         }
 
+        val userPublicKey = TextSecurePreferences.getLocalNumber(this)
+        val userAsRecipient = Recipient.from(this, Address.fromSerialized(userPublicKey), false)
+
+        if (!members.contains(userAsRecipient) && members.intersect(originalMembers.minus(userAsRecipient)) != members) {
+            val message = "Can't leave while adding or removing other members."
+            return Toast.makeText(this@EditClosedGroupActivity, message, Toast.LENGTH_LONG).show()
+        }
+
         if (isSSKBasedClosedGroup) {
             isLoading = true
             loader.fadeIn()
-            ClosedGroupsProtocolV2.update(this, groupPublicKey!!, members.map { it.address.serialize() }, name).successUi {
+            val promise: Promise<Unit, Exception>
+            if (!members.contains(Recipient.from(this, Address.fromSerialized(userPublicKey), false))) {
+                promise = ClosedGroupsProtocolV2.leave(this, groupPublicKey!!)
+            } else {
+                promise = ClosedGroupsProtocolV2.update(this, groupPublicKey!!, members.map { it.address.serialize() }, name)
+            }
+            promise.successUi {
                 loader.fadeOut()
                 isLoading = false
                 finish()

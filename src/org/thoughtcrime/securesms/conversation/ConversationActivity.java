@@ -161,6 +161,7 @@ import org.thoughtcrime.securesms.loki.database.LokiThreadDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiThreadDatabaseDelegate;
 import org.thoughtcrime.securesms.loki.database.LokiUserDatabase;
 import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocol;
+import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocolV2;
 import org.thoughtcrime.securesms.loki.protocol.SessionManagementProtocol;
 import org.thoughtcrime.securesms.loki.utilities.GeneralUtilitiesKt;
 import org.thoughtcrime.securesms.loki.utilities.MentionManagerUtilities;
@@ -1201,7 +1202,7 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
       }
       try {
         if (isSSKBasedClosedGroup) {
-          ClosedGroupsProtocol.leave(this, groupPublicKey);
+          ClosedGroupsProtocolV2.leave(this, groupPublicKey);
           initializeEnabledCheck();
         } else if (ClosedGroupsProtocol.leaveLegacyGroup(this, groupRecipient)) {
           initializeEnabledCheck();
