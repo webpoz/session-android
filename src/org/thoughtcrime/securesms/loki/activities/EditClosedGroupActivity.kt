@@ -28,6 +28,7 @@ import org.thoughtcrime.securesms.database.DatabaseFactory
 import org.thoughtcrime.securesms.groups.GroupManager
 import org.thoughtcrime.securesms.loki.dialogs.ClosedGroupEditingOptionsBottomSheet
 import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocol
+import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocolV2
 import org.thoughtcrime.securesms.loki.utilities.fadeIn
 import org.thoughtcrime.securesms.loki.utilities.fadeOut
 import org.thoughtcrime.securesms.mms.GlideApp
@@ -248,13 +249,14 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
         if (isSSKBasedClosedGroup) {
             isLoading = true
             loader.fadeIn()
-            ClosedGroupsProtocol.update(this, groupPublicKey!!, members.map { it.address.serialize() }, name).successUi {
+            ClosedGroupsProtocolV2.update(this, groupPublicKey!!, members.map { it.address.serialize() }, name).successUi {
                 loader.fadeOut()
                 isLoading = false
                 finish()
             }.failUi { exception ->
                 val message = if (exception is ClosedGroupsProtocol.Error) exception.description else "An error occurred"
                 Toast.makeText(this@EditClosedGroupActivity, message, Toast.LENGTH_LONG).show()
+                loader.fadeOut()
                 isLoading = false
             }
         } else {

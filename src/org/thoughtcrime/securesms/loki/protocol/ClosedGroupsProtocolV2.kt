@@ -234,10 +234,9 @@ object ClosedGroupsProtocolV2 {
     }
 
     private fun isValid(closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2): Boolean {
-        if (closedGroupUpdate.publicKey.isEmpty) { return false }
         when (closedGroupUpdate.type) {
             SignalServiceProtos.ClosedGroupUpdateV2.Type.NEW -> {
-                return !closedGroupUpdate.name.isNullOrEmpty() && !(closedGroupUpdate.encryptionKeyPair.privateKey ?: ByteString.copyFrom(ByteArray(0))).isEmpty
+                return !closedGroupUpdate.publicKey.isEmpty && !closedGroupUpdate.name.isNullOrEmpty() && !(closedGroupUpdate.encryptionKeyPair.privateKey ?: ByteString.copyFrom(ByteArray(0))).isEmpty
                     && !(closedGroupUpdate.encryptionKeyPair.publicKey ?: ByteString.copyFrom(ByteArray(0))).isEmpty && closedGroupUpdate.membersCount > 0 && closedGroupUpdate.adminsCount > 0
             }
             SignalServiceProtos.ClosedGroupUpdateV2.Type.UPDATE -> {

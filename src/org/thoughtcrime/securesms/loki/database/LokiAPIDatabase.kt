@@ -437,7 +437,7 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
         return timestampsAndKeyPairs.sortedBy { it.first.toLong() }.map { it.second }
     }
 
-    fun getLatestClosedGroupEncryptionKeyPair(groupPublicKey: String): ECKeyPair? {
+    override fun getLatestClosedGroupEncryptionKeyPair(groupPublicKey: String): ECKeyPair? {
         return getClosedGroupEncryptionKeyPairs(groupPublicKey).lastOrNull()
     }
 
