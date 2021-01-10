@@ -33,6 +33,7 @@ import org.thoughtcrime.securesms.database.model.ThreadRecord
 import org.thoughtcrime.securesms.jobs.MultiDeviceBlockedUpdateJob
 import org.thoughtcrime.securesms.loki.dialogs.*
 import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocol
+import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocolV2
 import org.thoughtcrime.securesms.loki.protocol.SessionResetImplementation
 import org.thoughtcrime.securesms.loki.utilities.*
 import org.thoughtcrime.securesms.loki.views.ConversationView
@@ -305,13 +306,23 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
         val threadID = thread.threadId
         val recipient = thread.recipient
         val threadDB = DatabaseFactory.getThreadDatabase(this)
-        val dialogMessage = if (recipient.isGroupRecipient) R.string.activity_home_leave_group_dialog_message else R.string.activity_home_delete_conversation_dialog_message
+        val isClosedGroup = recipient.address.isClosedGroup
+        val dialogMessage: String
+        if (recipient.isGroupRecipient) {
+            val group = DatabaseFactory.getGroupDatabase(this).getGroup(recipient.address.toString()).orNull()
+            if (group != null && group.admins.map { it.toPhoneString() }.contains(TextSecurePreferences.getLocalNumber(this))) {
+                dialogMessage = "Because you are the creator of this group it will be deleted for everyone. This cannot be undone."
+            } else {
+                dialogMessage = resources.getString(R.string.activity_home_leave_group_dialog_message)
+            }
+        } else {
+            dialogMessage = resources.getString(R.string.activity_home_delete_conversation_dialog_message)
+        }
         val dialog = AlertDialog.Builder(this)
         dialog.setMessage(dialogMessage)
         dialog.setPositiveButton(R.string.yes) { _, _ -> lifecycleScope.launch(Dispatchers.Main) {
             val context = this@HomeActivity as Context
 
-            val isClosedGroup = recipient.address.isClosedGroup
             // Send a leave group message if this is an active closed group
             if (isClosedGroup && DatabaseFactory.getGroupDatabase(context).isActive(recipient.address.toGroupString())) {
                 var isSSKBasedClosedGroup: Boolean
@@ -324,7 +335,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
                     isSSKBasedClosedGroup = false
                 }
                 if (isSSKBasedClosedGroup) {
-                    ClosedGroupsProtocol.leave(context, groupPublicKey!!)
+                    ClosedGroupsProtocolV2.leave(context, groupPublicKey!!)
                 } else if (!ClosedGroupsProtocol.leaveLegacyGroup(context, recipient)) {
                     Toast.makeText(context, R.string.activity_home_leaving_group_failed_message, Toast.LENGTH_LONG).show()
                     return@launch

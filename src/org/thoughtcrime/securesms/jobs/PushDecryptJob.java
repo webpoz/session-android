@@ -66,9 +66,11 @@ import org.thoughtcrime.securesms.linkpreview.LinkPreviewUtil;
 import org.thoughtcrime.securesms.logging.Log;
 import org.thoughtcrime.securesms.loki.activities.HomeActivity;
 import org.thoughtcrime.securesms.loki.api.SessionProtocolImpl;
+import org.thoughtcrime.securesms.loki.database.LokiAPIDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiMessageDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiThreadDatabase;
 import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocol;
+import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsProtocolV2;
 import org.thoughtcrime.securesms.loki.protocol.SessionManagementProtocol;
 import org.thoughtcrime.securesms.loki.protocol.SessionMetaProtocol;
 import org.thoughtcrime.securesms.loki.protocol.SessionResetImplementation;
@@ -126,6 +128,7 @@ import org.whispersystems.signalservice.api.messages.multidevice.StickerPackOper
 import org.whispersystems.signalservice.api.messages.multidevice.VerifiedMessage;
 import org.whispersystems.signalservice.api.messages.shared.SharedContact;
 import org.whispersystems.signalservice.api.push.SignalServiceAddress;
+import org.whispersystems.signalservice.loki.api.crypto.SessionProtocol;
 import org.whispersystems.signalservice.loki.api.fileserver.FileServerAPI;
 import org.whispersystems.signalservice.loki.crypto.LokiServiceCipher;
 import org.whispersystems.signalservice.loki.protocol.mentions.MentionsManager;
@@ -260,7 +263,8 @@ public class PushDecryptJob extends BaseJob implements InjectableType {
       SignalProtocolStore  axolotlStore         = new SignalProtocolStoreImpl(context);
       SessionResetProtocol sessionResetProtocol = new SessionResetImplementation(context);
       SignalServiceAddress localAddress         = new SignalServiceAddress(TextSecurePreferences.getLocalNumber(context));
-      LokiServiceCipher    cipher               = new LokiServiceCipher(localAddress, axolotlStore, DatabaseFactory.getSSKDatabase(context), new SessionProtocolImpl(context), sessionResetProtocol, UnidentifiedAccessUtil.getCertificateValidator());
+      LokiAPIDatabase      apiDB                = DatabaseFactory.getLokiAPIDatabase(context);
+      LokiServiceCipher    cipher               = new LokiServiceCipher(localAddress, axolotlStore, DatabaseFactory.getSSKDatabase(context), new SessionProtocolImpl(context), sessionResetProtocol, apiDB, UnidentifiedAccessUtil.getCertificateValidator());
 
       SignalServiceContent content = cipher.decrypt(envelope);
 
@@ -283,8 +287,8 @@ public class PushDecryptJob extends BaseJob implements InjectableType {
           MultiDeviceProtocol.handleUnlinkingRequestIfNeeded(context, content);
         } else {
 
-          if (message.getClosedGroupUpdate().isPresent()) {
-            ClosedGroupsProtocol.handleSharedSenderKeysUpdate(context, message.getClosedGroupUpdate().get(), content.getSender());
+          if (message.getClosedGroupUpdateV2().isPresent()) {
+            ClosedGroupsProtocolV2.handleMessage(context, message.getClosedGroupUpdateV2().get(), envelope.getSource(), content.getSender());
           }
 
           if (message.isEndSession()) {
@@ -380,6 +384,8 @@ public class PushDecryptJob extends BaseJob implements InjectableType {
       Log.i(TAG, "Dropping UD message from self.");
     } catch (IOException e) {
       Log.i(TAG, "IOException during message decryption.");
+    } catch (SessionProtocol.Exception e) {
+      Log.i(TAG, "Couldn't handle message due to error: " + e.getDescription());
     }
   }
 

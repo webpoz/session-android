@@ -24,7 +24,6 @@ import org.thoughtcrime.securesms.database.GroupDatabase;
 import org.thoughtcrime.securesms.database.GroupReceiptDatabase;
 import org.thoughtcrime.securesms.database.IdentityDatabase;
 import org.thoughtcrime.securesms.database.JobDatabase;
-import org.thoughtcrime.securesms.loki.database.LokiBackupFilesDatabase;
 import org.thoughtcrime.securesms.database.MmsDatabase;
 import org.thoughtcrime.securesms.database.OneTimePreKeyDatabase;
 import org.thoughtcrime.securesms.database.PushDatabase;
@@ -38,12 +37,14 @@ import org.thoughtcrime.securesms.database.ThreadDatabase;
 import org.thoughtcrime.securesms.jobs.RefreshPreKeysJob;
 import org.thoughtcrime.securesms.logging.Log;
 import org.thoughtcrime.securesms.loki.database.LokiAPIDatabase;
+import org.thoughtcrime.securesms.loki.database.LokiBackupFilesDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiMessageDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiPreKeyBundleDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiPreKeyRecordDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiThreadDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiUserDatabase;
 import org.thoughtcrime.securesms.loki.database.SharedSenderKeysDatabase;
+import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsMigration;
 import org.thoughtcrime.securesms.notifications.NotificationChannels;
 import org.thoughtcrime.securesms.service.KeyCachingService;
 import org.thoughtcrime.securesms.util.GroupUtil;
@@ -95,8 +96,9 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
   private static final int lokiV16                          = 37;
   private static final int lokiV17                          = 38;
   private static final int lokiV18_CLEAR_BG_POLL_JOBS       = 39;
+  private static final int lokiV19                          = 40;
 
-  private static final int    DATABASE_VERSION = lokiV18_CLEAR_BG_POLL_JOBS; // Loki - onUpgrade(...) must be updated to use Loki version numbers if Signal makes any database changes
+  private static final int    DATABASE_VERSION = lokiV19;
   private static final String DATABASE_NAME    = "signal.db";
 
   private final Context        context;
@@ -159,6 +161,8 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
     db.execSQL(LokiAPIDatabase.getCreateSessionRequestProcessedTimestampTableCommand());
     db.execSQL(LokiAPIDatabase.getCreateOpenGroupPublicKeyTableCommand());
     db.execSQL(LokiAPIDatabase.getCreateOpenGroupProfilePictureTableCommand());
+    db.execSQL(LokiAPIDatabase.getCreateClosedGroupEncryptionKeyPairsTable());
+    db.execSQL(LokiAPIDatabase.getCreateClosedGroupPublicKeysTable());
     db.execSQL(LokiPreKeyBundleDatabase.getCreateTableCommand());
     db.execSQL(LokiPreKeyRecordDatabase.getCreateTableCommand());
     db.execSQL(LokiMessageDatabase.getCreateMessageIDTableCommand());
@@ -649,6 +653,12 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
         // BackgroundPollJob was replaced with BackgroundPollWorker. Clear all the scheduled job records.
         db.execSQL("DELETE FROM job_spec WHERE factory_key = 'BackgroundPollJob'");
         db.execSQL("DELETE FROM constraint_spec WHERE factory_key = 'BackgroundPollJob'");
+      }
+
+      if (oldVersion < lokiV19) {
+        db.execSQL(LokiAPIDatabase.getCreateClosedGroupEncryptionKeyPairsTable());
+        db.execSQL(LokiAPIDatabase.getCreateClosedGroupPublicKeysTable());
+        ClosedGroupsMigration.INSTANCE.perform(db);
       }
 
       db.setTransactionSuccessful();
