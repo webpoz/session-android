@@ -39,8 +39,8 @@ object ClosedGroupsMigration {
         for (keyPair in keyPairs) {
             // In this particular case keyPair.publicKey == groupPublicKey
             val timestamp = Date().time.toString()
+            val index = "${keyPair.publicKey.serialize().toHexString()}-$timestamp"
             val encryptionKeyPairPublicKey = keyPair.publicKey.serialize().toHexString().removing05PrefixIfNeeded()
-            val index = "$encryptionKeyPairPublicKey-$timestamp"
             val encryptionKeyPairPrivateKey = keyPair.privateKey.serialize().toHexString()
             val row = ContentValues(3)
             row.put(LokiAPIDatabase.closedGroupsEncryptionKeyPairIndex, index)
