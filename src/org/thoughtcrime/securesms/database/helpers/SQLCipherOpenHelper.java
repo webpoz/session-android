@@ -24,7 +24,6 @@ import org.thoughtcrime.securesms.database.GroupDatabase;
 import org.thoughtcrime.securesms.database.GroupReceiptDatabase;
 import org.thoughtcrime.securesms.database.IdentityDatabase;
 import org.thoughtcrime.securesms.database.JobDatabase;
-import org.thoughtcrime.securesms.loki.database.LokiBackupFilesDatabase;
 import org.thoughtcrime.securesms.database.MmsDatabase;
 import org.thoughtcrime.securesms.database.OneTimePreKeyDatabase;
 import org.thoughtcrime.securesms.database.PushDatabase;
@@ -38,12 +37,14 @@ import org.thoughtcrime.securesms.database.ThreadDatabase;
 import org.thoughtcrime.securesms.jobs.RefreshPreKeysJob;
 import org.thoughtcrime.securesms.logging.Log;
 import org.thoughtcrime.securesms.loki.database.LokiAPIDatabase;
+import org.thoughtcrime.securesms.loki.database.LokiBackupFilesDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiMessageDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiPreKeyBundleDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiPreKeyRecordDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiThreadDatabase;
 import org.thoughtcrime.securesms.loki.database.LokiUserDatabase;
 import org.thoughtcrime.securesms.loki.database.SharedSenderKeysDatabase;
+import org.thoughtcrime.securesms.loki.protocol.ClosedGroupsMigration;
 import org.thoughtcrime.securesms.notifications.NotificationChannels;
 import org.thoughtcrime.securesms.service.KeyCachingService;
 import org.thoughtcrime.securesms.util.GroupUtil;
@@ -657,6 +658,7 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
       if (oldVersion < lokiV19) {
         db.execSQL(LokiAPIDatabase.getCreateClosedGroupEncryptionKeyPairsTable());
         db.execSQL(LokiAPIDatabase.getCreateClosedGroupPublicKeysTable());
+        ClosedGroupsMigration.INSTANCE.perform(db);
       }
 
       db.setTransactionSuccessful();

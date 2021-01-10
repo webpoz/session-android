@@ -88,14 +88,14 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
         private val openGroupProfilePicture = "open_group_avatar"
         @JvmStatic val createOpenGroupProfilePictureTableCommand = "CREATE TABLE $openGroupProfilePictureTable ($publicChatID STRING PRIMARY KEY, $openGroupProfilePicture TEXT NULLABLE DEFAULT NULL);"
         // Closed groups (V2)
-        private val closedGroupEncryptionKeyPairsTable = "closed_group_encryption_key_pairs_table"
-        private val closedGroupsEncryptionKeyPairIndex = "closed_group_encryption_key_pair_index"
-        private val encryptionKeyPairPublicKey = "encryption_key_pair_public_key"
-        private val encryptionKeyPairPrivateKey = "encryption_key_pair_private_key"
+        public val closedGroupEncryptionKeyPairsTable = "closed_group_encryption_key_pairs_table"
+        public val closedGroupsEncryptionKeyPairIndex = "closed_group_encryption_key_pair_index"
+        public val encryptionKeyPairPublicKey = "encryption_key_pair_public_key"
+        public val encryptionKeyPairPrivateKey = "encryption_key_pair_private_key"
         @JvmStatic
         val createClosedGroupEncryptionKeyPairsTable = "CREATE TABLE $closedGroupEncryptionKeyPairsTable ($closedGroupsEncryptionKeyPairIndex STRING PRIMARY KEY, $encryptionKeyPairPublicKey STRING, $encryptionKeyPairPrivateKey STRING)"
-        private val closedGroupPublicKeysTable = "closed_group_public_keys_table"
-        private val groupPublicKey = "group_public_key"
+        public val closedGroupPublicKeysTable = "closed_group_public_keys_table"
+        public val groupPublicKey = "group_public_key"
         @JvmStatic
         val createClosedGroupPublicKeysTable = "CREATE TABLE $closedGroupPublicKeysTable ($groupPublicKey STRING PRIMARY KEY)"
 
