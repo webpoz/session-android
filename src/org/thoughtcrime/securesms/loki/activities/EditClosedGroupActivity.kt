@@ -3,6 +3,7 @@ package org.thoughtcrime.securesms.loki.activities
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.loader.app.LoaderManager
 import androidx.loader.content.Loader
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -163,7 +164,8 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
         this.members.addAll(members)
         memberListAdapter.setMembers(members)
 
-        val admins = DatabaseFactory.getGroupDatabase(this).getGroup(groupID).get().admins.map { it.toPhoneString() }
+        val admins = DatabaseFactory.getGroupDatabase(this).getGroup(groupID).get().admins.map { it.toPhoneString() }.toMutableSet()
+        admins.remove(TextSecurePreferences.getLocalNumber(this))
         memberListAdapter.setLockedMembers(admins)
 
         mainContentContainer.visibility = if (members.isEmpty()) View.GONE else View.VISIBLE
@@ -250,7 +252,7 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
         val userPublicKey = TextSecurePreferences.getLocalNumber(this)
         val userAsRecipient = Recipient.from(this, Address.fromSerialized(userPublicKey), false)
 
-        if (!members.contains(userAsRecipient) && members.intersect(originalMembers.minus(userAsRecipient)) != members) {
+        if (!members.contains(userAsRecipient) && !members.map { it.address.toPhoneString() }.containsAll(originalMembers.minus(userPublicKey))) {
             val message = "Can't leave while adding or removing other members."
             return Toast.makeText(this@EditClosedGroupActivity, message, Toast.LENGTH_LONG).show()
         }

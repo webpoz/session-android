@@ -1188,7 +1188,18 @@ public class ConversationActivity extends PassphraseRequiredActionBarActivity
     builder.setTitle(getString(R.string.ConversationActivity_leave_group));
     builder.setIconAttribute(R.attr.dialog_info_icon);
     builder.setCancelable(true);
-    builder.setMessage(getString(R.string.ConversationActivity_are_you_sure_you_want_to_leave_this_group));
+
+    GroupRecord group = DatabaseFactory.getGroupDatabase(this).getGroup(getRecipient().getAddress().toGroupString()).orNull();
+    List<Address> admins = group.getAdmins();
+    String userPublicKey = TextSecurePreferences.getLocalNumber(this);
+    String message = getString(R.string.ConversationActivity_are_you_sure_you_want_to_leave_this_group);
+    for (Address admin : admins) {
+      if (admin.toPhoneString().equals(userPublicKey)) {
+        message = "Because you are the creator of this group it will be deleted for everyone. This cannot be undone.";
+      }
+    }
+
+    builder.setMessage(message);
     builder.setPositiveButton(R.string.yes, (dialog, which) -> {
       Recipient groupRecipient = getRecipient();
       String groupPublicKey;
