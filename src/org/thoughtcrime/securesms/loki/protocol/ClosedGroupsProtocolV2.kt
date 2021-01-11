@@ -229,11 +229,11 @@ object ClosedGroupsProtocolV2 {
     }
 
     @JvmStatic
-    public fun handleMessage(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, groupPublicKey: String, senderPublicKey: String) {
+    public fun handleMessage(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
         if (!isValid(closedGroupUpdate)) { return; }
         when (closedGroupUpdate.type) {
             SignalServiceProtos.ClosedGroupUpdateV2.Type.NEW -> handleNewClosedGroup(context, closedGroupUpdate, senderPublicKey)
-            SignalServiceProtos.ClosedGroupUpdateV2.Type.UPDATE -> handleClosedGroupUpdate(context, closedGroupUpdate, groupPublicKey, senderPublicKey)
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.UPDATE -> handleClosedGroupUpdate(context, closedGroupUpdate, sentTimestamp, groupPublicKey, senderPublicKey)
             SignalServiceProtos.ClosedGroupUpdateV2.Type.ENCRYPTION_KEY_PAIR -> handleGroupEncryptionKeyPair(context, closedGroupUpdate, groupPublicKey, senderPublicKey)
             else -> {
                 // Do nothing
@@ -288,7 +288,7 @@ object ClosedGroupsProtocolV2 {
         LokiPushNotificationManager.performOperation(context, ClosedGroupOperation.Subscribe, groupPublicKey, userPublicKey)
     }
 
-    public fun handleClosedGroupUpdate(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, groupPublicKey: String, senderPublicKey: String) {
+    public fun handleClosedGroupUpdate(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
         // Prepare
         val userPublicKey = TextSecurePreferences.getLocalNumber(context)
         val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
@@ -304,6 +304,11 @@ object ClosedGroupsProtocolV2 {
         }
         val oldMembers = group.members.map { it.serialize() }
         val newMembers = members.toSet().minus(oldMembers)
+        // Check that the message isn't from before the group was created
+        if (group.createdAt > sentTimestamp) {
+            Log.d("Loki", "Ignoring closed group update from before thread was created.")
+            return
+        }
         // Check that the sender is a member of the group (before the update)
         if (!oldMembers.contains(senderPublicKey)) {
             Log.d("Loki", "Ignoring closed group info message from non-member.")
