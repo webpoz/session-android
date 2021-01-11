@@ -187,13 +187,8 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
 
     private fun showKeyPairMigrationSheetIfNeeded() {
         if (KeyPairUtilities.hasV2KeyPair(this)) { return }
-        val lastNudge = TextSecurePreferences.getLastKeyPairMigrationNudge(this)
-        val nudgeInterval: Long = 3 * 24 * 60 * 60 * 1000 // 3 days
-        val nudge = (Date().time - lastNudge > nudgeInterval)
-        if (!nudge) { return }
         val keyPairMigrationSheet = KeyPairMigrationBottomSheet()
         keyPairMigrationSheet.show(supportFragmentManager, keyPairMigrationSheet.tag)
-        TextSecurePreferences.setLastKeyPairMigrationNudge(this, Date().time)
     }
 
     private fun showKeyPairMigrationSuccessSheetIfNeeded() {

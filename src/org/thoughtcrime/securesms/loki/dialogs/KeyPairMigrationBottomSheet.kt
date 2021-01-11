@@ -23,31 +23,22 @@ class KeyPairMigrationBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         upgradeNowButton.setOnClickListener { upgradeNow() }
-        upgradeLaterButton.setOnClickListener { dismiss() }
     }
 
     override fun onCreateDialog(savedInstanceState: Bundle?): Dialog {
         val dialog = super.onCreateDialog(savedInstanceState)
-        // Expand the bottom sheet by default
         dialog.setOnShowListener {
             val d = dialog as BottomSheetDialog
-            val bottomSheet = d.findViewById<FrameLayout>(com.google.android.material.R.id.design_bottom_sheet)
-            BottomSheetBehavior.from(bottomSheet!!).setState(BottomSheetBehavior.STATE_EXPANDED);
+            val bottomSheet = d.findViewById<FrameLayout>(com.google.android.material.R.id.design_bottom_sheet)!!
+            BottomSheetBehavior.from(bottomSheet).state = BottomSheetBehavior.STATE_EXPANDED
+            BottomSheetBehavior.from(bottomSheet).isHideable = false
         }
+        isCancelable = false
         return dialog
     }
 
     private fun upgradeNow() {
         val applicationContext = requireContext().applicationContext as ApplicationContext
-        dismiss()
-        val dialog = AlertDialog.Builder(requireContext())
-        dialog.setMessage("You’re upgrading to a new Session ID. This will give you improved privacy and security, but it will clear ALL app data. Contacts and conversations will be lost. Proceed?")
-        dialog.setPositiveButton(R.string.yes) { _, _ ->
-            applicationContext.clearAllData(true)
-        }
-        dialog.setNegativeButton(R.string.cancel) { _, _ ->
-            // Do nothing
-        }
-        dialog.create().show()
+        applicationContext.clearAllData(true)
     }
 }
