@@ -1,15 +1,12 @@
 package org.thoughtcrime.securesms.loki.utilities
 
-import android.app.Activity
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import com.goterl.lazycode.lazysodium.LazySodiumAndroid
 import com.goterl.lazycode.lazysodium.SodiumAndroid
 import com.goterl.lazycode.lazysodium.utils.Key
 import com.goterl.lazycode.lazysodium.utils.KeyPair
-import kotlinx.android.synthetic.main.activity_pn_mode.*
 import org.thoughtcrime.securesms.ApplicationContext
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil
 import org.thoughtcrime.securesms.database.Address
@@ -25,7 +22,6 @@ import org.whispersystems.libsignal.ecc.DjbECPublicKey
 import org.whispersystems.libsignal.ecc.ECKeyPair
 import org.whispersystems.libsignal.util.KeyHelper
 import org.whispersystems.signalservice.loki.utilities.hexEncodedPublicKey
-import org.whispersystems.signalservice.loki.utilities.toHexString
 
 object KeyPairUtilities {
 
@@ -66,10 +62,10 @@ object KeyPairUtilities {
     }
 
     fun getUserED25519KeyPair(context: Context): KeyPair? {
-        val hexEncodedED25519PublicKey = IdentityKeyUtil.retrieve(context, IdentityKeyUtil.ED25519_PUBLIC_KEY) ?: return null
-        val hexEncodedED25519SecretKey = IdentityKeyUtil.retrieve(context, IdentityKeyUtil.ED25519_SECRET_KEY) ?: return null
-        val ed25519PublicKey = Key.fromBase64String(hexEncodedED25519PublicKey)
-        val ed25519SecretKey = Key.fromBase64String(hexEncodedED25519SecretKey)
+        val base64EncodedED25519PublicKey = IdentityKeyUtil.retrieve(context, IdentityKeyUtil.ED25519_PUBLIC_KEY) ?: return null
+        val base64EncodedED25519SecretKey = IdentityKeyUtil.retrieve(context, IdentityKeyUtil.ED25519_SECRET_KEY) ?: return null
+        val ed25519PublicKey = Key.fromBytes(Base64.decode(base64EncodedED25519PublicKey))
+        val ed25519SecretKey = Key.fromBytes(Base64.decode(base64EncodedED25519SecretKey))
         return KeyPair(ed25519PublicKey, ed25519SecretKey)
     }
 
