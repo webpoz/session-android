@@ -42,7 +42,7 @@ import java.util.*
 import kotlin.jvm.Throws
 
 object ClosedGroupsProtocolV2 {
-    val groupSizeLimit = 20
+    const val groupSizeLimit = 100
 
     sealed class Error(val description: String) : Exception() {
         object NoThread : Error("Couldn't find a thread associated with the given group public key")
