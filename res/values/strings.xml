@@ -5,6 +5,7 @@
     <string name="yes">Yes</string>
     <string name="no">No</string>
     <string name="delete">Delete</string>
+    <string name="ban">Ban</string>
     <string name="please_wait">Please wait...</string>
     <string name="save">Save</string>
     <string name="note_to_self">Note to Self</string>
@@ -206,6 +207,7 @@
         <item quantity="one">This will permanently delete the selected message.</item>
         <item quantity="other">This will permanently delete all %1$d selected messages.</item>
     </plurals>
+    <string name="ConversationFragment_ban_selected_user">Ban this user?</string>
     <string name="ConversationFragment_save_to_sd_card">Save to storage?</string>
     <plurals name="ConversationFragment_saving_n_media_to_storage_warning">
         <item quantity="one">Saving this media to storage will allow any other apps on your device to access it.\n\nContinue?</item>
@@ -230,6 +232,8 @@
     <string name="ConversationFragment_sms">SMS</string>
     <string name="ConversationFragment_deleting">Deleting</string>
     <string name="ConversationFragment_deleting_messages">Deleting messages...</string>
+    <string name="ConversationFragment_banning">Banning</string>
+    <string name="ConversationFragment_banning_user">Banning user…</string>
     <string name="ConversationFragment_quoted_message_not_found">Original message not found</string>
     <string name="ConversationFragment_quoted_message_no_longer_available">Original message no longer available</string>
 
@@ -1340,6 +1344,7 @@
     <string name="conversation_context__menu_message_details">Message details</string>
     <string name="conversation_context__menu_copy_text">Copy text</string>
     <string name="conversation_context__menu_delete_message">Delete message</string>
+    <string name="conversation_context__menu_ban_user">Ban user</string>
     <string name="conversation_context__menu_forward_message">Forward message</string>
     <string name="conversation_context__menu_resend_message">Resend message</string>
     <string name="conversation_context__menu_reply_to_message">Reply to message</string>
