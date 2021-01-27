@@ -7,7 +7,6 @@ import android.content.IntentFilter
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import android.util.Log
 import com.opencsv.CSVReader
-import org.apache.commons.net.util.SubnetUtils
 import org.whispersystems.signalservice.loki.api.onionrequests.OnionRequestAPI
 import org.whispersystems.signalservice.loki.utilities.ThreadUtils
 import java.io.File
@@ -18,6 +17,11 @@ class IP2Country private constructor(private val context: Context) {
     private val pathsBuiltEventReceiver: BroadcastReceiver
     val countryNamesCache = mutableMapOf<String, String>()
 
+    private fun Ipv4Int(ip:String) = ip.takeWhile { it != '/' }.split('.').foldIndexed(0L) { i, acc, s ->
+        val asInt = s.toLong()
+        acc + (asInt shl (8 * (3-i)))
+    }
+
     private val ipv4ToCountry by lazy {
         val file = loadFile("geolite2_country_blocks_ipv4.csv")
         val csv = CSVReader(FileReader(file.absoluteFile)).apply {
@@ -25,9 +29,8 @@ class IP2Country private constructor(private val context: Context) {
         }
 
         csv.readAll()
-            .filter { cols -> !cols[1].isNullOrBlank() }
             .associate { cols ->
-                SubnetUtils(cols[0]) to cols[1].toInt()
+                Ipv4Int(cols[0]) to cols[1].toIntOrNull()
             }
     }
 
@@ -94,15 +97,17 @@ class IP2Country private constructor(private val context: Context) {
 
         val comps = ipv4ToCountry.asSequence()
 
-        val bestMatchIp = comps.firstOrNull { (subnet, _) ->
-            subnet.info.isInRange(ip)
-        }?.let { (_, code) ->
-            countryToNames[code]
+        val bestMatchCountry = comps.lastOrNull { it.key <= Ipv4Int(ip)  }?.let { (_, code) ->
+            if (code != null) {
+                countryToNames[code]
+            } else {
+                null
+            }
         }
 
-        if (bestMatchIp != null) {
-            countryNamesCache[ip] = bestMatchIp
-            return bestMatchIp
+        if (bestMatchCountry != null) {
+            countryNamesCache[ip] = bestMatchCountry
+            return bestMatchCountry
         } else {
             Log.d("Loki","Country name for $ip couldn't be found")
         }
