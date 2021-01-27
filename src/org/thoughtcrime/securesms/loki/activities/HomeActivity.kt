@@ -49,6 +49,7 @@ import org.whispersystems.signalservice.loki.protocol.meta.SessionMetaProtocol
 import org.whispersystems.signalservice.loki.protocol.sessionmanagement.SessionManagementProtocol
 import org.whispersystems.signalservice.loki.protocol.shelved.multidevice.MultiDeviceProtocol
 import org.whispersystems.signalservice.loki.protocol.shelved.syncmessages.SyncMessagesProtocol
+import org.whispersystems.signalservice.loki.utilities.ThreadUtils
 import org.whispersystems.signalservice.loki.utilities.toHexString
 import java.io.IOException
 import java.util.*
@@ -269,14 +270,14 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
             .setMessage(R.string.RecipientPreferenceActivity_you_will_no_longer_receive_messages_and_calls_from_this_contact)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.RecipientPreferenceActivity_block) { dialog, _ ->
-                Thread {
+                ThreadUtils.queue {
                     DatabaseFactory.getRecipientDatabase(this).setBlocked(thread.recipient, true)
                     ApplicationContext.getInstance(this).jobManager.add(MultiDeviceBlockedUpdateJob())
                     Util.runOnMain {
                         recyclerView.adapter!!.notifyDataSetChanged()
                         dialog.dismiss()
                     }
-                }.start()
+                }
             }.show()
     }
 
@@ -286,14 +287,14 @@ class HomeActivity : PassphraseRequiredActionBarActivity, ConversationClickListe
             .setMessage(R.string.RecipientPreferenceActivity_you_will_once_again_be_able_to_receive_messages_and_calls_from_this_contact)
             .setNegativeButton(android.R.string.cancel, null)
             .setPositiveButton(R.string.RecipientPreferenceActivity_unblock) { dialog, _ ->
-                Thread {
+                ThreadUtils.queue {
                     DatabaseFactory.getRecipientDatabase(this).setBlocked(thread.recipient, false)
                     ApplicationContext.getInstance(this).jobManager.add(MultiDeviceBlockedUpdateJob())
                     Util.runOnMain {
                         recyclerView.adapter!!.notifyDataSetChanged()
                         dialog.dismiss()
                     }
-                }.start()
+                }
             }.show()
     }
 

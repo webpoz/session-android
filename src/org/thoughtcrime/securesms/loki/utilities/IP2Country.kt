@@ -7,7 +7,9 @@ import android.content.IntentFilter
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import android.util.Log
 import com.opencsv.CSVReader
+import org.apache.commons.net.util.SubnetUtils
 import org.whispersystems.signalservice.loki.api.onionrequests.OnionRequestAPI
+import org.whispersystems.signalservice.loki.utilities.ThreadUtils
 import java.io.File
 import java.io.FileOutputStream
 import java.io.FileReader
@@ -16,12 +18,29 @@ class IP2Country private constructor(private val context: Context) {
     private val pathsBuiltEventReceiver: BroadcastReceiver
     val countryNamesCache = mutableMapOf<String, String>()
 
-    private val ipv4Table by lazy {
-        loadFile("geolite2_country_blocks_ipv4.csv")
+    private val ipv4ToCountry by lazy {
+        val file = loadFile("geolite2_country_blocks_ipv4.csv")
+        val csv = CSVReader(FileReader(file.absoluteFile)).apply {
+            skip(1)
+        }
+
+        csv.readAll()
+            .filter { cols -> !cols[1].isNullOrBlank() }
+            .associate { cols ->
+                SubnetUtils(cols[0]) to cols[1].toInt()
+            }
     }
 
-    private val countryNamesTable by lazy {
-        loadFile("geolite2_country_locations_english.csv")
+    private val countryToNames by lazy {
+        val file = loadFile("geolite2_country_locations_english.csv")
+        val csv = CSVReader(FileReader(file.absoluteFile)).apply {
+            skip(1)
+        }
+        csv.readAll()
+            .filter { cols -> !cols[0].isNullOrEmpty() && !cols[1].isNullOrEmpty() }
+            .associate { cols ->
+                cols[0].toInt() to cols[5]
+            }
     }
 
     // region Initialization
@@ -40,7 +59,6 @@ class IP2Country private constructor(private val context: Context) {
     init {
         populateCacheIfNeeded()
         pathsBuiltEventReceiver = object : BroadcastReceiver() {
-
             override fun onReceive(context: Context, intent: Intent) {
                 populateCacheIfNeeded()
             }
@@ -69,51 +87,38 @@ class IP2Country private constructor(private val context: Context) {
         return file
     }
 
-    private fun cacheCountryForIP(ip: String): String {
-        var truncatedIP = ip
-        fun getCountryInternal(): String {
-            val country = countryNamesCache[ip]
-            if (country != null) { return country }
-            val ipv4TableReader = CSVReader(FileReader(ipv4Table.absoluteFile))
-            val countryNamesTableReader = CSVReader(FileReader(countryNamesTable.absoluteFile))
-            var ipv4TableLine = ipv4TableReader.readNext()
-            while (ipv4TableLine != null) {
-                if (!ipv4TableLine[0].startsWith(truncatedIP)) {
-                    ipv4TableLine = ipv4TableReader.readNext()
-                    continue
-                }
-                val countryID = ipv4TableLine[1]
-                var countryNamesTableLine = countryNamesTableReader.readNext()
-                while (countryNamesTableLine != null) {
-                    if (countryNamesTableLine[0] != countryID) {
-                        countryNamesTableLine = countryNamesTableReader.readNext()
-                        continue
-                    }
-                    @Suppress("NAME_SHADOWING") val country = countryNamesTableLine[5]
-                    countryNamesCache[ip] = country
-                    return country
-                }
-            }
-            if (truncatedIP.contains(".") && !truncatedIP.endsWith(".")) { // The fuzziest we want to go is xxx.x
-                truncatedIP = truncatedIP.dropLast(1)
-                if (truncatedIP.endsWith(".")) { truncatedIP = truncatedIP.dropLast(1) }
-                return getCountryInternal()
-            } else {
-                return "Unknown Country"
-            }
+    private fun cacheCountryForIP(ip: String): String? {
+
+        // return early if cached
+        countryNamesCache[ip]?.let { return it }
+
+        val comps = ipv4ToCountry.asSequence()
+
+        val bestMatchIp = comps.firstOrNull { (subnet, _) ->
+            subnet.info.isInRange(ip)
+        }?.let { (_, code) ->
+            countryToNames[code]
         }
-        return getCountryInternal()
+
+        if (bestMatchIp != null) {
+            countryNamesCache[ip] = bestMatchIp
+            return bestMatchIp
+        } else {
+            Log.d("Loki","Country name for $ip couldn't be found")
+        }
+        return null
     }
 
     private fun populateCacheIfNeeded() {
-        Thread {
-            val path = OnionRequestAPI.paths.firstOrNull() ?: return@Thread
-            path.forEach { snode ->
-                cacheCountryForIP(snode.ip) // Preload if needed
+        ThreadUtils.queue {
+            OnionRequestAPI.paths.forEach { path ->
+                path.forEach { snode ->
+                    cacheCountryForIP(snode.ip) // Preload if needed
+                }
             }
             Broadcaster(context).broadcast("onionRequestPathCountriesLoaded")
             Log.d("Loki", "Finished preloading onion request path countries.")
-        }.start()
+        }
     }
     // endregion
 }
