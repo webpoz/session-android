@@ -11,6 +11,7 @@ import org.thoughtcrime.securesms.loki.api.PublicChatManager;
 import org.thoughtcrime.securesms.recipients.Recipient;
 import org.thoughtcrime.securesms.util.Debouncer;
 import org.whispersystems.signalservice.loki.api.Poller;
+import org.whispersystems.signalservice.loki.utilities.ThreadUtils;
 
 import java.util.concurrent.TimeUnit;
 
@@ -123,7 +124,7 @@ public class OptimizedMessageNotifier implements MessageNotifier {
 
   private void performOnBackgroundThreadIfNeeded(Runnable r) {
     if (Looper.myLooper() == Looper.getMainLooper()) {
-      new Thread(r).start();
+      ThreadUtils.queue(r);
     } else {
       r.run();
     }

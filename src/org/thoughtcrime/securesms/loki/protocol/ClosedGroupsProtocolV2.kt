@@ -11,12 +11,10 @@ import org.thoughtcrime.securesms.database.DatabaseFactory
 import org.thoughtcrime.securesms.loki.api.LokiPushNotificationManager
 import org.thoughtcrime.securesms.loki.api.LokiPushNotificationManager.ClosedGroupOperation
 import org.thoughtcrime.securesms.loki.api.SessionProtocolImpl
-import org.thoughtcrime.securesms.loki.utilities.recipient
 import org.thoughtcrime.securesms.mms.OutgoingGroupMediaMessage
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.sms.IncomingGroupMessage
 import org.thoughtcrime.securesms.sms.IncomingTextMessage
-import org.thoughtcrime.securesms.sms.MessageSender
 import org.thoughtcrime.securesms.util.GroupUtil
 import org.thoughtcrime.securesms.util.Hex
 import org.thoughtcrime.securesms.util.TextSecurePreferences
@@ -29,11 +27,7 @@ import org.whispersystems.signalservice.api.messages.SignalServiceGroup
 import org.whispersystems.signalservice.api.messages.SignalServiceGroup.GroupType
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.GroupContext
-import org.whispersystems.signalservice.loki.protocol.closedgroups.ClosedGroupRatchet
-import org.whispersystems.signalservice.loki.protocol.closedgroups.ClosedGroupRatchetCollectionType
-import org.whispersystems.signalservice.loki.protocol.closedgroups.ClosedGroupSenderKey
-import org.whispersystems.signalservice.loki.protocol.closedgroups.SharedSenderKeysImplementation
-import org.whispersystems.signalservice.loki.utilities.hexEncodedPrivateKey
+import org.whispersystems.signalservice.loki.utilities.ThreadUtils
 import org.whispersystems.signalservice.loki.utilities.hexEncodedPublicKey
 import org.whispersystems.signalservice.loki.utilities.removing05PrefixIfNeeded
 import org.whispersystems.signalservice.loki.utilities.toHexString
@@ -52,7 +46,7 @@ object ClosedGroupsProtocolV2 {
 
     public fun createClosedGroup(context: Context, name: String, members: Collection<String>): Promise<String, Exception> {
         val deferred = deferred<String, Exception>()
-        Thread {
+        ThreadUtils.queue {
             // Prepare
             val userPublicKey = TextSecurePreferences.getLocalNumber(context)
             val membersAsData = members.map { Hex.fromStringCondensed(it) }
@@ -87,7 +81,7 @@ object ClosedGroupsProtocolV2 {
             LokiPushNotificationManager.performOperation(context, ClosedGroupOperation.Subscribe, groupPublicKey, userPublicKey)
             // Fulfill the promise
             deferred.resolve(groupID)
-        }.start()
+        }
         // Return
         return deferred.promise
     }
@@ -116,7 +110,7 @@ object ClosedGroupsProtocolV2 {
 
     public fun update(context: Context, groupPublicKey: String, members: Collection<String>, name: String): Promise<Unit, Exception> {
         val deferred = deferred<Unit, Exception>()
-        Thread {
+        ThreadUtils.queue {
             val userPublicKey = TextSecurePreferences.getLocalNumber(context)
             val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
             val groupDB = DatabaseFactory.getGroupDatabase(context)
@@ -124,7 +118,7 @@ object ClosedGroupsProtocolV2 {
             val group = groupDB.getGroup(groupID).orNull()
             if (group == null) {
                 Log.d("Loki", "Can't update nonexistent closed group.")
-                return@Thread deferred.reject(Error.NoThread)
+                return@queue deferred.reject(Error.NoThread)
             }
             val oldMembers = group.members.map { it.serialize() }.toSet()
             val newMembers = members.minus(oldMembers)
@@ -134,18 +128,18 @@ object ClosedGroupsProtocolV2 {
             val encryptionKeyPair = apiDB.getLatestClosedGroupEncryptionKeyPair(groupPublicKey)
             if (encryptionKeyPair == null) {
                 Log.d("Loki", "Couldn't get encryption key pair for closed group.")
-                return@Thread deferred.reject(Error.NoKeyPair)
+                return@queue deferred.reject(Error.NoKeyPair)
             }
             val removedMembers = oldMembers.minus(members)
             if (removedMembers.contains(admins.first()) && members.isNotEmpty()) {
                 Log.d("Loki", "Can't remove admin from closed group unless the group is destroyed entirely.")
-                return@Thread deferred.reject(Error.InvalidUpdate)
+                return@queue deferred.reject(Error.InvalidUpdate)
             }
             val isUserLeaving = removedMembers.contains(userPublicKey)
             if (isUserLeaving && members.isNotEmpty()) {
                 if (removedMembers.count() != 1 || newMembers.isNotEmpty()) {
                     Log.d("Loki", "Can't remove self and add or remove others simultaneously.")
-                    return@Thread deferred.reject(Error.InvalidUpdate)
+                    return@queue deferred.reject(Error.InvalidUpdate)
                 }
             }
             // Send the update to the group
@@ -191,7 +185,7 @@ object ClosedGroupsProtocolV2 {
             val threadID = DatabaseFactory.getThreadDatabase(context).getOrCreateThreadIdFor(Recipient.from(context, Address.fromSerialized(groupID), false))
             insertOutgoingInfoMessage(context, groupID, infoType, name, members, admins, threadID)
             deferred.resolve(Unit)
-        }.start()
+        }
         return deferred.promise
     }
 
