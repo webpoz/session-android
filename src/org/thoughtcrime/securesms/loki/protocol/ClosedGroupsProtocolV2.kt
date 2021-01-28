@@ -8,15 +8,15 @@ import nl.komponents.kovenant.deferred
 import org.thoughtcrime.securesms.ApplicationContext
 import org.thoughtcrime.securesms.database.Address
 import org.thoughtcrime.securesms.database.DatabaseFactory
+import org.thoughtcrime.securesms.database.GroupDatabase
 import org.thoughtcrime.securesms.loki.api.LokiPushNotificationManager
 import org.thoughtcrime.securesms.loki.api.LokiPushNotificationManager.ClosedGroupOperation
 import org.thoughtcrime.securesms.loki.api.SessionProtocolImpl
-import org.thoughtcrime.securesms.loki.utilities.recipient
+import org.thoughtcrime.securesms.loki.database.LokiAPIDatabase
 import org.thoughtcrime.securesms.mms.OutgoingGroupMediaMessage
 import org.thoughtcrime.securesms.recipients.Recipient
 import org.thoughtcrime.securesms.sms.IncomingGroupMessage
 import org.thoughtcrime.securesms.sms.IncomingTextMessage
-import org.thoughtcrime.securesms.sms.MessageSender
 import org.thoughtcrime.securesms.util.GroupUtil
 import org.thoughtcrime.securesms.util.Hex
 import org.thoughtcrime.securesms.util.TextSecurePreferences
@@ -29,11 +29,6 @@ import org.whispersystems.signalservice.api.messages.SignalServiceGroup
 import org.whispersystems.signalservice.api.messages.SignalServiceGroup.GroupType
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos
 import org.whispersystems.signalservice.internal.push.SignalServiceProtos.GroupContext
-import org.whispersystems.signalservice.loki.protocol.closedgroups.ClosedGroupRatchet
-import org.whispersystems.signalservice.loki.protocol.closedgroups.ClosedGroupRatchetCollectionType
-import org.whispersystems.signalservice.loki.protocol.closedgroups.ClosedGroupSenderKey
-import org.whispersystems.signalservice.loki.protocol.closedgroups.SharedSenderKeysImplementation
-import org.whispersystems.signalservice.loki.utilities.hexEncodedPrivateKey
 import org.whispersystems.signalservice.loki.utilities.hexEncodedPublicKey
 import org.whispersystems.signalservice.loki.utilities.removing05PrefixIfNeeded
 import org.whispersystems.signalservice.loki.utilities.toHexString
@@ -229,14 +224,18 @@ object ClosedGroupsProtocolV2 {
     }
 
     @JvmStatic
-    public fun handleMessage(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
-        if (!isValid(closedGroupUpdate)) { return; }
+    fun handleMessage(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
+        if (!isValid(closedGroupUpdate)) { return }
         when (closedGroupUpdate.type) {
             SignalServiceProtos.ClosedGroupUpdateV2.Type.NEW -> handleNewClosedGroup(context, closedGroupUpdate, senderPublicKey)
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.MEMBERS_REMOVED -> handleClosedGroupMembersRemoved(context, closedGroupUpdate, sentTimestamp, groupPublicKey, senderPublicKey)
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.MEMBERS_ADDED -> handleClosedGroupMembersAdded(context, closedGroupUpdate, sentTimestamp, groupPublicKey, senderPublicKey)
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.NAME_CHANGE -> handleClosedGroupNameChange(context, closedGroupUpdate, sentTimestamp, groupPublicKey, senderPublicKey)
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.MEMBER_LEFT -> handleClosedGroupMemberLeft(context, sentTimestamp, groupPublicKey, senderPublicKey)
             SignalServiceProtos.ClosedGroupUpdateV2.Type.UPDATE -> handleClosedGroupUpdate(context, closedGroupUpdate, sentTimestamp, groupPublicKey, senderPublicKey)
             SignalServiceProtos.ClosedGroupUpdateV2.Type.ENCRYPTION_KEY_PAIR -> handleGroupEncryptionKeyPair(context, closedGroupUpdate, groupPublicKey, senderPublicKey)
             else -> {
-                // Do nothing
+                Log.d("Loki","Can't handle closed group update of unknown type: ${closedGroupUpdate.type}")
             }
         }
     }
@@ -288,7 +287,129 @@ object ClosedGroupsProtocolV2 {
         LokiPushNotificationManager.performOperation(context, ClosedGroupOperation.Subscribe, groupPublicKey, userPublicKey)
     }
 
-    public fun handleClosedGroupUpdate(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
+    fun handleClosedGroupMembersRemoved(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
+        val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
+        val groupDB = DatabaseFactory.getGroupDatabase(context)
+        val groupID = doubleEncodeGroupID(groupPublicKey)
+        val group = groupDB.getGroup(groupID).orNull()
+        if (group == null) {
+            Log.d("Loki", "Ignoring closed group info message for nonexistent group.")
+            return
+        }
+        val userPublicKey = TextSecurePreferences.getLocalNumber(context)
+        val name = group.title
+        // Check common group update logic
+        val members = group.members.map { it.serialize() }
+        val admins = group.admins.map { it.toPhoneString() }
+
+        // Users that are part of this remove update
+        val updateMembers = closedGroupUpdate.membersList.map { it.toByteArray().toHexString() }
+
+        if (!isValidGroupUpdate(group, sentTimestamp, senderPublicKey)) {
+            return
+        }
+        // If admin leaves the group is disbanded
+        val didAdminLeave = admins.any { it in updateMembers }
+        // newMembers to save is old members minus removed members
+        val newMembers = members.minus(updateMembers)
+
+        if (didAdminLeave) {
+            disableLocalGroupAndUnsubscribe(context, apiDB, groupPublicKey, groupDB, groupID, userPublicKey)
+        } else {
+            val isCurrentUserAdmin = admins.contains(userPublicKey)
+            if (isCurrentUserAdmin) {
+                generateAndSendNewEncryptionKeyPair(context, groupPublicKey, newMembers)
+            }
+        }
+        insertIncomingInfoMessage(context, senderPublicKey, groupID, GroupContext.Type.QUIT, SignalServiceGroup.Type.QUIT, name, members, admins)
+    }
+
+    fun handleClosedGroupMembersAdded(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
+//        // Check that the sender is a member of the group (before the update)
+//        val groupDB = DatabaseFactory.getGroupDatabase(context)
+//        val groupID = doubleEncodeGroupID(groupPublicKey)
+//        val group = groupDB.getGroup(groupID).orNull()
+//        if (group == null) {
+//            Log.d("Loki", "Ignoring closed group info message for nonexistent group.")
+//            return
+//        }
+//        if (!isValidGroupUpdate(group, sentTimestamp, senderPublicKey)) {
+//            return
+//        }
+//        val members = group.members.map { it.serialize() }
+//        val admins = group.admins.map { it.serialize() }
+//        if (members.none { it == senderPublicKey }) {
+//            Log.d("Loki", "Ignoring closed group info message from non-member.")
+//            return
+//        }
+//        val name = closedGroupUpdate.name
+//        groupDB.updateTitle(groupID, name)
+//
+//        insertIncomingInfoMessage(context, senderPublicKey, groupID, GroupContext.Type.UPDATE, SignalServiceGroup.Type.UPDATE, name, members, admins)
+    }
+
+    fun handleClosedGroupNameChange(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
+        // Check that the sender is a member of the group (before the update)
+        val groupDB = DatabaseFactory.getGroupDatabase(context)
+        val groupID = doubleEncodeGroupID(groupPublicKey)
+        val group = groupDB.getGroup(groupID).orNull()
+        if (group == null) {
+            Log.d("Loki", "Ignoring closed group info message for nonexistent group.")
+            return
+        }
+        // Check common group update logic
+        if (!isValidGroupUpdate(group, sentTimestamp, senderPublicKey)) {
+            return
+        }
+        val members = group.members.map { it.serialize() }
+        val admins = group.admins.map { it.serialize() }
+        if (members.none { it == senderPublicKey }) {
+            Log.d("Loki", "Ignoring closed group info message from non-member.")
+            return
+        }
+        val name = closedGroupUpdate.name
+        groupDB.updateTitle(groupID, name)
+
+        insertIncomingInfoMessage(context, senderPublicKey, groupID, GroupContext.Type.UPDATE, SignalServiceGroup.Type.UPDATE, name, members, admins)
+    }
+
+    private fun handleClosedGroupMemberLeft(context: Context, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
+        // Check the user leaving isn't us, will already be handled
+        val userPublicKey = TextSecurePreferences.getLocalNumber(context)
+        if (senderPublicKey == userPublicKey) {
+            return
+        }
+        val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
+        val groupDB = DatabaseFactory.getGroupDatabase(context)
+        val groupID = doubleEncodeGroupID(groupPublicKey)
+        val group = groupDB.getGroup(groupID).orNull()
+        if (group == null) {
+            Log.d("Loki", "Ignoring closed group info message for nonexistent group.")
+            return
+        }
+        val name = group.title
+        // Check common group update logic
+        val members = group.members.map { it.serialize() }
+        val admins = group.admins.map { it.toPhoneString() }
+        if (!isValidGroupUpdate(group, sentTimestamp, senderPublicKey)) {
+            return
+        }
+        // If admin leaves the group is disbanded
+        val didAdminLeave = admins.contains(senderPublicKey)
+        val newMembers = members.minus(senderPublicKey)
+
+        if (didAdminLeave) {
+            disableLocalGroupAndUnsubscribe(context, apiDB, groupPublicKey, groupDB, groupID, userPublicKey)
+        } else {
+            val isCurrentUserAdmin = admins.contains(userPublicKey)
+            if (isCurrentUserAdmin) {
+                generateAndSendNewEncryptionKeyPair(context, groupPublicKey, newMembers)
+            }
+        }
+        insertIncomingInfoMessage(context, senderPublicKey, groupID, GroupContext.Type.QUIT, SignalServiceGroup.Type.QUIT, name, members, admins)
+    }
+
+    private fun handleClosedGroupUpdate(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
         // Prepare
         val userPublicKey = TextSecurePreferences.getLocalNumber(context)
         val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
@@ -304,14 +425,8 @@ object ClosedGroupsProtocolV2 {
         }
         val oldMembers = group.members.map { it.serialize() }
         val newMembers = members.toSet().minus(oldMembers)
-        // Check that the message isn't from before the group was created
-        if (group.createdAt > sentTimestamp) {
-            Log.d("Loki", "Ignoring closed group update from before thread was created.")
-            return
-        }
-        // Check that the sender is a member of the group (before the update)
-        if (!oldMembers.contains(senderPublicKey)) {
-            Log.d("Loki", "Ignoring closed group info message from non-member.")
+        // Check common group update logic
+        if (!isValidGroupUpdate(group, sentTimestamp, senderPublicKey)) {
             return
         }
         // Check that the admin wasn't removed unless the group was destroyed entirely
@@ -322,14 +437,7 @@ object ClosedGroupsProtocolV2 {
         // Remove the group from the user's set of public keys to poll for if the current user was removed
         val wasCurrentUserRemoved = !members.contains(userPublicKey)
         if (wasCurrentUserRemoved) {
-            apiDB.removeClosedGroupPublicKey(groupPublicKey)
-            // Remove the key pairs
-            apiDB.removeAllClosedGroupEncryptionKeyPairs(groupPublicKey)
-            // Mark the group as inactive
-            groupDB.setActive(groupID, false)
-            groupDB.removeMember(groupID, Address.fromSerialized(userPublicKey))
-            // Notify the PN server
-            LokiPushNotificationManager.performOperation(context, ClosedGroupOperation.Unsubscribe, groupPublicKey, userPublicKey)
+            disableLocalGroupAndUnsubscribe(context, apiDB, groupPublicKey, groupDB, groupID, userPublicKey)
         }
         // Generate and distribute a new encryption key pair if needed
         val wasAnyUserRemoved = (members.toSet().intersect(oldMembers) != oldMembers.toSet())
@@ -348,6 +456,34 @@ object ClosedGroupsProtocolV2 {
         val type0 = if (wasSenderRemoved) GroupContext.Type.QUIT else GroupContext.Type.UPDATE
         val type1 = if (wasSenderRemoved) SignalServiceGroup.Type.QUIT else SignalServiceGroup.Type.UPDATE
         insertIncomingInfoMessage(context, senderPublicKey, groupID, type0, type1, name, members, group.admins.map { it.toPhoneString() })
+    }
+
+    private fun disableLocalGroupAndUnsubscribe(context: Context, apiDB: LokiAPIDatabase, groupPublicKey: String, groupDB: GroupDatabase, groupID: String, userPublicKey: String) {
+        apiDB.removeClosedGroupPublicKey(groupPublicKey)
+        // Remove the key pairs
+        apiDB.removeAllClosedGroupEncryptionKeyPairs(groupPublicKey)
+        // Mark the group as inactive
+        groupDB.setActive(groupID, false)
+        groupDB.removeMember(groupID, Address.fromSerialized(userPublicKey))
+        // Notify the PN server
+        LokiPushNotificationManager.performOperation(context, ClosedGroupOperation.Unsubscribe, groupPublicKey, userPublicKey)
+    }
+
+    private fun isValidGroupUpdate(group: GroupDatabase.GroupRecord,
+                                   sentTimestamp: Long,
+                                   senderPublicKey: String): Boolean  {
+        val oldMembers = group.members.map { it.serialize() }
+        // Check that the message isn't from before the group was created
+        if (group.createdAt > sentTimestamp) {
+            Log.d("Loki", "Ignoring closed group update from before thread was created.")
+            return false
+        }
+        // Check that the sender is a member of the group (before the update)
+        if (senderPublicKey !in oldMembers) {
+            Log.d("Loki", "Ignoring closed group info message from non-member.")
+            return false
+        }
+        return true
     }
 
     private fun handleGroupEncryptionKeyPair(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, groupPublicKey: String, senderPublicKey: String) {
