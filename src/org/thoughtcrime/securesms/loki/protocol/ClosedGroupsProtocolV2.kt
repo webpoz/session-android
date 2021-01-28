@@ -311,7 +311,8 @@ object ClosedGroupsProtocolV2 {
         // If admin leaves the group is disbanded
         val didAdminLeave = admins.any { it in updateMembers }
         // newMembers to save is old members minus removed members
-        val newMembers = members.minus(updateMembers)
+        val newMembers = members - updateMembers
+        val senderLeft = senderPublicKey in updateMembers
 
         if (didAdminLeave) {
             disableLocalGroupAndUnsubscribe(context, apiDB, groupPublicKey, groupDB, groupID, userPublicKey)
@@ -321,31 +322,36 @@ object ClosedGroupsProtocolV2 {
                 generateAndSendNewEncryptionKeyPair(context, groupPublicKey, newMembers)
             }
         }
-        insertIncomingInfoMessage(context, senderPublicKey, groupID, GroupContext.Type.QUIT, SignalServiceGroup.Type.QUIT, name, members, admins)
+        val (contextType, signalType) =
+                if (senderLeft) GroupContext.Type.QUIT to SignalServiceGroup.Type.QUIT
+                else GroupContext.Type.UPDATE to SignalServiceGroup.Type.UPDATE
+
+        insertIncomingInfoMessage(context, senderPublicKey, groupID, contextType, signalType, name, members, admins)
     }
 
     fun handleClosedGroupMembersAdded(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
-//        // Check that the sender is a member of the group (before the update)
-//        val groupDB = DatabaseFactory.getGroupDatabase(context)
-//        val groupID = doubleEncodeGroupID(groupPublicKey)
-//        val group = groupDB.getGroup(groupID).orNull()
-//        if (group == null) {
-//            Log.d("Loki", "Ignoring closed group info message for nonexistent group.")
-//            return
-//        }
-//        if (!isValidGroupUpdate(group, sentTimestamp, senderPublicKey)) {
-//            return
-//        }
-//        val members = group.members.map { it.serialize() }
-//        val admins = group.admins.map { it.serialize() }
-//        if (members.none { it == senderPublicKey }) {
-//            Log.d("Loki", "Ignoring closed group info message from non-member.")
-//            return
-//        }
-//        val name = closedGroupUpdate.name
-//        groupDB.updateTitle(groupID, name)
-//
-//        insertIncomingInfoMessage(context, senderPublicKey, groupID, GroupContext.Type.UPDATE, SignalServiceGroup.Type.UPDATE, name, members, admins)
+        val groupDB = DatabaseFactory.getGroupDatabase(context)
+        val groupID = doubleEncodeGroupID(groupPublicKey)
+        val group = groupDB.getGroup(groupID).orNull()
+        if (group == null) {
+            Log.d("Loki", "Ignoring closed group info message for nonexistent group.")
+            return
+        }
+        if (!isValidGroupUpdate(group, sentTimestamp, senderPublicKey)) {
+            return
+        }
+        val name = group.title
+        // Check common group update logic
+        val members = group.members.map { it.serialize() }
+        val admins = group.admins.map { it.serialize() }
+
+        // Users that are part of this remove update
+        val updateMembers = closedGroupUpdate.membersList.map { it.toByteArray().toHexString() }
+        // newMembers to save is old members minus removed members
+        val newMembers = members + updateMembers
+        groupDB.updateMembers(groupID, newMembers.map { Address.fromSerialized(it) })
+
+        insertIncomingInfoMessage(context, senderPublicKey, groupID, GroupContext.Type.UPDATE, SignalServiceGroup.Type.UPDATE, name, members, admins)
     }
 
     fun handleClosedGroupNameChange(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
@@ -363,10 +369,6 @@ object ClosedGroupsProtocolV2 {
         }
         val members = group.members.map { it.serialize() }
         val admins = group.admins.map { it.serialize() }
-        if (members.none { it == senderPublicKey }) {
-            Log.d("Loki", "Ignoring closed group info message from non-member.")
-            return
-        }
         val name = closedGroupUpdate.name
         groupDB.updateTitle(groupID, name)
 
@@ -396,14 +398,14 @@ object ClosedGroupsProtocolV2 {
         }
         // If admin leaves the group is disbanded
         val didAdminLeave = admins.contains(senderPublicKey)
-        val newMembers = members.minus(senderPublicKey)
+        val updatedMemberList = members - senderPublicKey
 
         if (didAdminLeave) {
             disableLocalGroupAndUnsubscribe(context, apiDB, groupPublicKey, groupDB, groupID, userPublicKey)
         } else {
             val isCurrentUserAdmin = admins.contains(userPublicKey)
             if (isCurrentUserAdmin) {
-                generateAndSendNewEncryptionKeyPair(context, groupPublicKey, newMembers)
+                generateAndSendNewEncryptionKeyPair(context, groupPublicKey, updatedMemberList)
             }
         }
         insertIncomingInfoMessage(context, senderPublicKey, groupID, GroupContext.Type.QUIT, SignalServiceGroup.Type.QUIT, name, members, admins)
@@ -424,7 +426,6 @@ object ClosedGroupsProtocolV2 {
             return
         }
         val oldMembers = group.members.map { it.serialize() }
-        val newMembers = members.toSet().minus(oldMembers)
         // Check common group update logic
         if (!isValidGroupUpdate(group, sentTimestamp, senderPublicKey)) {
             return
@@ -443,7 +444,7 @@ object ClosedGroupsProtocolV2 {
         val wasAnyUserRemoved = (members.toSet().intersect(oldMembers) != oldMembers.toSet())
         val isCurrentUserAdmin = group.admins.map { it.toPhoneString() }.contains(userPublicKey)
         if (wasAnyUserRemoved && isCurrentUserAdmin) {
-            generateAndSendNewEncryptionKeyPair(context, groupPublicKey, members.minus(newMembers))
+            generateAndSendNewEncryptionKeyPair(context, groupPublicKey, members)
         }
         // Update the group
         groupDB.updateTitle(groupID, name)
