@@ -322,11 +322,13 @@ object ClosedGroupsProtocolV2 {
         // newMembers to save is old members minus removed members
         val newMembers = members - updateMembers
         val senderLeft = senderPublicKey in updateMembers
+        val wasCurrentUserRemoved = userPublicKey in updateMembers
 
-        if (didAdminLeave) {
+        if (didAdminLeave || wasCurrentUserRemoved) {
             disableLocalGroupAndUnsubscribe(context, apiDB, groupPublicKey, groupDB, groupID, userPublicKey)
         } else {
             val isCurrentUserAdmin = admins.contains(userPublicKey)
+            groupDB.updateMembers(groupID, newMembers.map { Address.fromSerialized(it) })
             if (isCurrentUserAdmin) {
                 generateAndSendNewEncryptionKeyPair(context, groupPublicKey, newMembers)
             }
