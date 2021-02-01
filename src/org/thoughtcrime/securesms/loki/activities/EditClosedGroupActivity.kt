@@ -20,7 +20,7 @@ import kotlinx.android.synthetic.main.activity_edit_closed_group.loader
 import kotlinx.android.synthetic.main.activity_linked_devices.recyclerView
 import network.loki.messenger.R
 import nl.komponents.kovenant.Promise
-import nl.komponents.kovenant.functional.bind
+import nl.komponents.kovenant.task
 import nl.komponents.kovenant.ui.failUi
 import nl.komponents.kovenant.ui.successUi
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
@@ -260,21 +260,23 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
         if (isSSKBasedClosedGroup) {
             isLoading = true
             loader.fadeIn()
-            val promise: Promise<Unit, Exception> = if (!members.contains(Recipient.from(this, Address.fromSerialized(userPublicKey), false))) {
+            val promise: Promise<Any, Exception> = if (!members.contains(Recipient.from(this, Address.fromSerialized(userPublicKey), false))) {
                 ClosedGroupsProtocolV2.explicitLeave(this, groupPublicKey!!)
             } else {
-                val nameChanged =
-                        if (hasNameChanged) ClosedGroupsProtocolV2.explicitNameChange(this,groupPublicKey!!,name)
+                task {
+                    val name =
+                            if (hasNameChanged) ClosedGroupsProtocolV2.explicitNameChange(this@EditClosedGroupActivity,groupPublicKey!!,name)
+                            else Promise.of(Unit)
+                    name.get()
+                    members.filterNot { it in originalMembers }.let { adds ->
+                        if (adds.isNotEmpty()) ClosedGroupsProtocolV2.explicitAddMembers(this@EditClosedGroupActivity, groupPublicKey!!, adds.map { it.address.serialize() })
                         else Promise.of(Unit)
-                val userAdds = members.filterNot { it in originalMembers }.let { adds ->
-                    if (adds.isNotEmpty()) ClosedGroupsProtocolV2.explicitAddMembers(this, groupPublicKey!!, adds.map { it.address.serialize() })
-                    else Promise.of(Unit)
+                    }.get()
+                    originalMembers.filterNot { it in members }.let { removes ->
+                        if (removes.isNotEmpty()) ClosedGroupsProtocolV2.explicitRemoveMembers(this@EditClosedGroupActivity, groupPublicKey!!, removes.map { it.address.serialize() })
+                        else Promise.of(Unit)
+                    }.get()
                 }
-                val userRemoves = originalMembers.filterNot { it in members }.let { removes ->
-                    if (removes.isNotEmpty()) ClosedGroupsProtocolV2.explicitRemoveMembers(this, groupPublicKey!!, removes.map { it.address.serialize() })
-                    else Promise.of(Unit)
-                }
-                nameChanged bind { userAdds } bind { userRemoves }
 //                promise = ClosedGroupsProtocolV2.update(this, groupPublicKey!!, members.map { it.address.serialize() }, name)
             }
             promise.successUi {
