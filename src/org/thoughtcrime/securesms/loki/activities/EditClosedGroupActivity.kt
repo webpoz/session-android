@@ -215,8 +215,6 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
     private fun commitChanges() {
         val hasMemberListChanges = (members != originalMembers)
 
-
-
         if (!hasNameChanged && !hasMemberListChanges) {
             return finish()
         }
@@ -268,11 +266,11 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
                 val nameChanged =
                         if (hasNameChanged) ClosedGroupsProtocolV2.explicitNameChange(this,groupPublicKey!!,name)
                         else Promise.of(Unit)
-                val userAdds = members.filterNot { it !in originalMembers }.let { adds ->
+                val userAdds = members.filterNot { it in originalMembers }.let { adds ->
                     if (adds.isNotEmpty()) ClosedGroupsProtocolV2.explicitAddMembers(this, groupPublicKey!!, adds.map { it.address.serialize() })
                     else Promise.of(Unit)
                 }
-                val userRemoves = originalMembers.filterNot { it !in members }.let { removes ->
+                val userRemoves = originalMembers.filterNot { it in members }.let { removes ->
                     if (removes.isNotEmpty()) ClosedGroupsProtocolV2.explicitRemoveMembers(this, groupPublicKey!!, removes.map { it.address.serialize() })
                     else Promise.of(Unit)
                 }
