@@ -226,7 +226,7 @@ object ClosedGroupsProtocolV2 {
 
     @JvmStatic
     fun handleMessage(context: Context, closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, sentTimestamp: Long, groupPublicKey: String, senderPublicKey: String) {
-        if (!isValid(closedGroupUpdate)) { return }
+        if (!isValid(closedGroupUpdate, senderPublicKey)) { return }
         when (closedGroupUpdate.type) {
             SignalServiceProtos.ClosedGroupUpdateV2.Type.NEW -> handleNewClosedGroup(context, closedGroupUpdate, senderPublicKey)
             SignalServiceProtos.ClosedGroupUpdateV2.Type.MEMBERS_REMOVED -> handleClosedGroupMembersRemoved(context, closedGroupUpdate, sentTimestamp, groupPublicKey, senderPublicKey)
@@ -241,16 +241,20 @@ object ClosedGroupsProtocolV2 {
         }
     }
 
-    private fun isValid(closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2): Boolean {
+    private fun isValid(closedGroupUpdate: SignalServiceProtos.ClosedGroupUpdateV2, senderPublicKey: String): Boolean {
         return when (closedGroupUpdate.type) {
             SignalServiceProtos.ClosedGroupUpdateV2.Type.NEW -> {
                 (!closedGroupUpdate.publicKey.isEmpty && !closedGroupUpdate.name.isNullOrEmpty() && !(closedGroupUpdate.encryptionKeyPair.privateKey ?: ByteString.copyFrom(ByteArray(0))).isEmpty
                         && !(closedGroupUpdate.encryptionKeyPair.publicKey ?: ByteString.copyFrom(ByteArray(0))).isEmpty && closedGroupUpdate.membersCount > 0 && closedGroupUpdate.adminsCount > 0)
             }
-            SignalServiceProtos.ClosedGroupUpdateV2.Type.UPDATE,
             SignalServiceProtos.ClosedGroupUpdateV2.Type.MEMBERS_ADDED,
-            SignalServiceProtos.ClosedGroupUpdateV2.Type.MEMBERS_REMOVED,
-            SignalServiceProtos.ClosedGroupUpdateV2.Type.MEMBER_LEFT,
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.MEMBERS_REMOVED -> {
+                closedGroupUpdate.membersCount > 0
+            }
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.MEMBER_LEFT -> {
+                senderPublicKey.isNotEmpty()
+            }
+            SignalServiceProtos.ClosedGroupUpdateV2.Type.UPDATE,
             SignalServiceProtos.ClosedGroupUpdateV2.Type.NAME_CHANGE -> {
                 !closedGroupUpdate.name.isNullOrEmpty()
             }
