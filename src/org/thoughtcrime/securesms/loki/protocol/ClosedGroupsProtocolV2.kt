@@ -97,7 +97,7 @@ object ClosedGroupsProtocolV2 {
             val groupDB = DatabaseFactory.getGroupDatabase(context)
             val groupID = doubleEncodeGroupID(groupPublicKey)
             val group = groupDB.getGroup(groupID).orNull()
-            val members = group.members.map { it.serialize() }.toSet() - userPublicKey
+            val updatedMembers = group.members.map { it.serialize() }.toSet() - userPublicKey
             val admins = group.admins.map { it.serialize() }
             val name = group.title
             if (group == null) {
@@ -110,8 +110,7 @@ object ClosedGroupsProtocolV2 {
             job.setContext(context)
             job.onRun() // Run the job immediately
             // Remove the group private key and unsubscribe from PNs
-            apiDB.removeAllClosedGroupEncryptionKeyPairs(groupPublicKey)
-            apiDB.removeClosedGroupPublicKey(groupPublicKey)
+            disableLocalGroupAndUnsubscribe(context, apiDB, groupPublicKey, groupDB, groupID, userPublicKey)
             // Mark the group as inactive
             groupDB.setActive(groupID, false)
             groupDB.removeMember(groupID, Address.fromSerialized(userPublicKey))
@@ -120,7 +119,123 @@ object ClosedGroupsProtocolV2 {
             // Notify the user
             val infoType = GroupContext.Type.QUIT
             val threadID = DatabaseFactory.getThreadDatabase(context).getOrCreateThreadIdFor(Recipient.from(context, Address.fromSerialized(groupID), false))
-            insertOutgoingInfoMessage(context, groupID, infoType, name, members, admins, threadID)
+            insertOutgoingInfoMessage(context, groupID, infoType, name, updatedMembers, admins, threadID)
+            deferred.resolve(Unit)
+        }
+        return deferred.promise
+    }
+
+    @JvmStatic
+    fun explicitAddMembers(context: Context, groupPublicKey: String, membersToAdd: List<String>): Promise<Unit, Exception> {
+        val deferred = deferred<Unit, Exception>()
+        ThreadUtils.queue {
+            val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
+            val groupDB = DatabaseFactory.getGroupDatabase(context)
+            val groupID = doubleEncodeGroupID(groupPublicKey)
+            val group = groupDB.getGroup(groupID).orNull()
+            if (group == null) {
+                Log.d("Loki", "Can't leave nonexistent closed group.")
+                return@queue deferred.reject(Error.NoThread)
+            }
+            val updatedMembers = group.members.map { it.serialize() }.toSet() + membersToAdd
+            val membersAsData = updatedMembers.map { Hex.fromStringCondensed(it) }
+            val newMembersAsData = membersToAdd.map { Hex.fromStringCondensed(it) }
+            val admins = group.admins.map { it.serialize() }
+            val adminsAsData = admins.map { Hex.fromStringCondensed(it) }
+            val encryptionKeyPair = apiDB.getLatestClosedGroupEncryptionKeyPair(groupPublicKey)
+            if (encryptionKeyPair == null) {
+                Log.d("Loki", "Couldn't get encryption key pair for closed group.")
+                return@queue deferred.reject(Error.NoKeyPair)
+            }
+            val name = group.title
+            // Send the update to the group
+            val memberUpdateKind = ClosedGroupUpdateMessageSendJobV2.Kind.AddMembers(newMembersAsData)
+            val job = ClosedGroupUpdateMessageSendJobV2(groupPublicKey, memberUpdateKind)
+            job.setContext(context)
+            job.onRun() // Run the job immediately
+            // Send closed group update messages to any new members individually
+            for (member in membersToAdd) {
+                @Suppress("NAME_SHADOWING")
+                val closedGroupNewKind = ClosedGroupUpdateMessageSendJobV2.Kind.New(Hex.fromStringCondensed(groupPublicKey), name, encryptionKeyPair, membersAsData, adminsAsData)
+                @Suppress("NAME_SHADOWING")
+                val newMemberJob = ClosedGroupUpdateMessageSendJobV2(member, closedGroupNewKind)
+                ApplicationContext.getInstance(context).jobManager.add(newMemberJob)
+            }
+            // Notify the user
+            val infoType = GroupContext.Type.UPDATE
+            val threadID = DatabaseFactory.getThreadDatabase(context).getOrCreateThreadIdFor(Recipient.from(context, Address.fromSerialized(groupID), false))
+            groupDB.updateMembers(groupID, updatedMembers.map { Address.fromSerialized(it) })
+            insertOutgoingInfoMessage(context, groupID, infoType, name, updatedMembers, admins, threadID)
+            deferred.resolve(Unit)
+        }
+        return deferred.promise
+    }
+
+    @JvmStatic
+    fun explicitRemoveMembers(context: Context, groupPublicKey: String, membersToRemove: List<String>): Promise<Unit, Exception> {
+        val deferred = deferred<Unit, Exception>()
+        ThreadUtils.queue {
+            val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
+            val groupDB = DatabaseFactory.getGroupDatabase(context)
+            val groupID = doubleEncodeGroupID(groupPublicKey)
+            val group = groupDB.getGroup(groupID).orNull()
+            if (group == null) {
+                Log.d("Loki", "Can't leave nonexistent closed group.")
+                return@queue deferred.reject(Error.NoThread)
+            }
+            val updatedMembers = group.members.map { it.serialize() }.toSet() - membersToRemove
+            val removeMembersAsData = membersToRemove.map { Hex.fromStringCondensed(it) }
+            val admins = group.admins.map { it.serialize() }
+            val encryptionKeyPair = apiDB.getLatestClosedGroupEncryptionKeyPair(groupPublicKey)
+            if (encryptionKeyPair == null) {
+                Log.d("Loki", "Couldn't get encryption key pair for closed group.")
+                return@queue deferred.reject(Error.NoKeyPair)
+            }
+            if (membersToRemove.any { it in admins } && updatedMembers.isNotEmpty()) {
+                Log.d("Loki", "Can't remove admin from closed group unless the group is destroyed entirely.")
+                return@queue deferred.reject(Error.InvalidUpdate)
+            }
+            val name = group.title
+            // Send the update to the group
+            val memberUpdateKind = ClosedGroupUpdateMessageSendJobV2.Kind.RemoveMembers(removeMembersAsData)
+            val job = ClosedGroupUpdateMessageSendJobV2(groupPublicKey, memberUpdateKind)
+            job.setContext(context)
+            job.onRun() // Run the job immediately
+            // Save the new group members
+            // Notify the user
+            val infoType = GroupContext.Type.UPDATE
+            val threadID = DatabaseFactory.getThreadDatabase(context).getOrCreateThreadIdFor(Recipient.from(context, Address.fromSerialized(groupID), false))
+            groupDB.updateMembers(groupID, updatedMembers.map { Address.fromSerialized(it) })
+            insertOutgoingInfoMessage(context, groupID, infoType, name, updatedMembers, admins, threadID)
+            deferred.resolve(Unit)
+        }
+        return deferred.promise
+    }
+
+    @JvmStatic
+    fun explicitNameChange(context: Context, groupPublicKey: String, newName: String): Promise<Unit, Exception> {
+        val deferred = deferred<Unit, Exception>()
+        ThreadUtils.queue {
+            val groupDB = DatabaseFactory.getGroupDatabase(context)
+            val groupID = doubleEncodeGroupID(groupPublicKey)
+            val group = groupDB.getGroup(groupID).orNull()
+            val members = group.members.map { it.serialize() }.toSet()
+            val admins = group.admins.map { it.serialize() }
+            if (group == null) {
+                Log.d("Loki", "Can't leave nonexistent closed group.")
+                return@queue deferred.reject(Error.NoThread)
+            }
+            // Send the update to the group
+            val kind = ClosedGroupUpdateMessageSendJobV2.Kind.ChangeName(newName)
+            val job = ClosedGroupUpdateMessageSendJobV2(groupPublicKey, kind)
+            job.setContext(context)
+            job.onRun() // Run the job immediately
+            // Update the group
+            groupDB.updateTitle(groupID, newName)
+            // Notify the user
+            val infoType = GroupContext.Type.UPDATE
+            val threadID = DatabaseFactory.getThreadDatabase(context).getOrCreateThreadIdFor(Recipient.from(context, Address.fromSerialized(groupID), false))
+            insertOutgoingInfoMessage(context, groupID, infoType, newName, members, admins, threadID)
             deferred.resolve(Unit)
         }
         return deferred.promise
