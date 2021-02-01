@@ -3,7 +3,6 @@ package org.thoughtcrime.securesms.loki.activities
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import androidx.loader.app.LoaderManager
 import androidx.loader.content.Loader
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -13,7 +12,6 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
-import androidx.appcompat.content.res.AppCompatResources
 import kotlinx.android.synthetic.main.activity_create_closed_group.*
 import kotlinx.android.synthetic.main.activity_create_closed_group.emptyStateContainer
 import kotlinx.android.synthetic.main.activity_create_closed_group.mainContentContainer
@@ -35,7 +33,6 @@ import org.thoughtcrime.securesms.loki.utilities.fadeIn
 import org.thoughtcrime.securesms.loki.utilities.fadeOut
 import org.thoughtcrime.securesms.mms.GlideApp
 import org.thoughtcrime.securesms.recipients.Recipient
-import org.thoughtcrime.securesms.util.GroupUtil
 import org.thoughtcrime.securesms.util.TextSecurePreferences
 import org.thoughtcrime.securesms.util.ThemeUtil
 import org.whispersystems.signalservice.loki.utilities.toHexString
@@ -261,7 +258,7 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
             loader.fadeIn()
             val promise: Promise<Unit, Exception>
             if (!members.contains(Recipient.from(this, Address.fromSerialized(userPublicKey), false))) {
-                promise = ClosedGroupsProtocolV2.leave(this, groupPublicKey!!)
+                promise = ClosedGroupsProtocolV2.explicitLeave(this, groupPublicKey!!)
             } else {
                 promise = ClosedGroupsProtocolV2.update(this, groupPublicKey!!, members.map { it.address.serialize() }, name)
             }

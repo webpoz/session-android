@@ -89,7 +89,45 @@ object ClosedGroupsProtocolV2 {
     }
 
     @JvmStatic
-    public fun leave(context: Context, groupPublicKey: String): Promise<Unit, Exception> {
+    fun explicitLeave(context: Context, groupPublicKey: String): Promise<Unit, Exception> {
+        val deferred = deferred<Unit, Exception>()
+        ThreadUtils.queue {
+            val userPublicKey = TextSecurePreferences.getLocalNumber(context)
+            val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
+            val groupDB = DatabaseFactory.getGroupDatabase(context)
+            val groupID = doubleEncodeGroupID(groupPublicKey)
+            val group = groupDB.getGroup(groupID).orNull()
+            val members = group.members.map { it.serialize() }.toSet() - userPublicKey
+            val admins = group.admins.map { it.serialize() }
+            val name = group.title
+            if (group == null) {
+                Log.d("Loki", "Can't leave nonexistent closed group.")
+                return@queue deferred.reject(Error.NoThread)
+            }
+            // Send the update to the group
+            @Suppress("NAME_SHADOWING")
+            val job = ClosedGroupUpdateMessageSendJobV2(groupPublicKey, ClosedGroupUpdateMessageSendJobV2.Kind.Leave)
+            job.setContext(context)
+            job.onRun() // Run the job immediately
+            // Remove the group private key and unsubscribe from PNs
+            apiDB.removeAllClosedGroupEncryptionKeyPairs(groupPublicKey)
+            apiDB.removeClosedGroupPublicKey(groupPublicKey)
+            // Mark the group as inactive
+            groupDB.setActive(groupID, false)
+            groupDB.removeMember(groupID, Address.fromSerialized(userPublicKey))
+            // Notify the PN server
+            LokiPushNotificationManager.performOperation(context, ClosedGroupOperation.Unsubscribe, groupPublicKey, userPublicKey)
+            // Notify the user
+            val infoType = GroupContext.Type.QUIT
+            val threadID = DatabaseFactory.getThreadDatabase(context).getOrCreateThreadIdFor(Recipient.from(context, Address.fromSerialized(groupID), false))
+            insertOutgoingInfoMessage(context, groupID, infoType, name, members, admins, threadID)
+            deferred.resolve(Unit)
+        }
+        return deferred.promise
+    }
+
+    @JvmStatic
+    fun leave(context: Context, groupPublicKey: String): Promise<Unit, Exception> {
         val userPublicKey = TextSecurePreferences.getLocalNumber(context)
         val groupDB = DatabaseFactory.getGroupDatabase(context)
         val groupID = doubleEncodeGroupID(groupPublicKey)
@@ -110,7 +148,7 @@ object ClosedGroupsProtocolV2 {
         return update(context, groupPublicKey, newMembers, name)
     }
 
-    public fun update(context: Context, groupPublicKey: String, members: Collection<String>, name: String): Promise<Unit, Exception> {
+    fun update(context: Context, groupPublicKey: String, members: Collection<String>, name: String): Promise<Unit, Exception> {
         val deferred = deferred<Unit, Exception>()
         ThreadUtils.queue {
             val userPublicKey = TextSecurePreferences.getLocalNumber(context)
