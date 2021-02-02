@@ -261,7 +261,7 @@ class EditClosedGroupActivity : PassphraseRequiredActionBarActivity() {
             isLoading = true
             loader.fadeIn()
             val promise: Promise<Any, Exception> = if (!members.contains(Recipient.from(this, Address.fromSerialized(userPublicKey), false))) {
-                ClosedGroupsProtocolV2.explicitLeave(this, groupPublicKey!!)
+                ClosedGroupsProtocolV2.leave(this, groupPublicKey!!)
             } else {
 //                TODO: uncomment when we switch to sending new explicit updates after clients update
 //                task {
