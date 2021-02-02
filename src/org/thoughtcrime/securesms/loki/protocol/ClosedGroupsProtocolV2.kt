@@ -221,7 +221,7 @@ object ClosedGroupsProtocolV2 {
                 return@queue deferred.reject(Error.NoThread)
             }
             // Send the update to the group
-            val kind = ClosedGroupUpdateMessageSendJobV2.Kind.ChangeName(newName)
+            val kind = ClosedGroupUpdateMessageSendJobV2.Kind.NameChange(newName)
             val job = ClosedGroupUpdateMessageSendJobV2(groupPublicKey, kind)
             job.setContext(context)
             job.onRun() // Run the job immediately
