@@ -112,11 +112,6 @@ object ClosedGroupsProtocolV2 {
             job.onRun() // Run the job immediately
             // Remove the group private key and unsubscribe from PNs
             disableLocalGroupAndUnsubscribe(context, apiDB, groupPublicKey, groupDB, groupID, userPublicKey)
-            // Mark the group as inactive
-            groupDB.setActive(groupID, false)
-            groupDB.removeMember(groupID, Address.fromSerialized(userPublicKey))
-            // Notify the PN server
-            LokiPushNotificationManager.performOperation(context, ClosedGroupOperation.Unsubscribe, groupPublicKey, userPublicKey)
             // Notify the user
             val infoType = GroupContext.Type.QUIT
             val threadID = DatabaseFactory.getThreadDatabase(context).getOrCreateThreadIdFor(Recipient.from(context, Address.fromSerialized(groupID), false))
@@ -138,6 +133,7 @@ object ClosedGroupsProtocolV2 {
                 return@task Error.NoThread
             }
             val updatedMembers = group.members.map { it.serialize() }.toSet() + membersToAdd
+            // Save the new group members
             groupDB.updateMembers(groupID, updatedMembers.map { Address.fromSerialized(it) })
             val membersAsData = updatedMembers.map { Hex.fromStringCondensed(it) }
             val newMembersAsData = membersToAdd.map { Hex.fromStringCondensed(it) }
@@ -172,6 +168,7 @@ object ClosedGroupsProtocolV2 {
     @JvmStatic
     fun explicitRemoveMembers(context: Context, groupPublicKey: String, membersToRemove: List<String>): Promise<Any, Exception> {
         return task {
+            val userPublicKey = TextSecurePreferences.getLocalNumber(context)
             val apiDB = DatabaseFactory.getLokiAPIDatabase(context)
             val groupDB = DatabaseFactory.getGroupDatabase(context)
             val groupID = doubleEncodeGroupID(groupPublicKey)
@@ -181,6 +178,7 @@ object ClosedGroupsProtocolV2 {
                 return@task Error.NoThread
             }
             val updatedMembers = group.members.map { it.serialize() }.toSet() - membersToRemove
+            // Save the new group members
             groupDB.updateMembers(groupID, updatedMembers.map { Address.fromSerialized(it) })
             val removeMembersAsData = membersToRemove.map { Hex.fromStringCondensed(it) }
             val admins = group.admins.map { it.serialize() }
@@ -199,7 +197,10 @@ object ClosedGroupsProtocolV2 {
             val job = ClosedGroupUpdateMessageSendJobV2(groupPublicKey, memberUpdateKind)
             job.setContext(context)
             job.onRun() // Run the job immediately
-            // Save the new group members
+            val isCurrentUserAdmin = admins.contains(userPublicKey)
+            if (isCurrentUserAdmin) {
+                generateAndSendNewEncryptionKeyPair(context, groupPublicKey, updatedMembers)
+            }
             // Notify the user
             val infoType = GroupContext.Type.UPDATE
             val threadID = DatabaseFactory.getThreadDatabase(context).getOrCreateThreadIdFor(Recipient.from(context, Address.fromSerialized(groupID), false))
@@ -469,9 +470,14 @@ object ClosedGroupsProtocolV2 {
         val didAdminLeave = admins.any { it in updateMembers }
         // newMembers to save is old members minus removed members
         val newMembers = members - updateMembers
+        // user should be posting MEMBERS_LEFT so this should not be encountered
         val senderLeft = senderPublicKey in updateMembers
+        if (senderLeft) {
+            Log.d("Loki", "Received a MEMBERS_REMOVED instead of a MEMBERS_LEFT from sender $senderPublicKey")
+        }
         val wasCurrentUserRemoved = userPublicKey in updateMembers
 
+        // admin should send a MEMBERS_LEFT message but handled here in case
         if (didAdminLeave || wasCurrentUserRemoved) {
             disableLocalGroupAndUnsubscribe(context, apiDB, groupPublicKey, groupDB, groupID, userPublicKey)
         } else {
