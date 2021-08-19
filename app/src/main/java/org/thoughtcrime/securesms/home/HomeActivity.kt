@@ -39,6 +39,7 @@ import org.session.libsignal.utilities.toHexString
 import org.thoughtcrime.securesms.ApplicationContext
 import org.thoughtcrime.securesms.MuteDialog
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
+import org.thoughtcrime.securesms.calls.WebRtcTestsActivity
 import org.thoughtcrime.securesms.conversation.v2.ConversationActivityV2
 import org.thoughtcrime.securesms.conversation.v2.utilities.NotificationUtils
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil
@@ -52,7 +53,6 @@ import org.thoughtcrime.securesms.mms.GlideApp
 import org.thoughtcrime.securesms.mms.GlideRequests
 import org.thoughtcrime.securesms.onboarding.SeedActivity
 import org.thoughtcrime.securesms.onboarding.SeedReminderViewDelegate
-import org.thoughtcrime.securesms.preferences.SettingsActivity
 import org.thoughtcrime.securesms.util.*
 import java.io.IOException
 import java.util.*
@@ -400,8 +400,9 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
     }
 
     private fun openSettings() {
-        val intent = Intent(this, SettingsActivity::class.java)
-        show(intent, isForResult = true)
+        val intent = Intent(this, WebRtcTestsActivity::class.java)
+//        val intent = Intent(this, SettingsActivity::class.java)
+        show(intent, isForResult = false)
     }
 
     private fun showPath() {

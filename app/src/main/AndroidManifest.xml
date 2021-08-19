@@ -295,6 +295,14 @@
             android:configChanges="touchscreen|keyboard|keyboardHidden|orientation|screenLayout|screenSize"
             android:exported="true"
             android:theme="@style/Theme.Session.DayNight.NoActionBar" />
+        <activity android:name="org.thoughtcrime.securesms.calls.WebRtcTestsActivity"
+            android:screenOrientation="portrait"
+            android:parentActivityName="org.thoughtcrime.securesms.home.HomeActivity"
+            android:theme="@style/Theme.Session.DayNight.FlatActionBar">
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="org.thoughtcrime.securesms.home.HomeActivity" />
+        </activity>
         <service
             android:name="org.thoughtcrime.securesms.notifications.PushNotificationService"
             android:enabled="true"
@@ -303,6 +311,7 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+        <service android:enabled="true" android:name="org.thoughtcrime.securesms.service.WebRtcCallService"/>
         <service
             android:name="org.thoughtcrime.securesms.service.KeyCachingService"
             android:enabled="true"

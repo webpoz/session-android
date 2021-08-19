@@ -53,7 +53,7 @@ dependencies {
     implementation 'com.google.android.exoplayer:exoplayer-ui:2.9.1'
     implementation 'org.conscrypt:conscrypt-android:2.0.0'
     implementation 'org.signal:aesgcmprovider:0.0.3'
-    implementation 'org.whispersystems:webrtc-android:M74'
+    implementation 'org.whispersystems:webrtc-android:M77'
     implementation "me.leolin:ShortcutBadger:1.1.16"
     implementation 'se.emilsjolander:stickylistheaders:2.7.0'
     implementation 'com.jpardogo.materialtabstrip:library:1.0.9'
