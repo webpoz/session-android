@@ -36,6 +36,7 @@ import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.utilities.guava.Optional
 import org.session.libsignal.utilities.toHexString
 import org.thoughtcrime.securesms.*
+import org.thoughtcrime.securesms.calls.WebRtcTestsActivity
 import org.thoughtcrime.securesms.contacts.SelectContactsActivity
 import org.thoughtcrime.securesms.conversation.v2.ConversationActivityV2
 import org.thoughtcrime.securesms.conversation.v2.utilities.NotificationUtils
@@ -98,6 +99,11 @@ object ConversationMenuHelper {
             inflater.inflate(R.menu.menu_conversation_notification_settings, menu)
         }
 
+        // Call Tests
+        if (!isOpenGroup) {
+            inflater.inflate(R.menu.menu_conversation_call, menu)
+        }
+
         // Search
         val searchViewItem = menu.findItem(R.id.menu_search)
         (context as ConversationActivityV2).searchViewItem = searchViewItem
@@ -158,6 +164,7 @@ object ConversationMenuHelper {
             R.id.menu_unmute_notifications -> { unmute(context, thread) }
             R.id.menu_mute_notifications -> { mute(context, thread) }
             R.id.menu_notification_settings -> { setNotifyType(context, thread) }
+            R.id.menu_call -> { call(context, thread) }
         }
         return true
     }
@@ -172,6 +179,13 @@ object ConversationMenuHelper {
     private fun search(context: Context) {
         val searchViewModel = (context as ConversationActivityV2).searchViewModel!!
         searchViewModel.onSearchOpened()
+    }
+
+    private fun call(context: Context, thread: Recipient) {
+        val intent = Intent(context, WebRtcTestsActivity::class.java)
+        intent.putExtra(WebRtcTestsActivity.EXTRA_ADDRESS, thread.address)
+        val activity = context as AppCompatActivity
+        activity.startActivity(intent)
     }
 
     @SuppressLint("StaticFieldLeak")

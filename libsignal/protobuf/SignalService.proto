@@ -168,12 +168,15 @@ message CallMessage {
     OFFER              = 1;
     ANSWER             = 2;
     PROVISIONAL_ANSWER = 3;
+    ICE_CANDIDATES     = 4;
+    END_CALL           = 5;
   }
 
   // @required
-  required Type type  = 1;
-  // @required
-  required string sdp = 2;
+  required Type type              = 1;
+  repeated string sdps            = 2;
+  repeated uint32 sdpMLineIndexes = 3;
+  repeated string sdpMids         = 4;
 
 }
 

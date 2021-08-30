@@ -12,6 +12,7 @@ import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
@@ -32,8 +33,10 @@ import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import org.session.libsession.messaging.jobs.JobQueue
 import org.session.libsession.messaging.sending_receiving.MessageSender
+import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.utilities.*
 import org.session.libsession.utilities.Util
+import org.session.libsignal.utilities.Log
 import org.session.libsignal.utilities.ThreadUtils
 import org.session.libsignal.utilities.toHexString
 import org.thoughtcrime.securesms.ApplicationContext
@@ -53,6 +56,7 @@ import org.thoughtcrime.securesms.mms.GlideApp
 import org.thoughtcrime.securesms.mms.GlideRequests
 import org.thoughtcrime.securesms.onboarding.SeedActivity
 import org.thoughtcrime.securesms.onboarding.SeedReminderViewDelegate
+import org.thoughtcrime.securesms.preferences.SettingsActivity
 import org.thoughtcrime.securesms.util.*
 import java.io.IOException
 import java.util.*
@@ -131,6 +135,36 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
         }
         this.broadcastReceiver = broadcastReceiver
         LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver, IntentFilter("blockedContactsChanged"))
+        lifecycleScope.launchWhenCreated {
+            // web rtc channel handling
+            for (message in WebRtcUtils.SIGNAL_QUEUE) {
+                val sender = Address.fromSerialized(message.sender!!)
+                val intent = Intent(this@HomeActivity, WebRtcTestsActivity::class.java)
+                val bundle = bundleOf(
+                    WebRtcTestsActivity.EXTRA_ADDRESS to sender,
+                )
+                if (message.sdps.isNotEmpty() && message.sdpMids.isEmpty()) {
+                    // offer message
+                    Log.d("Loki-RTC", "answer receive")
+                    val sdps = message.sdps
+                    intent.action = WebRtcTestsActivity.ACTION_ANSWER
+                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdps.toTypedArray())
+                } else if (message.sdpMids.isNotEmpty()) {
+                    // ice candidates message
+                    Log.d("Loki-RTC", "update ice intent")
+                    val sdpMLineIndexes = message.sdpMLineIndexes
+                    val sdpMids = message.sdpMids
+                    val sdps = message.sdps
+                    intent.action = WebRtcTestsActivity.ACTION_UPDATE_ICE
+                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdps.toTypedArray())
+                    bundle.putIntArray(WebRtcTestsActivity.EXTRA_SDP_MLINE_INDEXES, sdpMLineIndexes.toIntArray())
+                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP_MIDS, sdpMids.toTypedArray())
+                }
+
+                intent.putExtras(bundle)
+                startActivity(intent)
+            }
+        }
         lifecycleScope.launchWhenStarted {
             launch(Dispatchers.IO) {
                 // Double check that the long poller is up
@@ -400,8 +434,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
     }
 
     private fun openSettings() {
-        val intent = Intent(this, WebRtcTestsActivity::class.java)
-//        val intent = Intent(this, SettingsActivity::class.java)
+        val intent = Intent(this, SettingsActivity::class.java)
         show(intent, isForResult = false)
     }
 
