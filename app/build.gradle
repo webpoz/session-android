@@ -154,7 +154,7 @@ dependencies {
     testImplementation 'org.robolectric:shadows-multidex:4.4'
 }
 
-def canonicalVersionCode = 222
+def canonicalVersionCode = 221
 def canonicalVersionName = "1.11.9"
 
 def postFixSize = 10
@@ -233,7 +233,6 @@ android {
 
     buildTypes {
         release {
-            debuggable true
             minifyEnabled false
         }
         debug {
