@@ -1,19 +1,76 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
+
 
     <org.webrtc.SurfaceViewRenderer
         android:id="@+id/remote_renderer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        app:layout_constraintBottom_toTopOf="@+id/halfway_guideline"
+        app:layout_constraintTop_toTopOf="parent"/>
+
+    <androidx.constraintlayout.widget.Guideline
+        android:id="@+id/halfway_guideline"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        app:layout_constraintGuide_percent="0.5" />
 
     <org.webrtc.SurfaceViewRenderer
         android:id="@+id/local_renderer"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"/>
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintTop_toBottomOf="@+id/halfway_guideline" />
 
-</LinearLayout>
+    <ImageView
+        android:id="@+id/end_call_button"
+        android:background="@drawable/circle_tintable"
+        android:src="@drawable/ic_baseline_call_end_24"
+        android:padding="@dimen/small_spacing"
+        app:tint="@color/core_white"
+        android:backgroundTint="@color/destructive"
+        android:layout_width="@dimen/large_button_height"
+        android:layout_height="@dimen/large_button_height"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="@dimen/large_spacing"
+        />
+
+    <ImageView
+        android:id="@+id/switch_camera_button"
+        android:background="@drawable/circle_tintable"
+        android:src="@drawable/ic_baseline_flip_camera_android_24"
+        android:padding="@dimen/small_spacing"
+        app:tint="@color/unimportant"
+        android:backgroundTint="@color/unimportant_button_background"
+        android:layout_width="@dimen/large_button_height"
+        android:layout_height="@dimen/large_button_height"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="@dimen/large_spacing"
+        app:layout_constraintHorizontal_bias="0.2"
+        />
+
+    <ImageView
+        android:id="@+id/switch_audio_button"
+        android:background="@drawable/circle_tintable"
+        android:src="@drawable/ic_audio_light"
+        android:padding="@dimen/small_spacing"
+        app:tint="@color/unimportant"
+        android:backgroundTint="@color/unimportant_button_background"
+        android:layout_width="@dimen/large_button_height"
+        android:layout_height="@dimen/large_button_height"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="@dimen/large_spacing"
+        app:layout_constraintHorizontal_bias="0.8"
+        />
+
+</androidx.constraintlayout.widget.ConstraintLayout>

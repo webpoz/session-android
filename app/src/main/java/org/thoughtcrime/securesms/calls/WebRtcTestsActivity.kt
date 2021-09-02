@@ -36,6 +36,8 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     private val eglBase by lazy { EglBase.create() }
     private val surfaceHelper by lazy { SurfaceTextureHelper.create(Thread.currentThread().name, eglBase.eglBaseContext) }
+    private val audioSource by lazy { connectionFactory.createAudioSource(MediaConstraints()) }
+    private val videoCapturer by lazy { createCameraCapturer(Camera2Enumerator(this)) }
 
     private val connectionFactory by lazy {
 
@@ -74,18 +76,32 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
             setEnableHardwareScaler(true)
             init(eglBase.eglBaseContext, null)
         }
+
         remote_renderer.run {
             setMirror(true)
             setEnableHardwareScaler(true)
             init(eglBase.eglBaseContext, null)
         }
 
-        val audioSource = connectionFactory.createAudioSource(MediaConstraints())
+        end_call_button.setOnClickListener {
+            endCall()
+        }
+
+        switch_camera_button.setOnClickListener {
+            videoCapturer?.switchCamera(null)
+        }
+
+        switch_audio_button.setOnClickListener {
+
+        }
+
         val videoSource = connectionFactory.createVideoSource(false)
 
-        val videoCapturer = createCameraCapturer(Camera2Enumerator(this)) ?: kotlin.run { finish(); return }
-        videoCapturer.initialize(surfaceHelper, local_renderer.context, videoSource.capturerObserver)
-        videoCapturer.startCapture(HD_VIDEO_WIDTH, HD_VIDEO_HEIGHT, 10)
+        videoCapturer?.initialize(surfaceHelper, local_renderer.context, videoSource.capturerObserver) ?: run {
+            finish()
+            return
+        }
+        videoCapturer?.startCapture(HD_VIDEO_WIDTH, HD_VIDEO_HEIGHT, 10)
 
         val audioTrack = connectionFactory.createAudioTrack(LOCAL_TRACK_ID + "_audio", audioSource)
         val videoTrack = connectionFactory.createVideoTrack(LOCAL_TRACK_ID, videoSource)
@@ -107,6 +123,19 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
             callAddress = intent.getParcelableExtra(EXTRA_ADDRESS) ?: run { finish(); return }
             peerConnection.createOffer(this, MediaConstraints())
         }
+    }
+
+    private fun endCall() {
+        peerConnection.close()
+        MessageSender.sendNonDurably(
+            CallMessage(SignalServiceProtos.CallMessage.Type.END_CALL,emptyList(),emptyList(), emptyList()),
+            callAddress
+        )
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        endCall()
     }
 
     override fun onNewIntent(intent: Intent?) {
@@ -132,7 +161,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         }
     }
 
-    private fun createCameraCapturer(enumerator: CameraEnumerator): VideoCapturer? {
+    private fun createCameraCapturer(enumerator: CameraEnumerator): CameraVideoCapturer? {
         val deviceNames = enumerator.deviceNames
 
         // First, try to find front facing camera
@@ -140,7 +169,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         for (deviceName in deviceNames) {
             if (enumerator.isFrontFacing(deviceName)) {
                 Log.d("Loki-RTC-vid", "Creating front facing camera capturer.")
-                val videoCapturer: VideoCapturer? = enumerator.createCapturer(deviceName, null)
+                val videoCapturer = enumerator.createCapturer(deviceName, null)
                 if (videoCapturer != null) {
                     return videoCapturer
                 }
@@ -152,7 +181,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         for (deviceName in deviceNames) {
             if (!enumerator.isFrontFacing(deviceName)) {
                 Log.d("Loki-RTC-vid", "Creating other camera capturer.")
-                val videoCapturer: VideoCapturer? = enumerator.createCapturer(deviceName, null)
+                val videoCapturer = enumerator.createCapturer(deviceName, null)
                 if (videoCapturer != null) {
                     return videoCapturer
                 }
