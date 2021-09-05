@@ -36,13 +36,12 @@ import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.utilities.*
 import org.session.libsession.utilities.Util
-import org.session.libsignal.utilities.Log
+import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.*
 import org.session.libsignal.utilities.ThreadUtils
 import org.session.libsignal.utilities.toHexString
 import org.thoughtcrime.securesms.ApplicationContext
 import org.thoughtcrime.securesms.MuteDialog
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
-import org.thoughtcrime.securesms.calls.WebRtcTestsActivity
 import org.thoughtcrime.securesms.conversation.v2.ConversationActivityV2
 import org.thoughtcrime.securesms.conversation.v2.utilities.NotificationUtils
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil
@@ -58,6 +57,7 @@ import org.thoughtcrime.securesms.onboarding.SeedActivity
 import org.thoughtcrime.securesms.onboarding.SeedReminderViewDelegate
 import org.thoughtcrime.securesms.preferences.SettingsActivity
 import org.thoughtcrime.securesms.util.*
+import org.thoughtcrime.securesms.webrtc.CallBottomSheet
 import java.io.IOException
 import java.util.*
 
@@ -139,30 +139,54 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
             // web rtc channel handling
             for (message in WebRtcUtils.SIGNAL_QUEUE) {
                 val sender = Address.fromSerialized(message.sender!!)
-                val intent = Intent(this@HomeActivity, WebRtcTestsActivity::class.java)
-                val bundle = bundleOf(
-                    WebRtcTestsActivity.EXTRA_ADDRESS to sender,
-                )
-                if (message.sdps.isNotEmpty() && message.sdpMids.isEmpty()) {
-                    // offer message
-                    Log.d("Loki-RTC", "answer receive")
-                    val sdps = message.sdps
-                    intent.action = WebRtcTestsActivity.ACTION_ANSWER
-                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdps.toTypedArray())
-                } else if (message.sdpMids.isNotEmpty()) {
-                    // ice candidates message
-                    Log.d("Loki-RTC", "update ice intent")
-                    val sdpMLineIndexes = message.sdpMLineIndexes
-                    val sdpMids = message.sdpMids
-                    val sdps = message.sdps
-                    intent.action = WebRtcTestsActivity.ACTION_UPDATE_ICE
-                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdps.toTypedArray())
-                    bundle.putIntArray(WebRtcTestsActivity.EXTRA_SDP_MLINE_INDEXES, sdpMLineIndexes.toIntArray())
-                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP_MIDS, sdpMids.toTypedArray())
+                synchronized(WebRtcUtils.callCache) {
+                    val set = WebRtcUtils.callCache[sender] ?: mutableSetOf()
+                    set += message
+                    WebRtcUtils.callCache[sender] = set
                 }
-
-                intent.putExtras(bundle)
-                startActivity(intent)
+                when (message.type) {
+                    OFFER -> {
+                        // show bottom sheet
+                        CallBottomSheet().apply {
+                            arguments = bundleOf(
+                                CallBottomSheet.ARGUMENT_ADDRESS to sender,
+                                CallBottomSheet.ARGUMENT_SDP to message.sdps.toTypedArray(),
+                                CallBottomSheet.ARGUMENT_TYPE to message.type!!.number
+                            )
+                            show(this@HomeActivity.supportFragmentManager,"call-sheet")
+                        }
+                    }
+                    ICE_CANDIDATES -> {
+                        // do nothing, already have candidates saved
+                    }
+                    END_CALL -> {
+                        // do nothing, maybe clear the callCache or something
+                    }
+                }
+//                val intent = Intent(this@HomeActivity, WebRtcTestsActivity::class.java)
+//                val bundle = bundleOf(
+//                    WebRtcTestsActivity.EXTRA_ADDRESS to sender,
+//                )
+//                if (message.sdps.isNotEmpty() && message.sdpMids.isEmpty()) {
+//                    // offer message
+//                    Log.d("Loki-RTC", "answer receive")
+//                    val sdps = message.sdps
+//                    intent.action = WebRtcTestsActivity.ACTION_ANSWER
+//                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdps.toTypedArray())
+//                } else if (message.sdpMids.isNotEmpty()) {
+//                    // ice candidates message
+//                    Log.d("Loki-RTC", "update ice intent")
+//                    val sdpMLineIndexes = message.sdpMLineIndexes
+//                    val sdpMids = message.sdpMids
+//                    val sdps = message.sdps
+//                    intent.action = WebRtcTestsActivity.ACTION_UPDATE_ICE
+//                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdps.toTypedArray())
+//                    bundle.putIntArray(WebRtcTestsActivity.EXTRA_SDP_MLINE_INDEXES, sdpMLineIndexes.toIntArray())
+//                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP_MIDS, sdpMids.toTypedArray())
+//                }
+//
+//                intent.putExtras(bundle)
+//                startActivity(intent)
             }
         }
         lifecycleScope.launchWhenStarted {

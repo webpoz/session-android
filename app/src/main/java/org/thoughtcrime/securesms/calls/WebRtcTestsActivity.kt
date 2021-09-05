@@ -2,7 +2,10 @@ package org.thoughtcrime.securesms.calls
 
 import android.content.Intent
 import android.os.Bundle
+import androidx.lifecycle.lifecycleScope
 import kotlinx.android.synthetic.main.activity_webrtc_tests.*
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import network.loki.messenger.R
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
@@ -15,7 +18,7 @@ import org.webrtc.*
 
 
 class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection.Observer,
-    SdpObserver {
+    SdpObserver, RTCStatsCollectorCallback {
 
     companion object {
         const val HD_VIDEO_WIDTH = 320
@@ -123,6 +126,20 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
             callAddress = intent.getParcelableExtra(EXTRA_ADDRESS) ?: run { finish(); return }
             peerConnection.createOffer(this, MediaConstraints())
         }
+
+        lifecycleScope.launchWhenResumed {
+            while (this.isActive) {
+                delay(5_000L)
+                peerConnection.getStats(this@WebRtcTestsActivity)
+            }
+        }
+
+    }
+
+    override fun onStatsDelivered(statsReport: RTCStatsReport?) {
+        statsReport?.let { report ->
+            Log.d("Loki-RTC", "report is: $report")
+        }
     }
 
     private fun endCall() {
@@ -131,6 +148,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
             CallMessage(SignalServiceProtos.CallMessage.Type.END_CALL,emptyList(),emptyList(), emptyList()),
             callAddress
         )
+        finish()
     }
 
     override fun onDestroy() {

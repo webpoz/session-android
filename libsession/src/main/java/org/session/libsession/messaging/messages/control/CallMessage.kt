@@ -11,6 +11,8 @@ class CallMessage(): ControlMessage() {
 
     override val isSelfSendValid: Boolean = false
 
+    override val ttl: Long = 5 * 60 * 1000
+
     override fun isValid(): Boolean = super.isValid() && type != null && !sdps.isNullOrEmpty()
 
     constructor(type: SignalServiceProtos.CallMessage.Type,
