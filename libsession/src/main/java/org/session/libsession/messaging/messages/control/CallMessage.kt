@@ -13,7 +13,8 @@ class CallMessage(): ControlMessage() {
 
     override val ttl: Long = 5 * 60 * 1000
 
-    override fun isValid(): Boolean = super.isValid() && type != null && !sdps.isNullOrEmpty()
+    override fun isValid(): Boolean = super.isValid() && type != null
+            && (!sdps.isNullOrEmpty() || type == SignalServiceProtos.CallMessage.Type.END_CALL)
 
     constructor(type: SignalServiceProtos.CallMessage.Type,
                 sdps: List<String>,
@@ -27,6 +28,8 @@ class CallMessage(): ControlMessage() {
 
     companion object {
         const val TAG = "CallMessage"
+
+        fun endCall() = CallMessage(SignalServiceProtos.CallMessage.Type.END_CALL, emptyList(), emptyList(), emptyList())
 
         fun fromProto(proto: SignalServiceProtos.Content): CallMessage? {
             val callMessageProto = if (proto.hasCallMessage()) proto.callMessage else return null
@@ -56,4 +59,32 @@ class CallMessage(): ControlMessage() {
             )
             .build()
     }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+
+        other as CallMessage
+
+        if (type != other.type) return false
+        if (sdps != other.sdps) return false
+        if (sdpMLineIndexes != other.sdpMLineIndexes) return false
+        if (sdpMids != other.sdpMids) return false
+        if (isSelfSendValid != other.isSelfSendValid) return false
+        if (ttl != other.ttl) return false
+
+        return true
+    }
+
+    override fun hashCode(): Int {
+        var result = type?.hashCode() ?: 0
+        result = 31 * result + sdps.hashCode()
+        result = 31 * result + sdpMLineIndexes.hashCode()
+        result = 31 * result + sdpMids.hashCode()
+        result = 31 * result + isSelfSendValid.hashCode()
+        result = 31 * result + ttl.hashCode()
+        return result
+    }
+
+
 }

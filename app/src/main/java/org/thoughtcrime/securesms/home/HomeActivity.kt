@@ -20,6 +20,7 @@ import androidx.loader.app.LoaderManager
 import androidx.loader.content.Loader
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import kotlinx.android.synthetic.main.activity_home.*
 import kotlinx.android.synthetic.main.seed_reminder_stub.*
 import kotlinx.android.synthetic.main.seed_reminder_stub.view.*
@@ -42,6 +43,7 @@ import org.session.libsignal.utilities.toHexString
 import org.thoughtcrime.securesms.ApplicationContext
 import org.thoughtcrime.securesms.MuteDialog
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
+import org.thoughtcrime.securesms.calls.WebRtcTestsActivity
 import org.thoughtcrime.securesms.conversation.v2.ConversationActivityV2
 import org.thoughtcrime.securesms.conversation.v2.utilities.NotificationUtils
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil
@@ -138,6 +140,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
         lifecycleScope.launchWhenCreated {
             // web rtc channel handling
             for (message in WebRtcUtils.SIGNAL_QUEUE) {
+
                 val sender = Address.fromSerialized(message.sender!!)
                 synchronized(WebRtcUtils.callCache) {
                     val set = WebRtcUtils.callCache[sender] ?: mutableSetOf()
@@ -156,37 +159,21 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
                             show(this@HomeActivity.supportFragmentManager,"call-sheet")
                         }
                     }
-                    ICE_CANDIDATES -> {
-                        // do nothing, already have candidates saved
-                    }
                     END_CALL -> {
-                        // do nothing, maybe clear the callCache or something
+                        // dismiss the call sheet
+                        supportFragmentManager.findFragmentByTag("call-sheet")?.let { callSheet ->
+                            if (callSheet is BottomSheetDialogFragment) {
+                                callSheet.dismiss()
+                            }
+                        }
+                        // clear the callCache for this sender
+                        synchronized(WebRtcUtils.callCache) {
+                            WebRtcUtils.callCache[sender] = mutableSetOf()
+                        }
+                        sendBroadcast(Intent(WebRtcTestsActivity.ACTION_END))
                     }
+                    else -> { /* do nothing */ }
                 }
-//                val intent = Intent(this@HomeActivity, WebRtcTestsActivity::class.java)
-//                val bundle = bundleOf(
-//                    WebRtcTestsActivity.EXTRA_ADDRESS to sender,
-//                )
-//                if (message.sdps.isNotEmpty() && message.sdpMids.isEmpty()) {
-//                    // offer message
-//                    Log.d("Loki-RTC", "answer receive")
-//                    val sdps = message.sdps
-//                    intent.action = WebRtcTestsActivity.ACTION_ANSWER
-//                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdps.toTypedArray())
-//                } else if (message.sdpMids.isNotEmpty()) {
-//                    // ice candidates message
-//                    Log.d("Loki-RTC", "update ice intent")
-//                    val sdpMLineIndexes = message.sdpMLineIndexes
-//                    val sdpMids = message.sdpMids
-//                    val sdps = message.sdps
-//                    intent.action = WebRtcTestsActivity.ACTION_UPDATE_ICE
-//                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdps.toTypedArray())
-//                    bundle.putIntArray(WebRtcTestsActivity.EXTRA_SDP_MLINE_INDEXES, sdpMLineIndexes.toIntArray())
-//                    bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP_MIDS, sdpMids.toTypedArray())
-//                }
-//
-//                intent.putExtras(bundle)
-//                startActivity(intent)
             }
         }
         lifecycleScope.launchWhenStarted {

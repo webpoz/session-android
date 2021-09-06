@@ -1,6 +1,9 @@
 package org.thoughtcrime.securesms.calls
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
 import androidx.lifecycle.lifecycleScope
 import kotlinx.android.synthetic.main.activity_webrtc_tests.*
@@ -9,6 +12,7 @@ import kotlinx.coroutines.isActive
 import network.loki.messenger.R
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
+import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.Debouncer
 import org.session.libsignal.protos.SignalServiceProtos
@@ -28,7 +32,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         private const val LOCAL_STREAM_ID = "local_track"
 
         const val ACTION_ANSWER = "answer"
-        const val ACTION_UPDATE_ICE = "updateIce"
+        const val ACTION_END = "end-call"
 
         const val EXTRA_SDP = "WebRtcTestsActivity_EXTRA_SDP"
         const val EXTRA_ADDRESS = "WebRtcTestsActivity_EXTRA_ADDRESS"
@@ -41,6 +45,8 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
     private val surfaceHelper by lazy { SurfaceTextureHelper.create(Thread.currentThread().name, eglBase.eglBaseContext) }
     private val audioSource by lazy { connectionFactory.createAudioSource(MediaConstraints()) }
     private val videoCapturer by lazy { createCameraCapturer(Camera2Enumerator(this)) }
+
+    private val acceptedCallMessageHashes = mutableSetOf<Int>()
 
     private val connectionFactory by lazy {
 
@@ -127,13 +133,44 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
             peerConnection.createOffer(this, MediaConstraints())
         }
 
-        lifecycleScope.launchWhenResumed {
+        lifecycleScope.launchWhenCreated {
             while (this.isActive) {
-                delay(5_000L)
-                peerConnection.getStats(this@WebRtcTestsActivity)
+                val answer = synchronized(WebRtcUtils.callCache) {
+                    WebRtcUtils.callCache[callAddress]?.firstOrNull { it.type == SignalServiceProtos.CallMessage.Type.ANSWER }
+                }
+                if (answer != null) {
+                    peerConnection.setRemoteDescription(
+                        this@WebRtcTestsActivity,
+                        SessionDescription(SessionDescription.Type.ANSWER, answer.sdps[0])
+                    )
+                    break
+                }
+                delay(2_000L)
             }
         }
 
+        registerReceiver(object: BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) {
+                endCall()
+            }
+        }, IntentFilter(ACTION_END))
+
+        lifecycleScope.launchWhenResumed {
+            while (this.isActive) {
+                delay(2_000L)
+                peerConnection.getStats(this@WebRtcTestsActivity)
+                synchronized(WebRtcUtils.callCache) {
+                    val set = WebRtcUtils.callCache[callAddress] ?: mutableSetOf()
+                    set.filter { it.hashCode() !in acceptedCallMessageHashes
+                            && it.type == SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES }.forEach { callMessage ->
+                        callMessage.iceCandidates().forEach { candidate ->
+                            peerConnection.addIceCandidate(candidate)
+                        }
+                        acceptedCallMessageHashes.add(callMessage.hashCode())
+                    }
+                }
+            }
+        }
     }
 
     override fun onStatsDelivered(statsReport: RTCStatsReport?) {
@@ -143,40 +180,17 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
     }
 
     private fun endCall() {
-        peerConnection.close()
         MessageSender.sendNonDurably(
-            CallMessage(SignalServiceProtos.CallMessage.Type.END_CALL,emptyList(),emptyList(), emptyList()),
+            CallMessage.endCall(),
             callAddress
         )
+        peerConnection.close()
         finish()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         endCall()
-    }
-
-    override fun onNewIntent(intent: Intent?) {
-        super.onNewIntent(intent)
-        if (intent == null) return
-        callAddress = intent.getParcelableExtra(EXTRA_ADDRESS) ?: run { finish(); return }
-        when (intent.action) {
-            ACTION_ANSWER -> {
-                peerConnection.setRemoteDescription(this,
-                    SessionDescription(SessionDescription.Type.ANSWER, intent.getStringArrayExtra(EXTRA_SDP)!![0])
-                )
-            }
-            ACTION_UPDATE_ICE -> {
-                val sdpIndexes = intent.getIntArrayExtra(EXTRA_SDP_MLINE_INDEXES)!!
-                val sdpMids = intent.getStringArrayExtra(EXTRA_SDP_MIDS)!!
-                val sdp = intent.getStringArrayExtra(EXTRA_SDP)!!
-                val amount = minOf(sdpIndexes.size, sdpMids.size)
-                (0 until amount).map { index ->
-                    val candidate = IceCandidate(sdpMids[index], sdpIndexes[index], sdp[index])
-                    peerConnection.addIceCandidate(candidate)
-                }
-            }
-        }
     }
 
     private fun createCameraCapturer(enumerator: CameraEnumerator): CameraVideoCapturer? {
@@ -314,6 +328,13 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     override fun onSetFailure(p0: String?) {
         Log.d("Loki-RTC", "onSetFailure: $p0")
+    }
+
+    private fun CallMessage.iceCandidates(): List<IceCandidate> {
+        val candidateSize = sdpMids.size
+        return (0 until candidateSize).map { i ->
+            IceCandidate(sdpMids[i], sdpMLineIndexes[i], sdps[i])
+        }
     }
 
 }
