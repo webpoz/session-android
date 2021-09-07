@@ -14,6 +14,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import androidx.loader.app.LoaderManager
@@ -150,13 +151,15 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
                 when (message.type) {
                     OFFER -> {
                         // show bottom sheet
-                        CallBottomSheet().apply {
-                            arguments = bundleOf(
-                                CallBottomSheet.ARGUMENT_ADDRESS to sender,
-                                CallBottomSheet.ARGUMENT_SDP to message.sdps.toTypedArray(),
-                                CallBottomSheet.ARGUMENT_TYPE to message.type!!.number
-                            )
-                            show(this@HomeActivity.supportFragmentManager,"call-sheet")
+                        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                            CallBottomSheet().apply {
+                                arguments = bundleOf(
+                                    CallBottomSheet.ARGUMENT_ADDRESS to sender,
+                                    CallBottomSheet.ARGUMENT_SDP to message.sdps.toTypedArray(),
+                                    CallBottomSheet.ARGUMENT_TYPE to message.type!!.number
+                                )
+                                show(this@HomeActivity.supportFragmentManager,"call-sheet")
+                            }
                         }
                     }
                     END_CALL -> {

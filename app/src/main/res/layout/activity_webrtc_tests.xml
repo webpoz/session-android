@@ -2,7 +2,42 @@
 <androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <TextView
+        android:padding="@dimen/small_spacing"
+        android:elevation="8dp"
+        tools:visibility="visible"
+        android:textColor="@color/white"
+        tools:text="relay"
+        android:visibility="gone"
+        android:background="@drawable/pill"
+        android:backgroundTint="@color/black"
+        android:layout_marginTop="@dimen/medium_spacing"
+        android:id="@+id/local_candidate_info"
+        app:layout_constraintEnd_toStartOf="@id/remote_candidate_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"/>
+
+    <TextView
+        android:padding="@dimen/small_spacing"
+        android:elevation="8dp"
+        tools:visibility="visible"
+        tools:text="relay"
+        android:visibility="gone"
+        android:textColor="@color/white"
+        android:background="@drawable/pill"
+        android:backgroundTint="@color/black"
+        android:layout_marginTop="@dimen/medium_spacing"
+        android:id="@+id/remote_candidate_info"
+        app:layout_constraintStart_toEndOf="@id/local_candidate_info"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
 
     <org.webrtc.SurfaceViewRenderer

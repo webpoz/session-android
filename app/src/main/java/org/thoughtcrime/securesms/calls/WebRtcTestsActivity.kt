@@ -1,10 +1,12 @@
 package org.thoughtcrime.securesms.calls
 
+import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import kotlinx.android.synthetic.main.activity_webrtc_tests.*
 import kotlinx.coroutines.delay
@@ -18,6 +20,7 @@ import org.session.libsession.utilities.Debouncer
 import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
+import org.thoughtcrime.securesms.permissions.Permissions
 import org.webrtc.*
 
 
@@ -63,6 +66,26 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
     private val candidates: MutableList<IceCandidate> = mutableListOf()
     private val iceDebouncer = Debouncer(2_000)
 
+    private var localCandidateType: String? = null
+        set(value) {
+            field = value
+            if (value != null) {
+                // show it
+                local_candidate_info.isVisible = true
+                local_candidate_info.text = "local: $value"
+            }
+        }
+
+    private var remoteCandidateType: String? = null
+        set(value) {
+            field = value
+            if (value != null) {
+                remote_candidate_info.isVisible = true
+                remote_candidate_info.text = "remote: $value"
+            }
+            // update text
+        }
+
     private lateinit var callAddress: Address
     private val peerConnection by lazy {
         // TODO: in a lokinet world, ice servers shouldn't be needed as .loki addresses should suffice to p2p
@@ -80,14 +103,20 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         super.onCreate(savedInstanceState, ready)
         setContentView(R.layout.activity_webrtc_tests)
 
+        //TODO: better handling of permissions
+        Permissions.with(this)
+            .request(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+            .onAllGranted {
+                setupStreams()
+            }
+            .execute()
+
         local_renderer.run {
-            setMirror(true)
             setEnableHardwareScaler(true)
             init(eglBase.eglBaseContext, null)
         }
 
         remote_renderer.run {
-            setMirror(true)
             setEnableHardwareScaler(true)
             init(eglBase.eglBaseContext, null)
         }
@@ -103,24 +132,6 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         switch_audio_button.setOnClickListener {
 
         }
-
-        val videoSource = connectionFactory.createVideoSource(false)
-
-        videoCapturer?.initialize(surfaceHelper, local_renderer.context, videoSource.capturerObserver) ?: run {
-            finish()
-            return
-        }
-        videoCapturer?.startCapture(HD_VIDEO_WIDTH, HD_VIDEO_HEIGHT, 10)
-
-        val audioTrack = connectionFactory.createAudioTrack(LOCAL_TRACK_ID + "_audio", audioSource)
-        val videoTrack = connectionFactory.createVideoTrack(LOCAL_TRACK_ID, videoSource)
-        videoTrack.addSink(local_renderer)
-
-        val stream = connectionFactory.createLocalMediaStream(LOCAL_STREAM_ID)
-        stream.addTrack(videoTrack)
-        stream.addTrack(audioTrack)
-
-        peerConnection.addStream(stream)
 
         // create either call or answer
         if (intent.action == ACTION_ANSWER) {
@@ -175,11 +186,27 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     override fun onStatsDelivered(statsReport: RTCStatsReport?) {
         statsReport?.let { report ->
+            val usedConnection = report.statsMap.filter { (_,v) -> v.type == "candidate-pair" && v.members["writable"] == true }.asIterable().firstOrNull()?.value ?: return@let
+
+            usedConnection.members["remoteCandidateId"]?.let { candidate ->
+                runOnUiThread {
+                    remoteCandidateType = report.statsMap[candidate]?.members?.get("candidateType") as? String
+                }
+            }
+
+            usedConnection.members["localCandidateId"]?.let { candidate ->
+                runOnUiThread {
+                    localCandidateType = report.statsMap[candidate]?.members?.get("candidateType") as? String
+                }
+            }
+
             Log.d("Loki-RTC", "report is: $report")
         }
     }
 
     private fun endCall() {
+        if (isFinishing) return
+
         MessageSender.sendNonDurably(
             CallMessage.endCall(),
             callAddress
@@ -191,6 +218,26 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
     override fun onDestroy() {
         super.onDestroy()
         endCall()
+    }
+
+    private fun setupStreams() {
+        val videoSource = connectionFactory.createVideoSource(false)
+
+        videoCapturer?.initialize(surfaceHelper, local_renderer.context, videoSource.capturerObserver) ?: run {
+            finish()
+            return
+        }
+        videoCapturer?.startCapture(HD_VIDEO_WIDTH, HD_VIDEO_HEIGHT, 10)
+
+        val audioTrack = connectionFactory.createAudioTrack(LOCAL_TRACK_ID + "_audio", audioSource)
+        val videoTrack = connectionFactory.createVideoTrack(LOCAL_TRACK_ID, videoSource)
+        videoTrack.addSink(local_renderer)
+
+        val stream = connectionFactory.createLocalMediaStream(LOCAL_STREAM_ID)
+        stream.addTrack(videoTrack)
+        stream.addTrack(audioTrack)
+
+        peerConnection.addStream(stream)
     }
 
     private fun createCameraCapturer(enumerator: CameraEnumerator): CameraVideoCapturer? {
@@ -237,16 +284,6 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {
         Log.d("Loki-RTC", "onIceGatheringChange: $p0")
-        p0 ?: return
-        Log.d("Loki-RTC","sending IceCandidates of size: ${candidates.size}")
-        MessageSender.sendNonDurably(
-            CallMessage(SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES,
-                candidates.map { it.sdp },
-                candidates.map { it.sdpMLineIndex },
-                candidates.map { it.sdpMid }
-            ),
-            callAddress
-        )
     }
 
     override fun onIceCandidate(iceCandidate: IceCandidate?) {
