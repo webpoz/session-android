@@ -39,6 +39,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
         const val EXTRA_SDP = "WebRtcTestsActivity_EXTRA_SDP"
         const val EXTRA_ADDRESS = "WebRtcTestsActivity_EXTRA_ADDRESS"
+        const val EXTRA_RELAY_USED = "WebRtcTestsActivity_EXTRA_RELAY_USED"
         const val EXTRA_SDP_MLINE_INDEXES = "WebRtcTestsActivity_EXTRA_SDP_MLINE_INDEXES"
         const val EXTRA_SDP_MIDS = "WebRtcTestsActivity_EXTRA_SDP_MIDS"
 
@@ -87,6 +88,8 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         }
 
     private lateinit var callAddress: Address
+    private var relayUsed: Boolean = true
+
     private val peerConnection by lazy {
         // TODO: in a lokinet world, ice servers shouldn't be needed as .loki addresses should suffice to p2p
         val server = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
@@ -94,7 +97,11 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         val server2 = PeerConnection.IceServer.builder("stun:stun2.l.google.com:19302").createIceServer()
         val server3 = PeerConnection.IceServer.builder("stun:stun3.l.google.com:19302").createIceServer()
         val server4 = PeerConnection.IceServer.builder("stun:stun4.l.google.com:19302").createIceServer()
-        val rtcConfig = PeerConnection.RTCConfiguration(listOf(server, server1, server2, server3, server4))
+        val iceServers = mutableListOf(server,server1,server2,server3,server4)
+        if (relayUsed) {
+            // add relay server
+        }
+        val rtcConfig = PeerConnection.RTCConfiguration(iceServers)
         rtcConfig.keyType = PeerConnection.KeyType.ECDSA
         connectionFactory.createPeerConnection(rtcConfig, this)!!
     }
@@ -102,6 +109,8 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
     override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
         super.onCreate(savedInstanceState, ready)
         setContentView(R.layout.activity_webrtc_tests)
+
+        relayUsed = intent.getBooleanExtra(EXTRA_RELAY_USED, true)
 
         //TODO: better handling of permissions
         Permissions.with(this)

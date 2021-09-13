@@ -99,7 +99,7 @@ object ConversationMenuHelper {
             inflater.inflate(R.menu.menu_conversation_notification_settings, menu)
         }
 
-        // Call Tests
+        // TODO: Call Tests
         if (!isOpenGroup) {
             inflater.inflate(R.menu.menu_conversation_call, menu)
         }
@@ -182,10 +182,24 @@ object ConversationMenuHelper {
     }
 
     private fun call(context: Context, thread: Recipient) {
-        val intent = Intent(context, WebRtcTestsActivity::class.java)
-        intent.putExtra(WebRtcTestsActivity.EXTRA_ADDRESS, thread.address)
-        val activity = context as AppCompatActivity
-        activity.startActivity(intent)
+        AlertDialog.Builder(context)
+            .setTitle("Call")
+            .setMessage("Use relay?")
+            .setPositiveButton("Use Relay") { d, w ->
+                val intent = Intent(context, WebRtcTestsActivity::class.java)
+                intent.putExtra(WebRtcTestsActivity.EXTRA_ADDRESS, thread.address)
+                intent.putExtra(WebRtcTestsActivity.EXTRA_RELAY_USED, false)
+                val activity = context as AppCompatActivity
+                activity.startActivity(intent)
+            }
+            .setNeutralButton("P2P only") { d, w ->
+                val intent = Intent(context, WebRtcTestsActivity::class.java)
+                intent.putExtra(WebRtcTestsActivity.EXTRA_ADDRESS, thread.address)
+                intent.putExtra(WebRtcTestsActivity.EXTRA_RELAY_USED, false)
+                val activity = context as AppCompatActivity
+                activity.startActivity(intent)
+            }
+            .show()
     }
 
     @SuppressLint("StaticFieldLeak")
