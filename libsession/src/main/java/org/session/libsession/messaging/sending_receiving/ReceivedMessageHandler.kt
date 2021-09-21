@@ -287,7 +287,8 @@ private fun handleNewClosedGroup(sender: String, sentTimestamp: Long, groupPubli
     val userPublicKey = TextSecurePreferences.getLocalNumber(context)
     // Create the group
     val groupID = GroupUtil.doubleEncodeGroupID(groupPublicKey)
-    if (storage.getGroup(groupID) != null) {
+    val groupExists = storage.getGroup(groupID) != null
+    if (groupExists) {
         // Update the group
         if (!storage.isGroupActive(groupPublicKey)) {
             // Clear zombie list if the group wasn't active
@@ -311,10 +312,10 @@ private fun handleNewClosedGroup(sender: String, sentTimestamp: Long, groupPubli
     // Notify the PN server
     PushNotificationAPI.performOperation(PushNotificationAPI.ClosedGroupOperation.Subscribe, groupPublicKey, storage.getUserPublicKey()!!)
     // Notify the user
-    if (userPublicKey == sender) {
+    if (userPublicKey == sender && !groupExists) {
         val threadID = storage.getOrCreateThreadIdFor(Address.fromSerialized(groupID))
         storage.insertOutgoingInfoMessage(context, groupID, SignalServiceGroup.Type.CREATION, name, members, admins, threadID, sentTimestamp)
-    } else {
+    } else if (userPublicKey != sender) {
         storage.insertIncomingInfoMessage(context, sender, groupID, SignalServiceGroup.Type.CREATION, name, members, admins, sentTimestamp)
     }
     // Start polling
