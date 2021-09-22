@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
+import android.view.MenuItem
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import kotlinx.android.synthetic.main.activity_webrtc_tests.*
@@ -28,8 +29,8 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
     SdpObserver, RTCStatsCollectorCallback {
 
     companion object {
-        const val HD_VIDEO_WIDTH = 320
-        const val HD_VIDEO_HEIGHT = 240
+        const val HD_VIDEO_WIDTH = 900
+        const val HD_VIDEO_HEIGHT = 1600
         const val CALL_ID = "call_id_session"
         private const val LOCAL_TRACK_ID = "local_track"
         private const val LOCAL_STREAM_ID = "local_track"
@@ -104,6 +105,18 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         val rtcConfig = PeerConnection.RTCConfiguration(iceServers)
         rtcConfig.keyType = PeerConnection.KeyType.ECDSA
         connectionFactory.createPeerConnection(rtcConfig, this)!!
+    }
+
+    override fun onBackPressed() {
+        endCall()
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        if (item.itemId == android.R.id.home) {
+            endCall()
+            return true
+        }
+        return super.onOptionsItemSelected(item)
     }
 
     override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
