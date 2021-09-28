@@ -52,8 +52,6 @@ import org.thoughtcrime.securesms.components.TypingStatusSender;
 import org.thoughtcrime.securesms.crypto.KeyPairUtilities;
 import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.LokiAPIDatabase;
-import org.thoughtcrime.securesms.dependencies.InjectableType;
-import org.thoughtcrime.securesms.dependencies.SignalCommunicationModule;
 import org.thoughtcrime.securesms.groups.OpenGroupManager;
 import org.thoughtcrime.securesms.home.HomeActivity;
 import org.thoughtcrime.securesms.jobmanager.DependencyInjector;
@@ -91,7 +89,7 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
-import dagger.ObjectGraph;
+import dagger.hilt.android.HiltAndroidApp;
 import kotlin.Unit;
 import kotlinx.coroutines.Job;
 import network.loki.messenger.BuildConfig;
@@ -104,6 +102,7 @@ import network.loki.messenger.BuildConfig;
  *
  * @author Moxie Marlinspike
  */
+@HiltAndroidApp
 public class ApplicationContext extends Application implements DependencyInjector, DefaultLifecycleObserver {
 
     public static final String PREFERENCES_NAME = "SecureSMS-Preferences";
@@ -116,11 +115,9 @@ public class ApplicationContext extends Application implements DependencyInjecto
     private JobManager jobManager;
     private ReadReceiptManager readReceiptManager;
     private ProfileManager profileManager;
-    private ObjectGraph objectGraph;
     public MessageNotifier messageNotifier = null;
     public Poller poller = null;
     public Broadcaster broadcaster = null;
-    public SignalCommunicationModule communicationModule;
     private Job firebaseInstanceIdJob;
     private Handler conversationListNotificationHandler;
     private final AndroidLogger logger = new AndroidLogger();
@@ -143,7 +140,6 @@ public class ApplicationContext extends Application implements DependencyInjecto
         initializeSecurityProvider();
         initializeLogging();
         initializeCrashHandling();
-        initializeDependencyInjection();
         NotificationChannels.create(this);
         ProcessLifecycleOwner.get().getLifecycle().addObserver(this);
         AppContext.INSTANCE.configureKovenant();
@@ -213,9 +209,6 @@ public class ApplicationContext extends Application implements DependencyInjecto
 
     @Override
     public void injectDependencies(Object object) {
-        if (object instanceof InjectableType) {
-            objectGraph.inject(object);
-        }
     }
 
     public void initializeLocaleParser() {
@@ -294,11 +287,6 @@ public class ApplicationContext extends Application implements DependencyInjecto
             .setJobStorage(new FastJobStorage(DatabaseFactory.getJobDatabase(this)))
             .setDependencyInjector(this)
             .build());
-    }
-
-    private void initializeDependencyInjection() {
-        communicationModule = new SignalCommunicationModule(this);
-        this.objectGraph = ObjectGraph.create(communicationModule);
     }
 
     private void initializeExpiringMessageManager() {

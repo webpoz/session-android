@@ -443,7 +443,7 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
     }
 
     private fun setUpLinkPreviewObserver() {
-        val linkPreviewViewModel = ViewModelProviders.of(this, LinkPreviewViewModel.Factory(LinkPreviewRepository(this)))[LinkPreviewViewModel::class.java]
+        val linkPreviewViewModel = ViewModelProviders.of(this, LinkPreviewViewModel.Factory(LinkPreviewRepository()))[LinkPreviewViewModel::class.java]
         this.linkPreviewViewModel = linkPreviewViewModel
         if (!TextSecurePreferences.isLinkPreviewsEnabled(this)) {
             linkPreviewViewModel.onUserCancel(); return
