@@ -17,6 +17,7 @@ import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.recipients.Recipient
 import org.thoughtcrime.securesms.calls.WebRtcTestsActivity
 import org.thoughtcrime.securesms.mms.GlideApp
+import java.util.*
 
 class CallBottomSheet: BottomSheetDialogFragment() {
 
@@ -24,6 +25,7 @@ class CallBottomSheet: BottomSheetDialogFragment() {
         const val ARGUMENT_ADDRESS = "CallBottomSheet_ADDRESS"
         const val ARGUMENT_SDP = "CallBottomSheet_SDP"
         const val ARGUMENT_TYPE = "CallBottomSheet_TYPE"
+        const val ARGUMENT_CALL_ID = "CallBottomSheet_CALL_ID"
     }
 
     private lateinit var address: Address
@@ -41,6 +43,8 @@ class CallBottomSheet: BottomSheetDialogFragment() {
 
         address = arguments?.getParcelable(ARGUMENT_ADDRESS) ?: return dismiss()
         val sdp = arguments?.getStringArray(ARGUMENT_SDP) ?: return dismiss()
+        val callId = arguments?.getString(ARGUMENT_CALL_ID) ?: return dismiss()
+        val callUUID = UUID.fromString(callId)
         val recipient = Recipient.from(requireContext(), address, false)
         profilePictureView.publicKey = address.serialize()
         profilePictureView.glide = GlideApp.with(this)
@@ -53,7 +57,8 @@ class CallBottomSheet: BottomSheetDialogFragment() {
             val intent = Intent(requireContext(), WebRtcTestsActivity::class.java)
             val bundle = bundleOf(
                 WebRtcTestsActivity.EXTRA_ADDRESS to address,
-                WebRtcTestsActivity.EXTRA_RELAY_USED to relaySwitch.isChecked
+                WebRtcTestsActivity.EXTRA_RELAY_USED to relaySwitch.isChecked,
+                WebRtcTestsActivity.EXTRA_CALL_ID to callId
             )
             intent.action = WebRtcTestsActivity.ACTION_ANSWER
             bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdp)
@@ -64,7 +69,7 @@ class CallBottomSheet: BottomSheetDialogFragment() {
         }
 
         declineButton.setOnClickListener {
-            MessageSender.sendNonDurably(CallMessage.endCall(), address)
+            MessageSender.sendNonDurably(CallMessage.endCall(callUUID), address)
             dismiss()
         }
 

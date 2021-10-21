@@ -2,16 +2,18 @@ package org.session.libsession.messaging.messages.control
 
 import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.utilities.Log
+import java.util.*
 
 class CallMessage(): ControlMessage() {
     var type: SignalServiceProtos.CallMessage.Type? = null
     var sdps: List<String> = listOf()
     var sdpMLineIndexes: List<Int> = listOf()
     var sdpMids: List<String> = listOf()
+    var callId: UUID? = null
 
     override val isSelfSendValid: Boolean = false
 
-    override val ttl: Long = 5 * 60 * 1000
+    override val ttl: Long = 300000L // 30s
 
     override fun isValid(): Boolean = super.isValid() && type != null
             && (!sdps.isNullOrEmpty() || type == SignalServiceProtos.CallMessage.Type.END_CALL)
@@ -19,17 +21,19 @@ class CallMessage(): ControlMessage() {
     constructor(type: SignalServiceProtos.CallMessage.Type,
                 sdps: List<String>,
                 sdpMLineIndexes: List<Int>,
-                sdpMids: List<String>) : this() {
+                sdpMids: List<String>,
+                callId: UUID) : this() {
         this.type = type
         this.sdps = sdps
         this.sdpMLineIndexes = sdpMLineIndexes
         this.sdpMids = sdpMids
+        this.callId = callId
     }
 
     companion object {
         const val TAG = "CallMessage"
 
-        fun endCall() = CallMessage(SignalServiceProtos.CallMessage.Type.END_CALL, emptyList(), emptyList(), emptyList())
+        fun endCall(callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.END_CALL, emptyList(), emptyList(), emptyList(), callId)
 
         fun fromProto(proto: SignalServiceProtos.Content): CallMessage? {
             val callMessageProto = if (proto.hasCallMessage()) proto.callMessage else return null
@@ -37,7 +41,8 @@ class CallMessage(): ControlMessage() {
             val sdps = callMessageProto.sdpsList
             val sdpMLineIndexes = callMessageProto.sdpMLineIndexesList
             val sdpMids = callMessageProto.sdpMidsList
-            return CallMessage(type,sdps, sdpMLineIndexes, sdpMids)
+            val callId = UUID.fromString(callMessageProto.uuid)
+            return CallMessage(type,sdps, sdpMLineIndexes, sdpMids, callId)
         }
     }
 
@@ -52,6 +57,7 @@ class CallMessage(): ControlMessage() {
             .addAllSdps(sdps)
             .addAllSdpMLineIndexes(sdpMLineIndexes)
             .addAllSdpMids(sdpMids)
+            .setUuid(callId!!.toString())
 
         return SignalServiceProtos.Content.newBuilder()
             .setCallMessage(
@@ -66,6 +72,7 @@ class CallMessage(): ControlMessage() {
 
         other as CallMessage
 
+        if (callId != other.callId) return false
         if (type != other.type) return false
         if (sdps != other.sdps) return false
         if (sdpMLineIndexes != other.sdpMLineIndexes) return false

@@ -12,13 +12,16 @@ import android.text.SpannableString
 import android.text.style.ForegroundColorSpan
 import android.view.View
 import android.widget.Toast
+import androidx.core.os.bundleOf
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.Observer
 import androidx.lifecycle.lifecycleScope
 import androidx.loader.app.LoaderManager
 import androidx.loader.content.Loader
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.android.synthetic.main.activity_home.*
 import kotlinx.android.synthetic.main.seed_reminder_stub.*
@@ -33,13 +36,16 @@ import org.greenrobot.eventbus.Subscribe
 import org.greenrobot.eventbus.ThreadMode
 import org.session.libsession.messaging.jobs.JobQueue
 import org.session.libsession.messaging.sending_receiving.MessageSender
+import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.utilities.*
 import org.session.libsession.utilities.Util
+import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.utilities.ThreadUtils
 import org.session.libsignal.utilities.toHexString
 import org.thoughtcrime.securesms.ApplicationContext
 import org.thoughtcrime.securesms.MuteDialog
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
+import org.thoughtcrime.securesms.calls.WebRtcTestsActivity
 import org.thoughtcrime.securesms.conversation.v2.ConversationActivityV2
 import org.thoughtcrime.securesms.conversation.v2.utilities.NotificationUtils
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil
@@ -58,6 +64,7 @@ import org.thoughtcrime.securesms.onboarding.SeedActivity
 import org.thoughtcrime.securesms.onboarding.SeedReminderViewDelegate
 import org.thoughtcrime.securesms.preferences.SettingsActivity
 import org.thoughtcrime.securesms.util.*
+import org.thoughtcrime.securesms.webrtc.CallBottomSheet
 import java.io.IOException
 import java.util.*
 import javax.inject.Inject
@@ -141,6 +148,50 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
         }
         this.broadcastReceiver = broadcastReceiver
         LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver, IntentFilter("blockedContactsChanged"))
+        lifecycleScope.launchWhenCreated {
+            // web rtc channel handling
+            for (message in WebRtcUtils.SIGNAL_QUEUE) {
+                // TODO: check errors here in the
+                val sender = Address.fromSerialized(message.sender!!)
+                val callId = message.callId!!
+                synchronized(WebRtcUtils.callCache) {
+                    val set = WebRtcUtils.callCache[callId] ?: mutableSetOf()
+                    set += message
+                    WebRtcUtils.callCache[callId] = set
+                }
+                when (message.type) {
+                    SignalServiceProtos.CallMessage.Type.OFFER -> {
+                        // show bottom sheet
+                        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                            CallBottomSheet().apply {
+                                arguments = bundleOf(
+                                    CallBottomSheet.ARGUMENT_ADDRESS to sender,
+                                    CallBottomSheet.ARGUMENT_SDP to message.sdps.toTypedArray(),
+                                    CallBottomSheet.ARGUMENT_TYPE to message.type!!.number,
+                                    CallBottomSheet.ARGUMENT_CALL_ID to callId.toString()
+                                )
+                                show(this@HomeActivity.supportFragmentManager,"call-sheet")
+                            }
+                        }
+                    }
+                    SignalServiceProtos.CallMessage.Type.END_CALL -> {
+                        // dismiss the call sheet
+                        supportFragmentManager.findFragmentByTag("call-sheet")?.let { callSheet ->
+                            if (callSheet is BottomSheetDialogFragment) {
+                                callSheet.dismiss()
+                            }
+                        }
+                        // clear the callCache for this sender
+                        synchronized(WebRtcUtils.callCache) {
+                            WebRtcUtils.callCache[callId] = mutableSetOf()
+                        }
+                        sendBroadcast(Intent(WebRtcTestsActivity.ACTION_END))
+                    }
+                    else -> { /* do nothing */ }
+                }
+            }
+        }
+
         lifecycleScope.launchWhenStarted {
             launch(Dispatchers.IO) {
                 // Double check that the long poller is up

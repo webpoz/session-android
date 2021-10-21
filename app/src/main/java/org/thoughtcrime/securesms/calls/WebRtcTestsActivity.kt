@@ -23,6 +23,7 @@ import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
 import org.thoughtcrime.securesms.permissions.Permissions
 import org.webrtc.*
+import java.util.*
 
 
 class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection.Observer,
@@ -40,6 +41,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
         const val EXTRA_SDP = "WebRtcTestsActivity_EXTRA_SDP"
         const val EXTRA_ADDRESS = "WebRtcTestsActivity_EXTRA_ADDRESS"
+        const val EXTRA_CALL_ID = "WebRtcTestsActivity_EXTRA_CALL_ID"
         const val EXTRA_RELAY_USED = "WebRtcTestsActivity_EXTRA_RELAY_USED"
         const val EXTRA_SDP_MLINE_INDEXES = "WebRtcTestsActivity_EXTRA_SDP_MLINE_INDEXES"
         const val EXTRA_SDP_MIDS = "WebRtcTestsActivity_EXTRA_SDP_MIDS"
@@ -89,20 +91,19 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         }
 
     private lateinit var callAddress: Address
+    private lateinit var callId: UUID
     private var relayUsed: Boolean = true
 
     private val peerConnection by lazy {
         // TODO: in a lokinet world, ice servers shouldn't be needed as .loki addresses should suffice to p2p
-        val server = PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
-        val server1 = PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer()
-        val server2 = PeerConnection.IceServer.builder("stun:stun2.l.google.com:19302").createIceServer()
-        val server3 = PeerConnection.IceServer.builder("stun:stun3.l.google.com:19302").createIceServer()
-        val server4 = PeerConnection.IceServer.builder("stun:stun4.l.google.com:19302").createIceServer()
-        val iceServers = mutableListOf(server,server1,server2,server3,server4)
+        val server = PeerConnection.IceServer.builder("turn:freyr.getsession.org:5349").setUsername("session").setPassword("session").createIceServer()
+        val iceServers = mutableListOf(server)
         if (relayUsed) {
             // add relay server
         }
-        val rtcConfig = PeerConnection.RTCConfiguration(iceServers)
+        val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
+            this.iceTransportsType = PeerConnection.IceTransportsType.RELAY
+        }
         rtcConfig.keyType = PeerConnection.KeyType.ECDSA
         connectionFactory.createPeerConnection(rtcConfig, this)!!
     }
@@ -156,6 +157,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         }
 
         // create either call or answer
+        callId = intent.getStringExtra(EXTRA_CALL_ID).let(UUID::fromString)
         if (intent.action == ACTION_ANSWER) {
             callAddress = intent.getParcelableExtra(EXTRA_ADDRESS) ?: run { finish(); return }
             val offerSdp = intent.getStringArrayExtra(EXTRA_SDP)!![0]
@@ -169,7 +171,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         lifecycleScope.launchWhenCreated {
             while (this.isActive) {
                 val answer = synchronized(WebRtcUtils.callCache) {
-                    WebRtcUtils.callCache[callAddress]?.firstOrNull { it.type == SignalServiceProtos.CallMessage.Type.ANSWER }
+                    WebRtcUtils.callCache[callId]?.firstOrNull { it.type == SignalServiceProtos.CallMessage.Type.ANSWER }
                 }
                 if (answer != null) {
                     peerConnection.setRemoteDescription(
@@ -193,7 +195,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
                 delay(2_000L)
                 peerConnection.getStats(this@WebRtcTestsActivity)
                 synchronized(WebRtcUtils.callCache) {
-                    val set = WebRtcUtils.callCache[callAddress] ?: mutableSetOf()
+                    val set = WebRtcUtils.callCache[callId] ?: mutableSetOf()
                     set.filter { it.hashCode() !in acceptedCallMessageHashes
                             && it.type == SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES }.forEach { callMessage ->
                         callMessage.iceCandidates().forEach { candidate ->
@@ -228,9 +230,10 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     private fun endCall() {
         if (isFinishing) return
+        val uuid = callId
 
         MessageSender.sendNonDurably(
-            CallMessage.endCall(),
+            CallMessage.endCall(uuid),
             callAddress
         )
         peerConnection.close()
@@ -319,7 +322,8 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
                 CallMessage(SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES,
                     candidates.map { it.sdp },
                     candidates.map { it.sdpMLineIndex },
-                    candidates.map { it.sdpMid }
+                    candidates.map { it.sdpMid },
+                    callId
                 ),
                 callAddress
             )
@@ -362,18 +366,28 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
             SessionDescription.Type.OFFER -> {
                 peerConnection.setLocalDescription(this, sdp)
                 MessageSender.sendNonDurably(
-                    CallMessage(SignalServiceProtos.CallMessage.Type.OFFER, listOf(sdp.description), listOf(), listOf()),
+                    CallMessage(SignalServiceProtos.CallMessage.Type.OFFER,
+                        listOf(sdp.description),
+                        listOf(),
+                        listOf(),
+                        callId
+                    ),
                     callAddress
                 )
             }
             SessionDescription.Type.ANSWER -> {
                 peerConnection.setLocalDescription(this, sdp)
                 MessageSender.sendNonDurably(
-                    CallMessage(SignalServiceProtos.CallMessage.Type.ANSWER, listOf(sdp.description), listOf(), listOf()),
+                    CallMessage(SignalServiceProtos.CallMessage.Type.ANSWER,
+                        listOf(sdp.description),
+                        listOf(),
+                        listOf(),
+                        callId
+                    ),
                     callAddress
                 )
             }
-            SessionDescription.Type.PRANSWER -> TODO("do the PR answer create success handling") // MessageSender.send()
+            null, SessionDescription.Type.PRANSWER -> TODO("do the PR answer create success handling") // MessageSender.send()
         }
     }
 

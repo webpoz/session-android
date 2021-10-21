@@ -46,6 +46,7 @@ import org.thoughtcrime.securesms.groups.EditClosedGroupActivity.Companion.group
 import org.thoughtcrime.securesms.util.BitmapUtil
 import org.thoughtcrime.securesms.util.getColorWithID
 import java.io.IOException
+import java.util.*
 
 object ConversationMenuHelper {
     
@@ -187,6 +188,7 @@ object ConversationMenuHelper {
             .setMessage("Use relay?")
             .setPositiveButton("Use Relay") { d, w ->
                 val intent = Intent(context, WebRtcTestsActivity::class.java)
+                intent.putExtra(WebRtcTestsActivity.EXTRA_CALL_ID, UUID.randomUUID().toString())
                 intent.putExtra(WebRtcTestsActivity.EXTRA_ADDRESS, thread.address)
                 intent.putExtra(WebRtcTestsActivity.EXTRA_RELAY_USED, false)
                 val activity = context as AppCompatActivity
