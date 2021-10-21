@@ -14914,6 +14914,33 @@ public final class SignalServiceProtos {
      */
     com.google.protobuf.ByteString
         getSdpMidsBytes(int index);
+
+    // required string uuid = 5;
+    /**
+     * <code>required string uuid = 5;</code>
+     *
+     * <pre>
+     * @required
+     * </pre>
+     */
+    boolean hasUuid();
+    /**
+     * <code>required string uuid = 5;</code>
+     *
+     * <pre>
+     * @required
+     * </pre>
+     */
+    java.lang.String getUuid();
+    /**
+     * <code>required string uuid = 5;</code>
+     *
+     * <pre>
+     * @required
+     * </pre>
+     */
+    com.google.protobuf.ByteString
+        getUuidBytes();
   }
   /**
    * Protobuf type {@code signalservice.CallMessage}
@@ -15014,6 +15041,11 @@ public final class SignalServiceProtos {
               sdpMids_.add(input.readBytes());
               break;
             }
+            case 42: {
+              bitField0_ |= 0x00000002;
+              uuid_ = input.readBytes();
+              break;
+            }
           }
         }
       } catch (com.google.protobuf.InvalidProtocolBufferException e) {
@@ -15068,27 +15100,35 @@ public final class SignalServiceProtos {
     public enum Type
         implements com.google.protobuf.ProtocolMessageEnum {
       /**
+       * <code>PRE_OFFER = 6;</code>
+       */
+      PRE_OFFER(0, 6),
+      /**
        * <code>OFFER = 1;</code>
        */
-      OFFER(0, 1),
+      OFFER(1, 1),
       /**
        * <code>ANSWER = 2;</code>
        */
-      ANSWER(1, 2),
+      ANSWER(2, 2),
       /**
        * <code>PROVISIONAL_ANSWER = 3;</code>
        */
-      PROVISIONAL_ANSWER(2, 3),
+      PROVISIONAL_ANSWER(3, 3),
       /**
        * <code>ICE_CANDIDATES = 4;</code>
        */
-      ICE_CANDIDATES(3, 4),
+      ICE_CANDIDATES(4, 4),
       /**
        * <code>END_CALL = 5;</code>
        */
-      END_CALL(4, 5),
+      END_CALL(5, 5),
       ;
 
+      /**
+       * <code>PRE_OFFER = 6;</code>
+       */
+      public static final int PRE_OFFER_VALUE = 6;
       /**
        * <code>OFFER = 1;</code>
        */
@@ -15115,6 +15155,7 @@ public final class SignalServiceProtos {
 
       public static Type valueOf(int value) {
         switch (value) {
+          case 6: return PRE_OFFER;
           case 1: return OFFER;
           case 2: return ANSWER;
           case 3: return PROVISIONAL_ANSWER;
@@ -15279,11 +15320,67 @@ public final class SignalServiceProtos {
       return sdpMids_.getByteString(index);
     }
 
+    // required string uuid = 5;
+    public static final int UUID_FIELD_NUMBER = 5;
+    private java.lang.Object uuid_;
+    /**
+     * <code>required string uuid = 5;</code>
+     *
+     * <pre>
+     * @required
+     * </pre>
+     */
+    public boolean hasUuid() {
+      return ((bitField0_ & 0x00000002) == 0x00000002);
+    }
+    /**
+     * <code>required string uuid = 5;</code>
+     *
+     * <pre>
+     * @required
+     * </pre>
+     */
+    public java.lang.String getUuid() {
+      java.lang.Object ref = uuid_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        if (bs.isValidUtf8()) {
+          uuid_ = s;
+        }
+        return s;
+      }
+    }
+    /**
+     * <code>required string uuid = 5;</code>
+     *
+     * <pre>
+     * @required
+     * </pre>
+     */
+    public com.google.protobuf.ByteString
+        getUuidBytes() {
+      java.lang.Object ref = uuid_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        uuid_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
     private void initFields() {
-      type_ = org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.OFFER;
+      type_ = org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.PRE_OFFER;
       sdps_ = com.google.protobuf.LazyStringArrayList.EMPTY;
       sdpMLineIndexes_ = java.util.Collections.emptyList();
       sdpMids_ = com.google.protobuf.LazyStringArrayList.EMPTY;
+      uuid_ = "";
     }
     private byte memoizedIsInitialized = -1;
     public final boolean isInitialized() {
@@ -15291,6 +15388,10 @@ public final class SignalServiceProtos {
       if (isInitialized != -1) return isInitialized == 1;
 
       if (!hasType()) {
+        memoizedIsInitialized = 0;
+        return false;
+      }
+      if (!hasUuid()) {
         memoizedIsInitialized = 0;
         return false;
       }
@@ -15312,6 +15413,9 @@ public final class SignalServiceProtos {
       }
       for (int i = 0; i < sdpMids_.size(); i++) {
         output.writeBytes(4, sdpMids_.getByteString(i));
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        output.writeBytes(5, getUuidBytes());
       }
       getUnknownFields().writeTo(output);
     }
@@ -15352,6 +15456,10 @@ public final class SignalServiceProtos {
         }
         size += dataSize;
         size += 1 * getSdpMidsList().size();
+      }
+      if (((bitField0_ & 0x00000002) == 0x00000002)) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeBytesSize(5, getUuidBytes());
       }
       size += getUnknownFields().getSerializedSize();
       memoizedSerializedSize = size;
@@ -15469,7 +15577,7 @@ public final class SignalServiceProtos {
 
       public Builder clear() {
         super.clear();
-        type_ = org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.OFFER;
+        type_ = org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.PRE_OFFER;
         bitField0_ = (bitField0_ & ~0x00000001);
         sdps_ = com.google.protobuf.LazyStringArrayList.EMPTY;
         bitField0_ = (bitField0_ & ~0x00000002);
@@ -15477,6 +15585,8 @@ public final class SignalServiceProtos {
         bitField0_ = (bitField0_ & ~0x00000004);
         sdpMids_ = com.google.protobuf.LazyStringArrayList.EMPTY;
         bitField0_ = (bitField0_ & ~0x00000008);
+        uuid_ = "";
+        bitField0_ = (bitField0_ & ~0x00000010);
         return this;
       }
 
@@ -15526,6 +15636,10 @@ public final class SignalServiceProtos {
           bitField0_ = (bitField0_ & ~0x00000008);
         }
         result.sdpMids_ = sdpMids_;
+        if (((from_bitField0_ & 0x00000010) == 0x00000010)) {
+          to_bitField0_ |= 0x00000002;
+        }
+        result.uuid_ = uuid_;
         result.bitField0_ = to_bitField0_;
         onBuilt();
         return result;
@@ -15575,12 +15689,21 @@ public final class SignalServiceProtos {
           }
           onChanged();
         }
+        if (other.hasUuid()) {
+          bitField0_ |= 0x00000010;
+          uuid_ = other.uuid_;
+          onChanged();
+        }
         this.mergeUnknownFields(other.getUnknownFields());
         return this;
       }
 
       public final boolean isInitialized() {
         if (!hasType()) {
+          
+          return false;
+        }
+        if (!hasUuid()) {
           
           return false;
         }
@@ -15607,7 +15730,7 @@ public final class SignalServiceProtos {
       private int bitField0_;
 
       // required .signalservice.CallMessage.Type type = 1;
-      private org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type type_ = org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.OFFER;
+      private org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type type_ = org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.PRE_OFFER;
       /**
        * <code>required .signalservice.CallMessage.Type type = 1;</code>
        *
@@ -15653,7 +15776,7 @@ public final class SignalServiceProtos {
        */
       public Builder clearType() {
         bitField0_ = (bitField0_ & ~0x00000001);
-        type_ = org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.OFFER;
+        type_ = org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.PRE_OFFER;
         onChanged();
         return this;
       }
@@ -15906,6 +16029,104 @@ public final class SignalServiceProtos {
   }
   ensureSdpMidsIsMutable();
         sdpMids_.add(value);
+        onChanged();
+        return this;
+      }
+
+      // required string uuid = 5;
+      private java.lang.Object uuid_ = "";
+      /**
+       * <code>required string uuid = 5;</code>
+       *
+       * <pre>
+       * @required
+       * </pre>
+       */
+      public boolean hasUuid() {
+        return ((bitField0_ & 0x00000010) == 0x00000010);
+      }
+      /**
+       * <code>required string uuid = 5;</code>
+       *
+       * <pre>
+       * @required
+       * </pre>
+       */
+      public java.lang.String getUuid() {
+        java.lang.Object ref = uuid_;
+        if (!(ref instanceof java.lang.String)) {
+          java.lang.String s = ((com.google.protobuf.ByteString) ref)
+              .toStringUtf8();
+          uuid_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <code>required string uuid = 5;</code>
+       *
+       * <pre>
+       * @required
+       * </pre>
+       */
+      public com.google.protobuf.ByteString
+          getUuidBytes() {
+        java.lang.Object ref = uuid_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          uuid_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>required string uuid = 5;</code>
+       *
+       * <pre>
+       * @required
+       * </pre>
+       */
+      public Builder setUuid(
+          java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000010;
+        uuid_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>required string uuid = 5;</code>
+       *
+       * <pre>
+       * @required
+       * </pre>
+       */
+      public Builder clearUuid() {
+        bitField0_ = (bitField0_ & ~0x00000010);
+        uuid_ = getDefaultInstance().getUuid();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>required string uuid = 5;</code>
+       *
+       * <pre>
+       * @required
+       * </pre>
+       */
+      public Builder setUuidBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  bitField0_ |= 0x00000010;
+        uuid_ = value;
         onChanged();
         return this;
       }
@@ -23560,41 +23781,42 @@ public final class SignalServiceProtos {
       "W\020\001\022\027\n\023ENCRYPTION_KEY_PAIR\020\003\022\017\n\013NAME_CHA" +
       "NGE\020\004\022\021\n\rMEMBERS_ADDED\020\005\022\023\n\017MEMBERS_REMO" +
       "VED\020\006\022\017\n\013MEMBER_LEFT\020\007\"$\n\005Flags\022\033\n\027EXPIR" +
-      "ATION_TIMER_UPDATE\020\002\"\315\001\n\013CallMessage\022-\n\004" +
+      "ATION_TIMER_UPDATE\020\002\"\352\001\n\013CallMessage\022-\n\004" +
       "type\030\001 \002(\0162\037.signalservice.CallMessage.T" +
       "ype\022\014\n\004sdps\030\002 \003(\t\022\027\n\017sdpMLineIndexes\030\003 \003" +
-      "(\r\022\017\n\007sdpMids\030\004 \003(\t\"W\n\004Type\022\t\n\005OFFER\020\001\022\n" +
-      "\n\006ANSWER\020\002\022\026\n\022PROVISIONAL_ANSWER\020\003\022\022\n\016IC",
-      "E_CANDIDATES\020\004\022\014\n\010END_CALL\020\005\"\347\003\n\024Configu" +
-      "rationMessage\022E\n\014closedGroups\030\001 \003(\0132/.si" +
-      "gnalservice.ConfigurationMessage.ClosedG" +
-      "roup\022\022\n\nopenGroups\030\002 \003(\t\022\023\n\013displayName\030" +
-      "\003 \001(\t\022\026\n\016profilePicture\030\004 \001(\t\022\022\n\nprofile" +
-      "Key\030\005 \001(\014\022=\n\010contacts\030\006 \003(\0132+.signalserv" +
-      "ice.ConfigurationMessage.Contact\032\233\001\n\013Clo" +
-      "sedGroup\022\021\n\tpublicKey\030\001 \001(\014\022\014\n\004name\030\002 \001(" +
-      "\t\0221\n\021encryptionKeyPair\030\003 \001(\0132\026.signalser" +
-      "vice.KeyPair\022\017\n\007members\030\004 \003(\014\022\016\n\006admins\030",
-      "\005 \003(\014\022\027\n\017expirationTimer\030\006 \001(\r\032V\n\007Contac" +
-      "t\022\021\n\tpublicKey\030\001 \002(\014\022\014\n\004name\030\002 \002(\t\022\026\n\016pr" +
-      "ofilePicture\030\003 \001(\t\022\022\n\nprofileKey\030\004 \001(\014\"u" +
-      "\n\016ReceiptMessage\0220\n\004type\030\001 \002(\0162\".signals" +
-      "ervice.ReceiptMessage.Type\022\021\n\ttimestamp\030" +
-      "\002 \003(\004\"\036\n\004Type\022\014\n\010DELIVERY\020\000\022\010\n\004READ\020\001\"\354\001" +
-      "\n\021AttachmentPointer\022\n\n\002id\030\001 \002(\006\022\023\n\013conte" +
-      "ntType\030\002 \001(\t\022\013\n\003key\030\003 \001(\014\022\014\n\004size\030\004 \001(\r\022" +
-      "\021\n\tthumbnail\030\005 \001(\014\022\016\n\006digest\030\006 \001(\014\022\020\n\010fi" +
-      "leName\030\007 \001(\t\022\r\n\005flags\030\010 \001(\r\022\r\n\005width\030\t \001",
-      "(\r\022\016\n\006height\030\n \001(\r\022\017\n\007caption\030\013 \001(\t\022\013\n\003u" +
-      "rl\030e \001(\t\"\032\n\005Flags\022\021\n\rVOICE_MESSAGE\020\001\"\365\001\n" +
-      "\014GroupContext\022\n\n\002id\030\001 \001(\014\022.\n\004type\030\002 \001(\0162" +
-      " .signalservice.GroupContext.Type\022\014\n\004nam" +
-      "e\030\003 \001(\t\022\017\n\007members\030\004 \003(\t\0220\n\006avatar\030\005 \001(\013" +
-      "2 .signalservice.AttachmentPointer\022\016\n\006ad" +
-      "mins\030\006 \003(\t\"H\n\004Type\022\013\n\007UNKNOWN\020\000\022\n\n\006UPDAT" +
-      "E\020\001\022\013\n\007DELIVER\020\002\022\010\n\004QUIT\020\003\022\020\n\014REQUEST_IN" +
-      "FO\020\004B3\n\034org.session.libsignal.protosB\023Si" +
-      "gnalServiceProtos"
+      "(\r\022\017\n\007sdpMids\030\004 \003(\t\022\014\n\004uuid\030\005 \002(\t\"f\n\004Typ" +
+      "e\022\r\n\tPRE_OFFER\020\006\022\t\n\005OFFER\020\001\022\n\n\006ANSWER\020\002\022",
+      "\026\n\022PROVISIONAL_ANSWER\020\003\022\022\n\016ICE_CANDIDATE" +
+      "S\020\004\022\014\n\010END_CALL\020\005\"\347\003\n\024ConfigurationMessa" +
+      "ge\022E\n\014closedGroups\030\001 \003(\0132/.signalservice" +
+      ".ConfigurationMessage.ClosedGroup\022\022\n\nope" +
+      "nGroups\030\002 \003(\t\022\023\n\013displayName\030\003 \001(\t\022\026\n\016pr" +
+      "ofilePicture\030\004 \001(\t\022\022\n\nprofileKey\030\005 \001(\014\022=" +
+      "\n\010contacts\030\006 \003(\0132+.signalservice.Configu" +
+      "rationMessage.Contact\032\233\001\n\013ClosedGroup\022\021\n" +
+      "\tpublicKey\030\001 \001(\014\022\014\n\004name\030\002 \001(\t\0221\n\021encryp" +
+      "tionKeyPair\030\003 \001(\0132\026.signalservice.KeyPai",
+      "r\022\017\n\007members\030\004 \003(\014\022\016\n\006admins\030\005 \003(\014\022\027\n\017ex" +
+      "pirationTimer\030\006 \001(\r\032V\n\007Contact\022\021\n\tpublic" +
+      "Key\030\001 \002(\014\022\014\n\004name\030\002 \002(\t\022\026\n\016profilePictur" +
+      "e\030\003 \001(\t\022\022\n\nprofileKey\030\004 \001(\014\"u\n\016ReceiptMe" +
+      "ssage\0220\n\004type\030\001 \002(\0162\".signalservice.Rece" +
+      "iptMessage.Type\022\021\n\ttimestamp\030\002 \003(\004\"\036\n\004Ty" +
+      "pe\022\014\n\010DELIVERY\020\000\022\010\n\004READ\020\001\"\354\001\n\021Attachmen" +
+      "tPointer\022\n\n\002id\030\001 \002(\006\022\023\n\013contentType\030\002 \001(" +
+      "\t\022\013\n\003key\030\003 \001(\014\022\014\n\004size\030\004 \001(\r\022\021\n\tthumbnai" +
+      "l\030\005 \001(\014\022\016\n\006digest\030\006 \001(\014\022\020\n\010fileName\030\007 \001(",
+      "\t\022\r\n\005flags\030\010 \001(\r\022\r\n\005width\030\t \001(\r\022\016\n\006heigh" +
+      "t\030\n \001(\r\022\017\n\007caption\030\013 \001(\t\022\013\n\003url\030e \001(\t\"\032\n" +
+      "\005Flags\022\021\n\rVOICE_MESSAGE\020\001\"\365\001\n\014GroupConte" +
+      "xt\022\n\n\002id\030\001 \001(\014\022.\n\004type\030\002 \001(\0162 .signalser" +
+      "vice.GroupContext.Type\022\014\n\004name\030\003 \001(\t\022\017\n\007" +
+      "members\030\004 \003(\t\0220\n\006avatar\030\005 \001(\0132 .signalse" +
+      "rvice.AttachmentPointer\022\016\n\006admins\030\006 \003(\t\"" +
+      "H\n\004Type\022\013\n\007UNKNOWN\020\000\022\n\n\006UPDATE\020\001\022\013\n\007DELI" +
+      "VER\020\002\022\010\n\004QUIT\020\003\022\020\n\014REQUEST_INFO\020\004B3\n\034org" +
+      ".session.libsignal.protosB\023SignalService",
+      "Protos"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {
@@ -23690,7 +23912,7 @@ public final class SignalServiceProtos {
           internal_static_signalservice_CallMessage_fieldAccessorTable = new
             com.google.protobuf.GeneratedMessage.FieldAccessorTable(
               internal_static_signalservice_CallMessage_descriptor,
-              new java.lang.String[] { "Type", "Sdps", "SdpMLineIndexes", "SdpMids", });
+              new java.lang.String[] { "Type", "Sdps", "SdpMLineIndexes", "SdpMids", "Uuid", });
           internal_static_signalservice_ConfigurationMessage_descriptor =
             getDescriptor().getMessageTypes().get(8);
           internal_static_signalservice_ConfigurationMessage_fieldAccessorTable = new

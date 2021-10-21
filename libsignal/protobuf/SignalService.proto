@@ -165,6 +165,7 @@ message DataMessage {
 message CallMessage {
 
   enum Type {
+    PRE_OFFER          = 6;
     OFFER              = 1;
     ANSWER             = 2;
     PROVISIONAL_ANSWER = 3;
@@ -172,12 +173,15 @@ message CallMessage {
     END_CALL           = 5;
   }
 
+  // Multiple ICE candidates may be batched together for performance
+
   // @required
-  required Type type              = 1;
+  required Type   type            = 1;
   repeated string sdps            = 2;
   repeated uint32 sdpMLineIndexes = 3;
   repeated string sdpMids         = 4;
-
+  // @required
+  required string uuid            = 5;
 }
 
 message ConfigurationMessage {
