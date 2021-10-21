@@ -96,8 +96,9 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     private val peerConnection by lazy {
         // TODO: in a lokinet world, ice servers shouldn't be needed as .loki addresses should suffice to p2p
-        val server = PeerConnection.IceServer.builder("turn:freyr.getsession.org:5349").setUsername("session").setPassword("session").createIceServer()
-        val iceServers = mutableListOf(server)
+        val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org").setUsername("user").setPassword("password").createIceServer()
+        val stun = PeerConnection.IceServer.builder("stun:freyr.getsession.org").createIceServer()
+        val iceServers = mutableListOf(turn,stun)
         if (relayUsed) {
             // add relay server
         }
