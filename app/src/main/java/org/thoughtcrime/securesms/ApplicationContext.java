@@ -33,6 +33,7 @@ import androidx.lifecycle.ProcessLifecycleOwner;
 
 import org.conscrypt.Conscrypt;
 import org.session.libsession.avatars.AvatarHelper;
+import org.session.libsession.database.MessageDataProvider;
 import org.session.libsession.messaging.MessagingModuleConfiguration;
 import org.session.libsession.messaging.sending_receiving.notifications.MessageNotifier;
 import org.session.libsession.messaging.sending_receiving.pollers.ClosedGroupPollerV2;
@@ -50,16 +51,19 @@ import org.session.libsignal.utilities.ThreadUtils;
 import org.signal.aesgcmprovider.AesGcmProvider;
 import org.thoughtcrime.securesms.components.TypingStatusSender;
 import org.thoughtcrime.securesms.crypto.KeyPairUtilities;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
+import org.thoughtcrime.securesms.database.JobDatabase;
 import org.thoughtcrime.securesms.database.LokiAPIDatabase;
+import org.thoughtcrime.securesms.database.Storage;
+import org.thoughtcrime.securesms.dependencies.DatabaseComponent;
+import org.thoughtcrime.securesms.dependencies.DatabaseModule;
 import org.thoughtcrime.securesms.groups.OpenGroupManager;
 import org.thoughtcrime.securesms.home.HomeActivity;
-import org.thoughtcrime.securesms.jobmanager.DependencyInjector;
 import org.thoughtcrime.securesms.jobmanager.JobManager;
 import org.thoughtcrime.securesms.jobmanager.impl.JsonDataSerializer;
 import org.thoughtcrime.securesms.jobs.FastJobStorage;
 import org.thoughtcrime.securesms.jobs.JobManagerFactories;
 import org.thoughtcrime.securesms.logging.AndroidLogger;
+import org.thoughtcrime.securesms.logging.PersistentLogger;
 import org.thoughtcrime.securesms.logging.UncaughtExceptionLogger;
 import org.thoughtcrime.securesms.notifications.BackgroundPollWorker;
 import org.thoughtcrime.securesms.notifications.DefaultMessageNotifier;
@@ -89,6 +93,9 @@ import java.util.Date;
 import java.util.HashSet;
 import java.util.Set;
 
+import javax.inject.Inject;
+
+import dagger.hilt.EntryPoints;
 import dagger.hilt.android.HiltAndroidApp;
 import kotlin.Unit;
 import kotlinx.coroutines.Job;
@@ -103,7 +110,7 @@ import network.loki.messenger.BuildConfig;
  * @author Moxie Marlinspike
  */
 @HiltAndroidApp
-public class ApplicationContext extends Application implements DependencyInjector, DefaultLifecycleObserver {
+public class ApplicationContext extends Application implements DefaultLifecycleObserver {
 
     public static final String PREFERENCES_NAME = "SecureSMS-Preferences";
 
@@ -120,7 +127,12 @@ public class ApplicationContext extends Application implements DependencyInjecto
     public Broadcaster broadcaster = null;
     private Job firebaseInstanceIdJob;
     private Handler conversationListNotificationHandler;
-    private final AndroidLogger logger = new AndroidLogger();
+    private PersistentLogger persistentLogger;
+
+    @Inject LokiAPIDatabase lokiAPIDatabase;
+    @Inject Storage storage;
+    @Inject MessageDataProvider messageDataProvider;
+    @Inject JobDatabase jobDatabase;
 
     private volatile boolean isAppVisible;
 
@@ -128,12 +140,24 @@ public class ApplicationContext extends Application implements DependencyInjecto
         return (ApplicationContext) context.getApplicationContext();
     }
 
+    public DatabaseComponent getDatabaseComponent() {
+        return EntryPoints.get(getApplicationContext(), DatabaseComponent.class);
+    }
+
     public Handler getConversationListNotificationHandler() {
+        if (this.conversationListNotificationHandler == null) {
+            conversationListNotificationHandler = new Handler(Looper.getMainLooper());
+        }
         return this.conversationListNotificationHandler;
     }
 
-@Override
+    public PersistentLogger getPersistentLogger() {
+        return this.persistentLogger;
+    }
+
+    @Override
     public void onCreate() {
+        DatabaseModule.init(this);
         super.onCreate();
         Log.i(TAG, "onCreate()");
         startKovenant();
@@ -145,11 +169,10 @@ public class ApplicationContext extends Application implements DependencyInjecto
         AppContext.INSTANCE.configureKovenant();
         messageNotifier = new OptimizedMessageNotifier(new DefaultMessageNotifier());
         broadcaster = new Broadcaster(this);
-        conversationListNotificationHandler = new Handler(Looper.getMainLooper());
-        LokiAPIDatabase apiDB = DatabaseFactory.getLokiAPIDatabase(this);
+        LokiAPIDatabase apiDB = getDatabaseComponent().lokiAPIDatabase();
         MessagingModuleConfiguration.Companion.configure(this,
-                DatabaseFactory.getStorage(this),
-                DatabaseFactory.getAttachmentProvider(this),
+                storage,
+                messageDataProvider,
                 ()-> KeyPairUtilities.INSTANCE.getUserED25519KeyPair(this)
         );
         SnodeModule.Companion.configure(apiDB, broadcaster);
@@ -205,10 +228,6 @@ public class ApplicationContext extends Application implements DependencyInjecto
         stopKovenant(); // Loki
         OpenGroupManager.INSTANCE.stopPolling();
         super.onTerminate();
-    }
-
-    @Override
-    public void injectDependencies(Object object) {
     }
 
     public void initializeLocaleParser() {
@@ -270,7 +289,10 @@ public class ApplicationContext extends Application implements DependencyInjecto
     }
 
     private void initializeLogging() {
-        Log.initialize(logger);
+        if (persistentLogger == null) {
+            persistentLogger = new PersistentLogger(this);
+        }
+        Log.initialize(new AndroidLogger(), persistentLogger);
     }
 
     private void initializeCrashHandling() {
@@ -284,8 +306,7 @@ public class ApplicationContext extends Application implements DependencyInjecto
             .setJobFactories(JobManagerFactories.getJobFactories(this))
             .setConstraintFactories(JobManagerFactories.getConstraintFactories(this))
             .setConstraintObservers(JobManagerFactories.getConstraintObservers(this))
-            .setJobStorage(new FastJobStorage(DatabaseFactory.getJobDatabase(this)))
-            .setDependencyInjector(this)
+            .setJobStorage(new FastJobStorage(jobDatabase))
             .build());
     }
 

@@ -14,8 +14,8 @@ import org.session.libsignal.streams.AttachmentCipherInputStream;
 import org.session.libsignal.utilities.Hex;
 import org.session.libsignal.utilities.Log;
 import org.session.libsignal.utilities.guava.Optional;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.GroupDatabase;
+import org.thoughtcrime.securesms.dependencies.DatabaseComponent;
 import org.thoughtcrime.securesms.jobmanager.Job;
 import org.thoughtcrime.securesms.jobmanager.impl.NetworkConstraint;
 import org.thoughtcrime.securesms.mms.AttachmentStreamUriLoader.AttachmentModel;
@@ -64,7 +64,7 @@ public class AvatarDownloadJob extends BaseJob {
 
   @Override
   public void onRun() throws IOException {
-    GroupDatabase         database   = DatabaseFactory.getGroupDatabase(context);
+    GroupDatabase         database   = DatabaseComponent.get(context).groupDatabase();
     Optional<GroupRecord> record     = database.getGroup(groupId);
     File                  attachment = null;
 

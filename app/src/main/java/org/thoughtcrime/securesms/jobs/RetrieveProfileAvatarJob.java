@@ -15,8 +15,8 @@ import org.session.libsession.utilities.recipients.Recipient;
 import org.session.libsignal.exceptions.PushNetworkException;
 import org.session.libsignal.streams.ProfileCipherInputStream;
 import org.session.libsignal.utilities.Log;
-import org.thoughtcrime.securesms.database.DatabaseFactory;
 import org.thoughtcrime.securesms.database.RecipientDatabase;
+import org.thoughtcrime.securesms.dependencies.DatabaseComponent;
 import org.thoughtcrime.securesms.jobmanager.Job;
 import org.thoughtcrime.securesms.jobmanager.impl.NetworkConstraint;
 
@@ -76,7 +76,7 @@ public class RetrieveProfileAvatarJob extends BaseJob {
 
   @Override
   public void onRun() throws IOException {
-    RecipientDatabase database   = DatabaseFactory.getRecipientDatabase(context);
+    RecipientDatabase database   = DatabaseComponent.get(context).recipientDatabase();
     byte[]            profileKey = recipient.resolve().getProfileKey();
 
     if (profileKey == null) {
