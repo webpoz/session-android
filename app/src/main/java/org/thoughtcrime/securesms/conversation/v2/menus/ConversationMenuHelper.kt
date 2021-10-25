@@ -190,14 +190,12 @@ object ConversationMenuHelper {
                 val intent = Intent(context, WebRtcTestsActivity::class.java)
                 intent.putExtra(WebRtcTestsActivity.EXTRA_CALL_ID, UUID.randomUUID().toString())
                 intent.putExtra(WebRtcTestsActivity.EXTRA_ADDRESS, thread.address)
-                intent.putExtra(WebRtcTestsActivity.EXTRA_RELAY_USED, false)
                 val activity = context as AppCompatActivity
                 activity.startActivity(intent)
             }
             .setNeutralButton("P2P only") { d, w ->
                 val intent = Intent(context, WebRtcTestsActivity::class.java)
                 intent.putExtra(WebRtcTestsActivity.EXTRA_ADDRESS, thread.address)
-                intent.putExtra(WebRtcTestsActivity.EXTRA_RELAY_USED, false)
                 val activity = context as AppCompatActivity
                 activity.startActivity(intent)
             }

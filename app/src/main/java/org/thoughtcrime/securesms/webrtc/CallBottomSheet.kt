@@ -57,7 +57,6 @@ class CallBottomSheet: BottomSheetDialogFragment() {
             val intent = Intent(requireContext(), WebRtcTestsActivity::class.java)
             val bundle = bundleOf(
                 WebRtcTestsActivity.EXTRA_ADDRESS to address,
-                WebRtcTestsActivity.EXTRA_RELAY_USED to relaySwitch.isChecked,
                 WebRtcTestsActivity.EXTRA_CALL_ID to callId
             )
             intent.action = WebRtcTestsActivity.ACTION_ANSWER

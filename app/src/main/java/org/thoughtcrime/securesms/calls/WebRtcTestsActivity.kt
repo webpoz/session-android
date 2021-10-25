@@ -42,9 +42,6 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         const val EXTRA_SDP = "WebRtcTestsActivity_EXTRA_SDP"
         const val EXTRA_ADDRESS = "WebRtcTestsActivity_EXTRA_ADDRESS"
         const val EXTRA_CALL_ID = "WebRtcTestsActivity_EXTRA_CALL_ID"
-        const val EXTRA_RELAY_USED = "WebRtcTestsActivity_EXTRA_RELAY_USED"
-        const val EXTRA_SDP_MLINE_INDEXES = "WebRtcTestsActivity_EXTRA_SDP_MLINE_INDEXES"
-        const val EXTRA_SDP_MIDS = "WebRtcTestsActivity_EXTRA_SDP_MIDS"
 
     }
 
@@ -92,16 +89,12 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     private lateinit var callAddress: Address
     private lateinit var callId: UUID
-    private var relayUsed: Boolean = true
 
     private val peerConnection by lazy {
         // TODO: in a lokinet world, ice servers shouldn't be needed as .loki addresses should suffice to p2p
         val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org:5349").setUsername("webrtc").setPassword("webrtc").createIceServer()
 //        val stun = PeerConnection.IceServer.builder("stun:freyr.getsession.org").createIceServer()
         val iceServers = mutableListOf(turn)
-        if (relayUsed) {
-            // add relay server
-        }
         val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
             this.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.ENABLED
             this.candidateNetworkPolicy = PeerConnection.CandidateNetworkPolicy.ALL
@@ -126,8 +119,6 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
     override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
         super.onCreate(savedInstanceState, ready)
         setContentView(R.layout.activity_webrtc_tests)
-
-        relayUsed = intent.getBooleanExtra(EXTRA_RELAY_USED, true)
 
         //TODO: better handling of permissions
         Permissions.with(this)
