@@ -5,6 +5,7 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
 import android.os.Vibrator
+import org.session.libsession.utilities.ServiceUtil
 import org.session.libsignal.utilities.Log
 
 class IncomingRinger(private val context: Context) {
@@ -13,11 +14,11 @@ class IncomingRinger(private val context: Context) {
         val PATTERN = longArrayOf(0L, 1000L, 1000L)
     }
 
-    private val vibrator: Vibrator? = context.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator?
+    private val vibrator: Vibrator? = ServiceUtil.getVibrator(context)
     var mediaPlayer: MediaPlayer? = null
 
     fun start(vibrate: Boolean) {
-        val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+        val audioManager = ServiceUtil.getAudioManager(context)
         mediaPlayer?.release()
         mediaPlayer = createMediaPlayer()
         val ringerMode = audioManager.ringerMode
@@ -62,7 +63,7 @@ class IncomingRinger(private val context: Context) {
         else ringerMode == AudioManager.RINGER_MODE_VIBRATE
     }
 
-    fun createMediaPlayer(): MediaPlayer? {
+    private fun createMediaPlayer(): MediaPlayer? {
         try {
             val defaultRingtone = try {
                 RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_RINGTONE)

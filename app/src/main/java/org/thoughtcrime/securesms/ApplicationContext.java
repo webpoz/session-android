@@ -54,6 +54,7 @@ import org.thoughtcrime.securesms.crypto.KeyPairUtilities;
 import org.thoughtcrime.securesms.database.JobDatabase;
 import org.thoughtcrime.securesms.database.LokiAPIDatabase;
 import org.thoughtcrime.securesms.database.Storage;
+import org.thoughtcrime.securesms.dependencies.CallComponent;
 import org.thoughtcrime.securesms.dependencies.DatabaseComponent;
 import org.thoughtcrime.securesms.dependencies.DatabaseModule;
 import org.thoughtcrime.securesms.groups.OpenGroupManager;
@@ -138,6 +139,10 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
 
     public static ApplicationContext getInstance(Context context) {
         return (ApplicationContext) context.getApplicationContext();
+    }
+
+    public CallComponent getCallComponent() {
+        return EntryPoints.get(getApplicationContext(), CallComponent.class);
     }
 
     public DatabaseComponent getDatabaseComponent() {

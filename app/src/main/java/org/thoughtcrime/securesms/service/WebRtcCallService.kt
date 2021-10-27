@@ -6,23 +6,26 @@ import android.content.Intent
 import android.os.IBinder
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
+import org.thoughtcrime.securesms.dependencies.CallComponent
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallManager
-import org.thoughtcrime.securesms.webrtc.RTCAudioManager
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
 import java.util.*
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class WebRtcCallService: Service(), RTCAudioManager.EventListener {
+class WebRtcCallService: Service(), SignalAudioManager.EventListener {
 
     @Inject lateinit var callManager: CallManager
+    val signalAudioManager: SignalAudioManager by lazy {
+        SignalAudioManager(this, this, CallComponent.get(this).callManagerCompat())
+    }
 
     companion object {
         private const val ACTION_UPDATE = "UPDATE"
         private const val ACTION_STOP = "STOP"
         private const val ACTION_DENY_CALL = "DENY_CALL"
         private const val ACTION_LOCAL_HANGUP = "LOCAL_HANGUP"
-        private const val ACTION_WANTS_BLUETOOTH = "WANTS_BLUETOOTH"
         private const val ACTION_CHANGE_POWER_BUTTON = "CHANGE_POWER_BUTTON"
         private const val ACTION_SEND_AUDIO_COMMAND = "SEND_AUDIO_COMMAND"
 
@@ -83,5 +86,9 @@ class WebRtcCallService: Service(), RTCAudioManager.EventListener {
         // shutdown audiomanager
         // unregister network receiver
         // unregister power button
+    }
+
+    override fun onAudioDeviceChanged(activeDevice: SignalAudioManager.AudioDevice, devices: Set<SignalAudioManager.AudioDevice>) {
+        TODO("Not yet implemented")
     }
 }
