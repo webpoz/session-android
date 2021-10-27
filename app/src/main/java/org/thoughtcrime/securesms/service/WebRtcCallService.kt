@@ -8,11 +8,12 @@ import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallManager
+import org.thoughtcrime.securesms.webrtc.RTCAudioManager
 import java.util.*
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class WebRtcCallService: Service() {
+class WebRtcCallService: Service(), RTCAudioManager.EventListener {
 
     @Inject lateinit var callManager: CallManager
 
@@ -63,9 +64,24 @@ class WebRtcCallService: Service() {
                 .putExtra(EXTRA_ENABLED, register)
             ContextCompat.startForegroundService(context, intent)
         }
-
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onCreate() {
+        super.onCreate()
+        // create audio manager
+        // reset call notification
+        // register uncaught exception handler
+        // register network receiver
+        // telephony listen to call state
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // unregister exception handler
+        // shutdown audiomanager
+        // unregister network receiver
+        // unregister power button
+    }
 }

@@ -92,13 +92,13 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     private val peerConnection by lazy {
         // TODO: in a lokinet world, ice servers shouldn't be needed as .loki addresses should suffice to p2p
-        val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org:5349").setUsername("webrtc").setPassword("webrtc").createIceServer()
-//        val stun = PeerConnection.IceServer.builder("stun:freyr.getsession.org").createIceServer()
-        val iceServers = mutableListOf(turn)
+        val stun = PeerConnection.IceServer.builder("stun:freyr.getsession.org:5349").setTlsCertPolicy(PeerConnection.TlsCertPolicy.TLS_CERT_POLICY_INSECURE_NO_CHECK).createIceServer()
+        val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org:5349").setUsername("webrtc").setPassword("webrtc").setTlsCertPolicy(PeerConnection.TlsCertPolicy.TLS_CERT_POLICY_INSECURE_NO_CHECK).createIceServer()
+        val iceServers = mutableListOf(turn, stun)
         val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
             this.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.ENABLED
             this.candidateNetworkPolicy = PeerConnection.CandidateNetworkPolicy.ALL
-            this.iceTransportsType = PeerConnection.IceTransportsType.RELAY
+//            this.iceTransportsType = PeerConnection.IceTransportsType.RELAY
         }
         rtcConfig.keyType = PeerConnection.KeyType.ECDSA
         connectionFactory.createPeerConnection(rtcConfig, this)!!
