@@ -1,5 +1,6 @@
 package org.thoughtcrime.securesms.service
 
+import android.app.Notification
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -35,6 +36,10 @@ class WebRtcCallService: Service(), SignalAudioManager.EventListener {
         private const val EXTRA_AUDIO_COMMAND = "AUDIO_COMMAND"
 
         private const val INVALID_NOTIFICATION_ID = -1
+
+        private var lastNotificationId: Int = INVALID_NOTIFICATION_ID
+        private var lastNotification: Notification? = null
+
 
         fun update(context: Context, type: Int, callId: UUID) {
             val intent = Intent(context, WebRtcCallService::class.java)
