@@ -11,8 +11,11 @@ import org.thoughtcrime.securesms.dependencies.CallComponent
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallManager
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
+import java.sql.CallableStatement
 import java.util.*
 import javax.inject.Inject
+import kotlin.properties.Delegates
+import kotlin.properties.Delegates.observable
 
 @AndroidEntryPoint
 class WebRtcCallService: Service(), SignalAudioManager.EventListener {
@@ -20,6 +23,10 @@ class WebRtcCallService: Service(), SignalAudioManager.EventListener {
     @Inject lateinit var callManager: CallManager
     val signalAudioManager: SignalAudioManager by lazy {
         SignalAudioManager(this, this, CallComponent.get(this).callManagerCompat())
+    }
+
+    private enum class CallState {
+        STATE_IDLE, STATE_DIALING, STATE_ANSWERING, STATE_REMOTE_RINGING, STATE_LOCAL_RINGING, STATE_CONNECTED
     }
 
     companion object {
@@ -72,6 +79,10 @@ class WebRtcCallService: Service(), SignalAudioManager.EventListener {
                 .putExtra(EXTRA_ENABLED, register)
             ContextCompat.startForegroundService(context, intent)
         }
+    }
+
+    private var state: CallState by observable(CallState.STATE_IDLE) { _, previousValue, newValue ->
+
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

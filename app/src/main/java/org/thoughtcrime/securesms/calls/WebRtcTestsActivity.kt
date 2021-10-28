@@ -7,8 +7,10 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Bundle
 import android.view.MenuItem
+import androidx.activity.viewModels
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.android.synthetic.main.activity_webrtc_tests.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -22,10 +24,11 @@ import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
 import org.thoughtcrime.securesms.permissions.Permissions
+import org.thoughtcrime.securesms.webrtc.CallViewModel
 import org.webrtc.*
 import java.util.*
 
-
+@AndroidEntryPoint
 class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection.Observer,
     SdpObserver, RTCStatsCollectorCallback {
 
@@ -45,24 +48,13 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     }
 
-    private val eglBase by lazy { EglBase.create() }
-    private val surfaceHelper by lazy { SurfaceTextureHelper.create(Thread.currentThread().name, eglBase.eglBaseContext) }
+    private val viewModel by viewModels<CallViewModel>()
+
+    private val surfaceHelper by lazy { SurfaceTextureHelper.create(Thread.currentThread().name, viewModel.eglBaseContext) }
     private val audioSource by lazy { connectionFactory.createAudioSource(MediaConstraints()) }
     private val videoCapturer by lazy { createCameraCapturer(Camera2Enumerator(this)) }
 
     private val acceptedCallMessageHashes = mutableSetOf<Int>()
-
-    private val connectionFactory by lazy {
-
-        val decoderFactory = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
-        val encoderFactory = DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true)
-
-        PeerConnectionFactory.builder()
-            .setVideoDecoderFactory(decoderFactory)
-            .setVideoEncoderFactory(encoderFactory)
-            .setOptions(PeerConnectionFactory.Options())
-            .createPeerConnectionFactory()
-    }
 
     private val candidates: MutableList<IceCandidate> = mutableListOf()
     private val iceDebouncer = Debouncer(2_000)
@@ -89,20 +81,6 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     private lateinit var callAddress: Address
     private lateinit var callId: UUID
-
-    private val peerConnection by lazy {
-        // TODO: in a lokinet world, ice servers shouldn't be needed as .loki addresses should suffice to p2p
-        val stun = PeerConnection.IceServer.builder("stun:freyr.getsession.org:5349").setTlsCertPolicy(PeerConnection.TlsCertPolicy.TLS_CERT_POLICY_INSECURE_NO_CHECK).createIceServer()
-        val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org:5349").setUsername("webrtc").setPassword("webrtc").setTlsCertPolicy(PeerConnection.TlsCertPolicy.TLS_CERT_POLICY_INSECURE_NO_CHECK).createIceServer()
-        val iceServers = mutableListOf(turn, stun)
-        val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
-            this.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.ENABLED
-            this.candidateNetworkPolicy = PeerConnection.CandidateNetworkPolicy.ALL
-//            this.iceTransportsType = PeerConnection.IceTransportsType.RELAY
-        }
-        rtcConfig.keyType = PeerConnection.KeyType.ECDSA
-        connectionFactory.createPeerConnection(rtcConfig, this)!!
-    }
 
     override fun onBackPressed() {
         endCall()
