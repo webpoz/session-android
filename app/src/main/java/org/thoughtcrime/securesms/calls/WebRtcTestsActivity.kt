@@ -5,15 +5,21 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioManager
 import android.os.Bundle
 import android.view.MenuItem
+import android.view.Window
+import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.android.synthetic.main.activity_webrtc_tests.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import network.loki.messenger.R
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
@@ -29,12 +35,9 @@ import org.webrtc.*
 import java.util.*
 
 @AndroidEntryPoint
-class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection.Observer,
-    SdpObserver, RTCStatsCollectorCallback {
+class WebRtcTestsActivity: PassphraseRequiredActionBarActivity() {
 
     companion object {
-        const val HD_VIDEO_WIDTH = 900
-        const val HD_VIDEO_HEIGHT = 1600
         const val CALL_ID = "call_id_session"
         private const val LOCAL_TRACK_ID = "local_track"
         private const val LOCAL_STREAM_ID = "local_track"
@@ -45,39 +48,13 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         const val EXTRA_SDP = "WebRtcTestsActivity_EXTRA_SDP"
         const val EXTRA_ADDRESS = "WebRtcTestsActivity_EXTRA_ADDRESS"
         const val EXTRA_CALL_ID = "WebRtcTestsActivity_EXTRA_CALL_ID"
-
     }
 
     private val viewModel by viewModels<CallViewModel>()
 
-    private val surfaceHelper by lazy { SurfaceTextureHelper.create(Thread.currentThread().name, viewModel.eglBaseContext) }
-    private val audioSource by lazy { connectionFactory.createAudioSource(MediaConstraints()) }
-    private val videoCapturer by lazy { createCameraCapturer(Camera2Enumerator(this)) }
-
     private val acceptedCallMessageHashes = mutableSetOf<Int>()
 
     private val candidates: MutableList<IceCandidate> = mutableListOf()
-    private val iceDebouncer = Debouncer(2_000)
-
-    private var localCandidateType: String? = null
-        set(value) {
-            field = value
-            if (value != null) {
-                // show it
-                local_candidate_info.isVisible = true
-                local_candidate_info.text = "local: $value"
-            }
-        }
-
-    private var remoteCandidateType: String? = null
-        set(value) {
-            field = value
-            if (value != null) {
-                remote_candidate_info.isVisible = true
-                remote_candidate_info.text = "remote: $value"
-            }
-            // update text
-        }
 
     private lateinit var callAddress: Address
     private lateinit var callId: UUID
@@ -96,15 +73,26 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
         super.onCreate(savedInstanceState, ready)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        requestWindowFeature(Window.FEATURE_NO_TITLE)
         setContentView(R.layout.activity_webrtc_tests)
+        volumeControlStream = AudioManager.STREAM_VOICE_CALL
 
-        //TODO: better handling of permissions
+        initializeResources()
+
         Permissions.with(this)
-            .request(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)
+            .request(Manifest.permission.RECORD_AUDIO)
             .onAllGranted {
                 setupStreams()
             }
             .execute()
+
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                viewModel
+            }
+        }
 
         local_renderer.run {
             setEnableHardwareScaler(true)
@@ -180,24 +168,8 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         }
     }
 
-    override fun onStatsDelivered(statsReport: RTCStatsReport?) {
-        statsReport?.let { report ->
-            val usedConnection = report.statsMap.filter { (_,v) -> v.type == "candidate-pair" && v.members["writable"] == true }.asIterable().firstOrNull()?.value ?: return@let
+    private fun initializeResources() {
 
-            usedConnection.members["remoteCandidateId"]?.let { candidate ->
-                runOnUiThread {
-                    remoteCandidateType = report.statsMap[candidate]?.members?.get("candidateType") as? String
-                }
-            }
-
-            usedConnection.members["localCandidateId"]?.let { candidate ->
-                runOnUiThread {
-                    localCandidateType = report.statsMap[candidate]?.members?.get("candidateType") as? String
-                }
-            }
-
-            Log.d("Loki-RTC", "report is: $report")
-        }
     }
 
     private fun endCall() {
@@ -235,36 +207,6 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
         stream.addTrack(audioTrack)
 
         peerConnection.addStream(stream)
-    }
-
-    private fun createCameraCapturer(enumerator: CameraEnumerator): CameraVideoCapturer? {
-        val deviceNames = enumerator.deviceNames
-
-        // First, try to find front facing camera
-        Log.d("Loki-RTC-vid", "Looking for front facing cameras.")
-        for (deviceName in deviceNames) {
-            if (enumerator.isFrontFacing(deviceName)) {
-                Log.d("Loki-RTC-vid", "Creating front facing camera capturer.")
-                val videoCapturer = enumerator.createCapturer(deviceName, null)
-                if (videoCapturer != null) {
-                    return videoCapturer
-                }
-            }
-        }
-
-        // Front facing camera not found, try something else
-        Log.d("Loki-RTC-vid", "Looking for other cameras.")
-        for (deviceName in deviceNames) {
-            if (!enumerator.isFrontFacing(deviceName)) {
-                Log.d("Loki-RTC-vid", "Creating other camera capturer.")
-                val videoCapturer = enumerator.createCapturer(deviceName, null)
-                if (videoCapturer != null) {
-                    return videoCapturer
-                }
-            }
-        }
-
-        return null
     }
 
     override fun onSignalingChange(p0: PeerConnection.SignalingState?) {
@@ -373,13 +315,6 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity(), PeerConnection
 
     override fun onSetFailure(p0: String?) {
         Log.d("Loki-RTC", "onSetFailure: $p0")
-    }
-
-    private fun CallMessage.iceCandidates(): List<IceCandidate> {
-        val candidateSize = sdpMids.size
-        return (0 until candidateSize).map { i ->
-            IceCandidate(sdpMids[i], sdpMLineIndexes[i], sdps[i])
-        }
     }
 
 }

@@ -6,23 +6,29 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import org.session.libsession.messaging.messages.control.CallMessage
 import org.webrtc.*
 import javax.inject.Inject
 
 @HiltViewModel
-class CallViewModel @Inject constructor(
-        private val callManager: CallManager
-): ViewModel(), PeerConnection.Observer {
+class CallViewModel @Inject constructor(private val callManager: CallManager): ViewModel() {
 
     sealed class StateEvent {
         data class AudioEnabled(val isEnabled: Boolean): StateEvent()
         data class VideoEnabled(val isEnabled: Boolean): StateEvent()
     }
 
-    private val audioEnabledState = MutableStateFlow(StateEvent.AudioEnabled(true))
-    private val videoEnabledState = MutableStateFlow(StateEvent.VideoEnabled(false))
+    val audioEnabledState = MutableStateFlow(
+            callManager.audioEnabled.let { isEnabled ->
 
-    private val peerConnection = callManager.getPeerConnection(this)
+            }
+    )
+    val videoEnabledState = MutableStateFlow(
+            callManager.videoEnabled.let { isEnabled ->
+
+            }
+    )
+
 
     // set up listeners for establishing connection toggling video / audio
     init {
@@ -30,50 +36,6 @@ class CallViewModel @Inject constructor(
                 .launchIn(viewModelScope)
         videoEnabledState.onEach { (enabled) -> callManager.setVideoEnabled(enabled) }
                 .launchIn(viewModelScope)
-    }
-
-    override fun onSignalingChange(p0: PeerConnection.SignalingState?) {
-
-    }
-
-    override fun onIceConnectionChange(p0: PeerConnection.IceConnectionState?) {
-
-    }
-
-    override fun onIceConnectionReceivingChange(p0: Boolean) {
-
-    }
-
-    override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {
-
-    }
-
-    override fun onIceCandidate(p0: IceCandidate?) {
-
-    }
-
-    override fun onIceCandidatesRemoved(p0: Array<out IceCandidate>?) {
-
-    }
-
-    override fun onAddStream(p0: MediaStream?) {
-
-    }
-
-    override fun onRemoveStream(p0: MediaStream?) {
-
-    }
-
-    override fun onDataChannel(p0: DataChannel?) {
-
-    }
-
-    override fun onRenegotiationNeeded() {
-
-    }
-
-    override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) {
-
     }
 
 }

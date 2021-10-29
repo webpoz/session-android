@@ -122,10 +122,6 @@ object DatabaseModule {
     @Singleton
     fun provideStorage(@ApplicationContext context: Context, openHelper: SQLCipherOpenHelper) = Storage(context,openHelper)
 
-//    @Provides
-//    @Singleton
-//    fun provideCallDataProvider(storage: Storage) = SessionCallDataProvider(storage)
-
     @Provides
     @Singleton
     fun provideAttachmentProvider(@ApplicationContext context: Context, openHelper: SQLCipherOpenHelper): MessageDataProvider = DatabaseAttachmentProvider(context, openHelper)

@@ -18,16 +18,9 @@ import kotlin.properties.Delegates
 import kotlin.properties.Delegates.observable
 
 @AndroidEntryPoint
-class WebRtcCallService: Service(), SignalAudioManager.EventListener {
+class WebRtcCallService: Service() {
 
     @Inject lateinit var callManager: CallManager
-    val signalAudioManager: SignalAudioManager by lazy {
-        SignalAudioManager(this, this, CallComponent.get(this).callManagerCompat())
-    }
-
-    private enum class CallState {
-        STATE_IDLE, STATE_DIALING, STATE_ANSWERING, STATE_REMOTE_RINGING, STATE_LOCAL_RINGING, STATE_CONNECTED
-    }
 
     companion object {
         private const val ACTION_UPDATE = "UPDATE"
@@ -81,10 +74,6 @@ class WebRtcCallService: Service(), SignalAudioManager.EventListener {
         }
     }
 
-    private var state: CallState by observable(CallState.STATE_IDLE) { _, previousValue, newValue ->
-
-    }
-
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onCreate() {
@@ -102,9 +91,5 @@ class WebRtcCallService: Service(), SignalAudioManager.EventListener {
         // shutdown audiomanager
         // unregister network receiver
         // unregister power button
-    }
-
-    override fun onAudioDeviceChanged(activeDevice: SignalAudioManager.AudioDevice, devices: Set<SignalAudioManager.AudioDevice>) {
-        TODO("Not yet implemented")
     }
 }

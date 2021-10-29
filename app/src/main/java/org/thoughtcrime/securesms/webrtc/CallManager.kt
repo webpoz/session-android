@@ -2,44 +2,72 @@ package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
 import com.android.mms.transaction.MessageSender
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.session.libsession.messaging.messages.control.CallMessage
+import org.session.libsignal.protos.SignalServiceProtos
+import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.database.Storage
+import org.thoughtcrime.securesms.dependencies.CallComponent
+import org.thoughtcrime.securesms.service.WebRtcCallService
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
 import org.webrtc.*
 import java.util.concurrent.Executors
 import javax.inject.Inject
 
-class CallManager(private val context: Context,
-                   private val storage: Storage): PeerConnection.Observer {
+class CallManager(private val context: Context): PeerConnection.Observer,
+        SignalAudioManager.EventListener,
+        CallDataListener {
+
+    enum class CallState {
+        STATE_IDLE, STATE_DIALING, STATE_ANSWERING, STATE_REMOTE_RINGING, STATE_LOCAL_RINGING, STATE_CONNECTED
+    }
+
+
+    val signalAudioManager: SignalAudioManager by lazy {
+        SignalAudioManager(context, this, CallComponent.get(context).audioManagerCompat())
+    }
 
     private val serviceExecutor = Executors.newSingleThreadExecutor()
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
     private val eglBase: EglBase = EglBase.create()
 
-    private val connectionFactory by lazy {
+    private var peerConnectionWrapper: PeerConnectionWrapper? = null
 
-        val decoderFactory = DefaultVideoDecoderFactory(eglBase.eglBaseContext)
-        val encoderFactory = DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true)
+    private val currentCallState: MutableStateFlow<CallState> = MutableStateFlow(CallState.STATE_IDLE)
 
-        PeerConnectionFactory.builder()
-                .setVideoDecoderFactory(decoderFactory)
-                .setVideoEncoderFactory(encoderFactory)
-                .setOptions(PeerConnectionFactory.Options())
-                .createPeerConnectionFactory()!!
+    private fun createCameraCapturer(enumerator: CameraEnumerator): CameraVideoCapturer? {
+        val deviceNames = enumerator.deviceNames
+
+        // First, try to find front facing camera
+        Log.d("Loki-RTC-vid", "Looking for front facing cameras.")
+        for (deviceName in deviceNames) {
+            if (enumerator.isFrontFacing(deviceName)) {
+                Log.d("Loki-RTC-vid", "Creating front facing camera capturer.")
+                val videoCapturer = enumerator.createCapturer(deviceName, null)
+                if (videoCapturer != null) {
+                    return videoCapturer
+                }
+            }
+        }
+
+        // Front facing camera not found, try something else
+        Log.d("Loki-RTC-vid", "Looking for other cameras.")
+        for (deviceName in deviceNames) {
+            if (!enumerator.isFrontFacing(deviceName)) {
+                Log.d("Loki-RTC-vid", "Creating other camera capturer.")
+                val videoCapturer = enumerator.createCapturer(deviceName, null)
+                if (videoCapturer != null) {
+                    return videoCapturer
+                }
+            }
+        }
+
+        return null
     }
 
-    private var peerConnection: PeerConnection? = null
+    override fun newCallMessage(callMessage: SignalServiceProtos.CallMessage) {
 
-    private fun getPeerConnection(): PeerConnection {
-        val stun = PeerConnection.IceServer.builder("stun:freyr.getsession.org:5349").setTlsCertPolicy(PeerConnection.TlsCertPolicy.TLS_CERT_POLICY_INSECURE_NO_CHECK).createIceServer()
-        val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org:5349").setUsername("webrtc").setPassword("webrtc").setTlsCertPolicy(PeerConnection.TlsCertPolicy.TLS_CERT_POLICY_INSECURE_NO_CHECK).createIceServer()
-        val iceServers = mutableListOf(turn, stun)
-        val rtcConfig = PeerConnection.RTCConfiguration(iceServers).apply {
-            this.tcpCandidatePolicy = PeerConnection.TcpCandidatePolicy.ENABLED
-            this.candidateNetworkPolicy = PeerConnection.CandidateNetworkPolicy.ALL
-            // this.iceTransportsType = PeerConnection.IceTransportsType.RELAY
-        }
-        rtcConfig.keyType = PeerConnection.KeyType.ECDSA
-        return connectionFactory.createPeerConnection(rtcConfig, this)!!
     }
 
     fun networkChange(networkAvailable: Boolean) {
@@ -54,9 +82,11 @@ class CallManager(private val context: Context,
 
     }
 
+
+
     fun callEnded() {
-        peerConnection?.close()
-        peerConnection = null
+        peerConnectionWrapper?.()
+        peerConnectionWrapper = null
     }
 
     fun setAudioEnabled(isEnabled: Boolean) {
@@ -110,4 +140,16 @@ class CallManager(private val context: Context,
     override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) {
         TODO("Not yet implemented")
     }
+
+    override fun onAudioDeviceChanged(activeDevice: SignalAudioManager.AudioDevice, devices: Set<SignalAudioManager.AudioDevice>) {
+        TODO("Not yet implemented")
+    }
+
+    private fun CallMessage.iceCandidates(): List<IceCandidate> {
+        val candidateSize = sdpMids.size
+        return (0 until candidateSize).map { i ->
+            IceCandidate(sdpMids[i], sdpMLineIndexes[i], sdps[i])
+        }
+    }
+
 }

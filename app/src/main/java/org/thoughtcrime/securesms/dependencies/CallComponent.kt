@@ -16,6 +16,6 @@ interface CallComponent {
         fun get(context: Context) = ApplicationContext.getInstance(context).callComponent
     }
 
-    fun callManagerCompat(): AudioManagerCompat
+    fun audioManagerCompat(): AudioManagerCompat
 
 }
