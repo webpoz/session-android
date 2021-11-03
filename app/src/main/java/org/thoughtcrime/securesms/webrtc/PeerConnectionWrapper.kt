@@ -72,4 +72,30 @@ class PeerConnectionWrapper(context: Context,
         peerConnection.addStream(mediaStream)
     }
 
+    fun addIceCandidate(candidate: IceCandidate) {
+        // TODO: filter logic based on known servers
+        peerConnection.addIceCandidate(candidate)
+    }
+
+    fun dispose() {
+        camera.dispose()
+
+        videoSource?.dispose()
+
+        audioSource.dispose()
+        peerConnection.close()
+        peerConnection.dispose()
+    }
+
+    fun setAudioEnabled(isEnabled: Boolean) {
+        audioTrack.setEnabled(isEnabled)
+    }
+
+    fun setVideoEnabled(isEnabled: Boolean) {
+        videoTrack?.let { track ->
+            track.setEnabled(isEnabled)
+            camera.enabled = isEnabled
+        }
+    }
+
 }

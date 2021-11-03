@@ -126,7 +126,7 @@ class SignalAudioManager(private val context: Context,
         Log.d(TAG, "Started")
     }
 
-    private fun stop(playDisconnect: Boolean) {
+    fun stop(playDisconnect: Boolean) {
         Log.d(TAG, "Stopping. state: $state")
         if (state == State.UNINITIALIZED) {
             Log.i(TAG, "Trying to stop AudioManager in incorrect state: $state")

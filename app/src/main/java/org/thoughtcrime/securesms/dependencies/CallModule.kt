@@ -25,8 +25,8 @@ abstract class CallModule {
 
     @Provides
     @Singleton
-    fun provideCallManager(@ApplicationContext context: Context, storage: Storage) =
-            CallManager(context)
+    fun provideCallManager(@ApplicationContext context: Context, storage: Storage, audioManagerCompat: AudioManagerCompat) =
+            CallManager(context, audioManagerCompat)
 
     @Binds
     @Singleton

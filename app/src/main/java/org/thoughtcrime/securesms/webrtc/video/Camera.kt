@@ -45,6 +45,10 @@ class Camera(context: Context,
         }
     }
 
+    fun dispose() {
+        capturer?.dispose()
+    }
+
     fun flip() {
         if (capturer == null || cameraCount < 2) {
             Log.w(TAG, "Tried to flip camera without capturer or less than 2 cameras")
