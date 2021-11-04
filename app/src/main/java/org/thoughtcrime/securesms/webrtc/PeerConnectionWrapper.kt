@@ -1,9 +1,13 @@
 package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
+import kotlinx.coroutines.runBlocking
+import org.session.libsignal.utilities.SettableFuture
 import org.thoughtcrime.securesms.webrtc.video.Camera
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
+import org.thoughtcrime.securesms.webrtc.video.CameraState
 import org.webrtc.*
+import java.util.concurrent.ExecutionException
 
 class PeerConnectionWrapper(context: Context,
                             factory: PeerConnectionFactory,
@@ -72,6 +76,14 @@ class PeerConnectionWrapper(context: Context,
         peerConnection.addStream(mediaStream)
     }
 
+    fun getCameraState(): CameraState {
+        return CameraState(camera.activeDirection, camera.cameraCount)
+    }
+
+    fun createDataChannel(channelName: String): DataChannel {
+
+    }
+
     fun addIceCandidate(candidate: IceCandidate) {
         // TODO: filter logic based on known servers
         peerConnection.addIceCandidate(candidate)
@@ -85,6 +97,124 @@ class PeerConnectionWrapper(context: Context,
         audioSource.dispose()
         peerConnection.close()
         peerConnection.dispose()
+    }
+
+    fun setRemoteDescription(description: SessionDescription) {
+        val future = SettableFuture<Boolean>()
+
+        peerConnection.setRemoteDescription(object: SdpObserver {
+            override fun onCreateSuccess(p0: SessionDescription?) {
+                throw AssertionError()
+            }
+
+            override fun onCreateFailure(p0: String?) {
+                throw AssertionError()
+            }
+
+            override fun onSetSuccess() {
+                future.set(true)
+            }
+
+            override fun onSetFailure(error: String?) {
+                future.setException(PeerConnectionException(error))
+            }
+        }, description)
+
+        try {
+            future.get()
+        } catch (e: InterruptedException) {
+            throw AssertionError(e)
+        } catch (e: ExecutionException) {
+            throw PeerConnectionException(e)
+        }
+    }
+
+    fun createAnswer(mediaConstraints: MediaConstraints) : SessionDescription {
+        val future = SettableFuture<SessionDescription>()
+
+        peerConnection.createAnswer(object:SdpObserver {
+            override fun onCreateSuccess(sdp: SessionDescription?) {
+                future.set(sdp)
+            }
+
+            override fun onSetSuccess() {
+                throw AssertionError()
+            }
+
+            override fun onCreateFailure(p0: String?) {
+                future.setException(PeerConnectionException(p0))
+            }
+
+            override fun onSetFailure(p0: String?) {
+                throw AssertionError()
+            }
+        }, mediaConstraints)
+
+        try {
+            return future.get()
+        } catch (e: InterruptedException) {
+            throw AssertionError()
+        } catch (e: ExecutionException) {
+            throw PeerConnectionException(e)
+        }
+    }
+
+    fun createOffer(mediaConstraints: MediaConstraints): SessionDescription {
+        val future = SettableFuture<SessionDescription>()
+
+        peerConnection.createAnswer(object:SdpObserver {
+            override fun onCreateSuccess(sdp: SessionDescription?) {
+                future.set(sdp)
+            }
+
+            override fun onSetSuccess() {
+                throw AssertionError()
+            }
+
+            override fun onCreateFailure(p0: String?) {
+                future.setException(PeerConnectionException(p0))
+            }
+
+            override fun onSetFailure(p0: String?) {
+                throw AssertionError()
+            }
+        }, mediaConstraints)
+
+        try {
+            return future.get()
+        } catch (e: InterruptedException) {
+            throw AssertionError()
+        } catch (e: ExecutionException) {
+            throw PeerConnectionException(e)
+        }
+    }
+
+    fun setLocalDescription(sdp: SessionDescription) {
+        val future = SettableFuture<Boolean>()
+
+        peerConnection.setLocalDescription(object: SdpObserver {
+            override fun onCreateSuccess(p0: SessionDescription?) {
+
+            }
+
+            override fun onSetSuccess() {
+                future.set(true)
+            }
+
+            override fun onCreateFailure(p0: String?) {}
+
+            override fun onSetFailure(error: String?) {
+                future.setException(PeerConnectionException(error))
+            }
+        }, sdp)
+
+        try {
+            future.get()
+        } catch(e: InterruptedException) {
+            throw AssertionError(e)
+        } catch(e: ExecutionException) {
+            throw PeerConnectionException(e)
+        }
     }
 
     fun setAudioEnabled(isEnabled: Boolean) {

@@ -19,6 +19,7 @@ import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.calls.WebRtcCallActivity
+import org.thoughtcrime.securesms.dependencies.DatabaseComponent
 import org.thoughtcrime.securesms.util.CallNotificationBuilder
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_ESTABLISHED
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_CONNECTING
@@ -79,8 +80,6 @@ class WebRtcCallService: Service() {
         const val EXTRA_ICE_SDP_LINE_INDEX = "ice_sdp_line_index"
         const val EXTRA_RESULT_RECEIVER = "result_receiver"
 
-        const val DATA_CHANNEL_NAME = "signaling"
-
         const val INVALID_NOTIFICATION_ID = -1
 
         fun acceptCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_ANSWER_CALL)
@@ -109,6 +108,7 @@ class WebRtcCallService: Service() {
     private var lastNotification: Notification? = null
 
     private val serviceExecutor = Executors.newSingleThreadExecutor()
+    private val timeoutExecutor = Executors.newScheduledThreadPool(1)
     private val hangupOnCallAnswered = HangUpRtcOnPstnCallAnsweredListener {
         startService(hangupIntent(this))
     }
@@ -163,7 +163,6 @@ class WebRtcCallService: Service() {
 
     override fun onCreate() {
         super.onCreate()
-        callManager.initializeResources(this)
         // create audio manager
         registerIncomingPstnCallReceiver()
         registerWiredHeadsetStateReceiver()
@@ -230,15 +229,147 @@ class WebRtcCallService: Service() {
     private fun handleIncomingCall(intent: Intent) {
         if (callManager.currentConnectionState != STATE_IDLE) throw IllegalStateException("Incoming on non-idle")
 
-        val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION)
+        val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION) ?: return
         callManager.postConnectionEvent(STATE_ANSWERING)
-        callManager.callId = getCallId(intent)
+        val callId = getCallId(intent)
+        callManager.callId = callId
         callManager.clearPendingIceUpdates()
         val recipient = getRemoteRecipient(intent)
         callManager.recipient = recipient
         if (isIncomingMessageExpired(intent)) {
             insertMissedCall(recipient, true)
+            terminate()
+            return
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            setCallInProgressNotification(TYPE_INCOMING_CONNECTING, recipient)
+        }
+
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
+
+        callManager.initializeVideo(this)
+
+        val expectedState = callManager.currentConnectionState
+        val expectedCallId = callManager.callId
+
+        try {
+            val answerFuture = callManager.onIncomingCall(offer, this) // add is always turn here
+            answerFuture.fail { e ->
+                if (isConsistentState(expectedState,expectedCallId, callManager.currentConnectionState, callManager.callId)) {
+                    Log.e(TAG, e)
+                    insertMissedCall(recipient, true)
+                    terminate()
+                }
+            }
+            callManager.postViewModelState(CallViewModel.State.CALL_INCOMING)
+            // lock manager update phone state processing here
+        } catch (e: Exception) {
+            Log.e(TAG,e)
+            terminate()
+        }
+    }
+
+    private fun handleOutgoingCall(intent: Intent) {
+        if (callManager.currentConnectionState != STATE_IDLE) throw IllegalStateException("Dialing from non-idle")
+
+        callManager.postConnectionEvent(STATE_DIALING)
+        callManager.recipient = getRemoteRecipient(intent)
+        val callId = UUID.randomUUID()
+        callManager.callId = callId
+
+        callManager.initializeVideo(this)
+
+        callManager.postViewModelState(CallViewModel.State.CALL_OUTGOING)
+        // update phone state IN_CALL
+        callManager.initializeAudioForCall()
+        callManager.startOutgoingRinger(OutgoingRinger.Type.RINGING)
+        // bluetoothStateManager.setWantsConnection(true)
+        setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
+//        DatabaseComponent.get(this).insertOutgoingCall(callManager.recipient!!.address)
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
+
+        val expectedState = callManager.currentConnectionState
+        val expectedCallId = callManager.callId
+
+        try {
+            val offerFuture = callManager.onOutgoingCall(this)
+            offerFuture.fail { e ->
+                if (isConsistentState(expectedState, expectedCallId, callManager.currentConnectionState, callManager.callId)) {
+                    Log.e(TAG,e)
+                    callManager.postViewModelState(CallViewModel.State.NETWORK_FAILURE)
+                    terminate()
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG,e)
+            terminate()
+        }
+    }
+
+    private fun handleAnswerCall(intent: Intent) {
+        if (callManager.currentConnectionState != STATE_LOCAL_RINGING) {
+            Log.e(TAG,"Can only answer from ringing!")
+            return
+        }
+
+        if (callManager.callNotSetup()) {
+            throw AssertionError("assert")
+        }
+
+        // DatabaseComponent.get(this).smsDatabase().insertReceivedCall(recipient)
+
+        val (callId, recipient) = callManager.handleAnswerCall()
+
+        intent.putExtra(EXTRA_CALL_ID, callId)
+        intent.putExtra(EXTRA_RECIPIENT_ADDRESS, recipient.address)
+        handleCallConnected(intent)
+    }
+
+    private fun handleDenyCall(intent: Intent) {
+        if (callManager.currentConnectionState != STATE_LOCAL_RINGING) {
+            Log.e(TAG,"Can only deny from ringing!")
+            return
+        }
+
+        if (callManager.callNotSetup()) {
+            throw AssertionError("assert")
+        }
+
+        callManager.handleDenyCall()
+
+        // DatabaseComponent.get(this).smsDatabase().insertMissedCall(recipient)
+        terminate()
+    }
+
+    private fun handleLocalHangup(intent: Intent) {
+        callManager.handleLocalHangup()
+        terminate()
+    }
+
+    private fun handleRemoteHangup(intent: Intent) {
+        if (callManager.callId != getCallId(intent)) {
+            Log.e(TAG, "Hangup for non-active call...")
+            return
+        }
+
+        callManager.handleRemoteHangup()
+
+        if (callManager.currentConnectionState in arrayOf(STATE_ANSWERING, STATE_LOCAL_RINGING)) {
+            callManager.recipient?.let { recipient ->
+                insertMissedCall(recipient, true)
+            }
+        }
+    }
+
+    private fun handleSetMuteAudio(intent: Intent) {
+        val muted = intent.getBooleanExtra(EXTRA_MUTE, false)
+        callManager.handleSetMuteAudio(muted)
+    }
+
+    private fun handleSetMuteVideo(intent: Intent) {
+        val muted = intent.getBooleanExtra(EXTRA_MUTE, false)
+        callManager.handleSetMuteVideo(muted)
     }
 
     private fun handleCheckTimeout(intent: Intent) {
@@ -300,10 +431,27 @@ class WebRtcCallService: Service() {
         }
     }
 
+    private abstract class FailureListener<V>(
+            expectedState: CallManager.CallState,
+            expectedCallId: UUID?,
+            getState: () -> Pair<CallManager.CallState, UUID?>): StateAwareListener<V>(expectedState, expectedCallId, getState) {
+        override fun onSuccessContinue(result: V) {}
+    }
+
+    private abstract class SuccessOnlyListener<V>(
+            expectedState: CallManager.CallState,
+            expectedCallId: UUID?,
+            getState: () -> Pair<CallManager.CallState, UUID>): StateAwareListener<V>(expectedState, expectedCallId, getState) {
+        override fun onFailureContinue(throwable: Throwable?) {
+            Log.e(TAG, throwable)
+            throw AssertionError(throwable)
+        }
+    }
+
     private abstract class StateAwareListener<V>(
             private val expectedState: CallManager.CallState,
-            private val expectedCallId: UUID,
-            private val getState: ()->Pair<CallManager.CallState, UUID>): FutureTaskListener<V> {
+            private val expectedCallId: UUID?,
+            private val getState: ()->Pair<CallManager.CallState, UUID?>): FutureTaskListener<V> {
 
         companion object {
             private val TAG = Log.tag(StateAwareListener::class.java)
@@ -336,6 +484,15 @@ class WebRtcCallService: Service() {
         abstract fun onSuccessContinue(result: V)
         abstract fun onFailureContinue(throwable: Throwable?)
 
+    }
+
+    private fun isConsistentState(
+            expectedState: CallManager.CallState,
+            expectedCallId: UUID?,
+            currentState: CallManager.CallState,
+            currentCallId: UUID?
+    ): Boolean {
+        return expectedState == currentState && expectedCallId == currentCallId
     }
 
 }

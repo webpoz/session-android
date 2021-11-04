@@ -33,6 +33,20 @@ class CallMessage(): ControlMessage() {
     companion object {
         const val TAG = "CallMessage"
 
+        fun answer(sdp: String, callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.ANSWER,
+                listOf(sdp),
+                listOf(),
+                listOf(),
+                callId
+        )
+
+        fun offer(sdp: String, callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.OFFER,
+                listOf(sdp),
+                listOf(),
+                listOf(),
+                callId
+        )
+
         fun endCall(callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.END_CALL, emptyList(), emptyList(), emptyList(), callId)
 
         fun fromProto(proto: SignalServiceProtos.Content): CallMessage? {

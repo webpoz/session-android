@@ -15,8 +15,8 @@ class Camera(context: Context,
     }
 
     val capturer: CameraVideoCapturer?
-    private val cameraCount: Int
-    private var activeDirection: CameraState.Direction = PENDING
+    val cameraCount: Int
+    var activeDirection: CameraState.Direction = PENDING
     var enabled: Boolean = false
     set(value) {
         field = value

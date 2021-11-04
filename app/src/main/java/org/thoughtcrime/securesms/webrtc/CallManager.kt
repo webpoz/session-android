@@ -1,26 +1,30 @@
 package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
+import android.content.Intent
 import android.telephony.TelephonyManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import nl.komponents.kovenant.Promise
 import org.session.libsession.messaging.messages.control.CallMessage
+import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.utilities.Log
-import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.thoughtcrime.securesms.webrtc.audio.AudioManagerCompat
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
+import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
 import org.webrtc.*
+import java.lang.NullPointerException
 import java.util.*
 import java.util.concurrent.Executors
 
 class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConnection.Observer,
         SignalAudioManager.EventListener,
-        CallDataListener {
+        CallDataListener, CameraEventListener, DataChannel.Observer {
 
     enum class CallState {
         STATE_IDLE, STATE_DIALING, STATE_ANSWERING, STATE_REMOTE_RINGING, STATE_LOCAL_RINGING, STATE_CONNECTED
@@ -47,6 +51,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
                 CallState.STATE_CONNECTED
         )
         val DISCONNECTED_STATES = arrayOf(CallState.STATE_IDLE)
+        private const val DATA_CHANNEL_NAME = "signaling"
     }
 
 
@@ -63,8 +68,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     private val _callStateEvents = MutableStateFlow(CallViewModel.State.CALL_PENDING)
     val callStateEvents = _callStateEvents.asSharedFlow()
     private var localCameraState: CameraState = CameraState.UNKNOWN
-    private var microphoneEnabled = true
-    private var remoteVideoEnabled = false
     private var bluetoothAvailable = false
 
     val currentConnectionState = (_connectionEvents.value as StateEvent.CallStateUpdate).state
@@ -75,7 +78,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     var callId: UUID? = null
     var recipient: Recipient? = null
-    private var peerConnectionWrapper: PeerConnectionWrapper? = null
+
+    fun getCurrentCallState(): Pair<CallState, UUID?> = currentConnectionState to callId
+
+    private var peerConnection: PeerConnectionWrapper? = null
     private var dataChannel: DataChannel? = null
 
     private val pendingOutgoingIceUpdates = ArrayDeque<IceCandidate>()
@@ -88,6 +94,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     fun clearPendingIceUpdates() {
         pendingOutgoingIceUpdates.clear()
         pendingIncomingIceUpdates.clear()
+    }
+
+    fun initializeAudioForCall() {
+        signalAudioManager.initializeAudioForCall()
     }
 
     fun startOutgoingRinger(ringerType: OutgoingRinger.Type) {
@@ -177,20 +187,20 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun callEnded() {
-        peerConnectionWrapper?.dispose()
-        peerConnectionWrapper = null
+        peerConnection?.dispose()
+        peerConnection = null
     }
 
     fun setAudioEnabled(isEnabled: Boolean) {
         currentConnectionState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
-            peerConnectionWrapper?.setAudioEnabled(isEnabled)
+            peerConnection?.setAudioEnabled(isEnabled)
             _audioEvents.value = StateEvent.AudioEnabled(true)
         }
     }
 
     fun setVideoEnabled(isEnabled: Boolean) {
         currentConnectionState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
-            peerConnectionWrapper?.setVideoEnabled(isEnabled)
+            peerConnection?.setVideoEnabled(isEnabled)
             _audioEvents.value = StateEvent.AudioEnabled(true)
         }
     }
@@ -239,6 +249,19 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     }
 
+    override fun onBufferedAmountChange(l: Long) {
+        Log.i(TAG,"onBufferedAmountChange: $l")
+    }
+
+    override fun onStateChange() {
+        Log.i(TAG,"onStateChange")
+    }
+
+    override fun onMessage(buffer: DataChannel.Buffer?) {
+        Log.i(TAG,"onMessage...")
+        TODO("interpret the data channel buffer and check for signals")
+    }
+
     override fun onAudioDeviceChanged(activeDevice: SignalAudioManager.AudioDevice, devices: Set<SignalAudioManager.AudioDevice>) {
         signalAudioManager.handleCommand(AudioManagerCommand())
     }
@@ -250,15 +273,15 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         }
     }
 
-    private fun CallState.withState(vararg expected: CallState, transition: ()->Unit) {
+    private fun CallState.withState(vararg expected: CallState, transition: () -> Unit) {
         if (this in expected) transition()
         else Log.w(TAG,"Tried to transition state $this but expected $expected")
     }
 
     fun stop() {
         signalAudioManager.stop(currentConnectionState in OUTGOING_STATES)
-        peerConnectionWrapper?.dispose()
-        peerConnectionWrapper = null
+        peerConnection?.dispose()
+        peerConnection = null
 
         localRenderer?.release()
         remoteRenderer?.release()
@@ -278,8 +301,119 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         pendingIncomingIceUpdates.clear()
     }
 
-    fun initializeResources(webRtcCallService: WebRtcCallService) {
-        TODO("Not yet implemented")
+    override fun onCameraSwitchCompleted(newCameraState: CameraState) {
+        localCameraState = newCameraState
+    }
+
+    fun onIncomingCall(offer: String, context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {
+        val callId = callId ?: return Promise.ofFail(NullPointerException("callId is null"))
+        val recipient = recipient ?: return Promise.ofFail(NullPointerException("recipient is null"))
+        val factory = peerConnectionFactory ?: return Promise.ofFail(NullPointerException("peerConnectionFactory is null"))
+        val local = localRenderer ?: return Promise.ofFail(NullPointerException("localRenderer is null"))
+        val base = eglBase ?: return Promise.ofFail(NullPointerException("eglBase is null"))
+        val connection = PeerConnectionWrapper(
+                context,
+                factory,
+                this,
+                local,
+                this,
+                base,
+                isAlwaysTurn
+        )
+        peerConnection = connection
+        localCameraState = connection.getCameraState()
+        connection.setRemoteDescription(SessionDescription(SessionDescription.Type.OFFER, offer))
+        val answer = connection.createAnswer(MediaConstraints())
+        connection.setLocalDescription(answer)
+
+        val answerMessage = MessageSender.sendNonDurably(CallMessage.answer(
+                answer.description,
+                callId
+        ), recipient.address)
+
+        while (pendingIncomingIceUpdates.isNotEmpty()) {
+            val candidate = pendingIncomingIceUpdates.pop() ?: break
+            connection.addIceCandidate(candidate)
+        }
+        return answerMessage // TODO: maybe add success state update
+    }
+
+    fun onOutgoingCall(context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {
+        val callId = callId ?: return Promise.ofFail(NullPointerException("callId is null"))
+        val recipient = recipient
+                ?: return Promise.ofFail(NullPointerException("recipient is null"))
+        val factory = peerConnectionFactory
+                ?: return Promise.ofFail(NullPointerException("peerConnectionFactory is null"))
+        val local = localRenderer
+                ?: return Promise.ofFail(NullPointerException("localRenderer is null"))
+        val base = eglBase ?: return Promise.ofFail(NullPointerException("eglBase is null"))
+
+        val connection = PeerConnectionWrapper(
+                context,
+                factory,
+                this,
+                local,
+                this,
+                base,
+                isAlwaysTurn
+        )
+
+        localCameraState = connection.getCameraState()
+        val dataChannel = connection.createDataChannel(DATA_CHANNEL_NAME)
+        dataChannel.registerObserver(this)
+        val offer = connection.createOffer(MediaConstraints())
+        connection.setLocalDescription(offer)
+
+        Log.i(TAG, "Sending offer: ${offer.description}")
+
+        return MessageSender.sendNonDurably(CallMessage.offer(
+                offer.description,
+                callId
+        ), recipient.address)
+    }
+
+    fun callNotSetup(): Boolean =
+            peerConnection == null || dataChannel == null || recipient == null || callId == null
+
+    fun handleAnswerCall(): Pair<UUID, Recipient> {
+        peerConnection?.let { connection ->
+            connection.setAudioEnabled(true)
+            connection.setVideoEnabled(true)
+        }
+        return callId!! to recipient!!
+    }
+
+    fun handleDenyCall() {
+        val callId = callId ?: return
+        val recipient = recipient ?: return
+        MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
+    }
+
+    fun handleLocalHangup() {
+        val recipient = recipient ?: return
+        val callId = callId ?: return
+
+        postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
+        MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
+    }
+
+    fun handleRemoteHangup() {
+        when (currentConnectionState) {
+            CallState.STATE_DIALING,
+            CallState.STATE_REMOTE_RINGING -> postViewModelState(CallViewModel.State.RECIPIENT_UNAVAILABLE)
+            else -> postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
+        }
+    }
+
+    fun handleSetMuteAudio(muted: Boolean) {
+        _audioEvents.value = StateEvent.AudioEnabled(!muted)
+        peerConnection?.setAudioEnabled(_audioEvents.value.isEnabled)
+    }
+
+    fun handleSetMuteVideo(muted: Boolean) {
+        _videoEvents.value = StateEvent.VideoEnabled(!muted)
+        peerConnection?.setVideoEnabled(_videoEvents.value.isEnabled)
+        TODO()
     }
 
 }

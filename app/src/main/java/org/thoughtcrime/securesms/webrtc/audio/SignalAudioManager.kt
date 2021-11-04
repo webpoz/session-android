@@ -4,12 +4,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.SoundPool
 import android.net.Uri
 import android.os.Build
 import android.os.HandlerThread
 import network.loki.messenger.R
+import org.session.libsession.utilities.ServiceUtil
 import org.session.libsession.utilities.concurrent.SignalExecutors
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
@@ -353,6 +355,11 @@ class SignalAudioManager(private val context: Context,
         Log.i(TAG, "onWiredHeadsetChange state: $state plug: $pluggedIn mic: $hasMic")
         hasWiredHeadset = pluggedIn
         updateAudioDeviceState()
+    }
+
+    fun initializeAudioForCall() {
+        val audioManager: AudioManager = ServiceUtil.getAudioManager(context)
+        audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
     }
 
     private inner class WiredHeadsetReceiver : BroadcastReceiver() {
