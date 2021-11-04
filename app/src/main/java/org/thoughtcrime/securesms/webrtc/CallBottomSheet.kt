@@ -15,7 +15,7 @@ import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.recipients.Recipient
-import org.thoughtcrime.securesms.calls.WebRtcTestsActivity
+import org.thoughtcrime.securesms.calls.WebRtcCallActivity
 import org.thoughtcrime.securesms.mms.GlideApp
 import java.util.*
 
@@ -54,13 +54,13 @@ class CallBottomSheet: BottomSheetDialogFragment() {
         nameTextView.text = recipient.name ?: address.serialize()
 
         acceptButton.setOnClickListener {
-            val intent = Intent(requireContext(), WebRtcTestsActivity::class.java)
+            val intent = Intent(requireContext(), WebRtcCallActivity::class.java)
             val bundle = bundleOf(
-                WebRtcTestsActivity.EXTRA_ADDRESS to address,
-                WebRtcTestsActivity.EXTRA_CALL_ID to callId
+                WebRtcCallActivity.EXTRA_ADDRESS to address,
+                WebRtcCallActivity.EXTRA_CALL_ID to callId
             )
-            intent.action = WebRtcTestsActivity.ACTION_ANSWER
-            bundle.putStringArray(WebRtcTestsActivity.EXTRA_SDP, sdp)
+            intent.action = WebRtcCallActivity.ACTION_ANSWER
+            bundle.putStringArray(WebRtcCallActivity.EXTRA_SDP, sdp)
 
             intent.putExtras(bundle)
             startActivity(intent)

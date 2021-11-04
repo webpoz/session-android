@@ -903,5 +903,13 @@
     <string name="activity_settings_support">Debug Log</string>
     <string name="dialog_share_logs_title">Share Logs</string>
     <string name="dialog_share_logs_explanation">Would you like to export your application logs to be able to share for troubleshooting?</string>
+    <string name="CallNotificationBuilder_connecting">Connecting…</string>
+    <string name="NotificationBarManager__incoming_signal_call">Incoming call</string>
+    <string name="NotificationBarManager__deny_call">Deny call</string>
+    <string name="NotificationBarManager__answer_call">Answer call</string>
+    <string name="NotificationBarManager_call_in_progress">Call in progress</string>
+    <string name="NotificationBarManager__cancel_call">Cancel call</string>
+    <string name="NotificationBarManager__establishing_signal_call">Establishing call</string>
+    <string name="NotificationBarManager__end_call">End call</string>
 
 </resources>

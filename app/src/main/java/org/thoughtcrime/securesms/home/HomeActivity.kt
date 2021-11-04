@@ -45,7 +45,7 @@ import org.session.libsignal.utilities.toHexString
 import org.thoughtcrime.securesms.ApplicationContext
 import org.thoughtcrime.securesms.MuteDialog
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
-import org.thoughtcrime.securesms.calls.WebRtcTestsActivity
+import org.thoughtcrime.securesms.calls.WebRtcCallActivity
 import org.thoughtcrime.securesms.conversation.v2.ConversationActivityV2
 import org.thoughtcrime.securesms.conversation.v2.utilities.NotificationUtils
 import org.thoughtcrime.securesms.crypto.IdentityKeyUtil
@@ -185,7 +185,7 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
                         synchronized(WebRtcUtils.callCache) {
                             WebRtcUtils.callCache[callId] = mutableSetOf()
                         }
-                        sendBroadcast(Intent(WebRtcTestsActivity.ACTION_END))
+                        sendBroadcast(Intent(WebRtcCallActivity.ACTION_END))
                     }
                     else -> { /* do nothing */ }
                 }

@@ -58,8 +58,8 @@ class SignalAudioManager(private val context: Context,
     private val connectedSoundId = soundPool.load(context, R.raw.webrtc_completed, 1)
     private val disconnectedSoundId = soundPool.load(context, R.raw.webrtc_disconnected, 1)
 
-    private val incomingRinger = IncomingRinger(context)
-    private val outgoingRinger = OutgoingRinger(context)
+    val incomingRinger = IncomingRinger(context)
+    val outgoingRinger = OutgoingRinger(context)
 
     private var wiredHeadsetReceiver: WiredHeadsetReceiver? = null
 
@@ -340,7 +340,7 @@ class SignalAudioManager(private val context: Context,
         incomingRinger.stop()
     }
 
-    private fun startOutgoingRinger() {
+    fun startOutgoingRinger(type: OutgoingRinger.Type) {
         Log.i(TAG, "startOutgoingRinger(): currentDevice: $selectedAudioDevice")
 
         androidAudioManager.mode = AudioManager.MODE_IN_COMMUNICATION

@@ -11,6 +11,7 @@ import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.thoughtcrime.securesms.webrtc.audio.AudioManagerCompat
+import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
 import org.thoughtcrime.securesms.webrtc.video.CameraState
 import org.webrtc.*
@@ -59,19 +60,21 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     val remoteVideoEvents = _remoteVideoEvents.asSharedFlow()
     private val _connectionEvents = MutableStateFlow<StateEvent>(StateEvent.CallStateUpdate(CallState.STATE_IDLE))
     val connectionEvents = _connectionEvents.asSharedFlow()
+    private val _callStateEvents = MutableStateFlow(CallViewModel.State.CALL_PENDING)
+    val callStateEvents = _callStateEvents.asSharedFlow()
     private var localCameraState: CameraState = CameraState.UNKNOWN
     private var microphoneEnabled = true
     private var remoteVideoEnabled = false
     private var bluetoothAvailable = false
 
-    private val currentCallState = (_connectionEvents.value as StateEvent.CallStateUpdate).state
+    val currentConnectionState = (_connectionEvents.value as StateEvent.CallStateUpdate).state
 
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
     private var eglBase: EglBase? = null
 
-    private var callId: UUID? = null
-    private var recipient: Recipient? = null
+    var callId: UUID? = null
+    var recipient: Recipient? = null
     private var peerConnectionWrapper: PeerConnectionWrapper? = null
     private var dataChannel: DataChannel? = null
 
@@ -81,6 +84,23 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     private var localRenderer: SurfaceViewRenderer? = null
     private var remoteRenderer: SurfaceViewRenderer? = null
     private var peerConnectionFactory: PeerConnectionFactory? = null
+
+    fun clearPendingIceUpdates() {
+        pendingOutgoingIceUpdates.clear()
+        pendingIncomingIceUpdates.clear()
+    }
+
+    fun startOutgoingRinger(ringerType: OutgoingRinger.Type) {
+        signalAudioManager.startOutgoingRinger(ringerType)
+    }
+
+    fun postConnectionEvent(newState: CallState) {
+        _connectionEvents.value = StateEvent.CallStateUpdate(newState)
+    }
+
+    fun postViewModelState(newState: CallViewModel.State) {
+        _callStateEvents.value = newState
+    }
 
     private fun createCameraCapturer(enumerator: CameraEnumerator): CameraVideoCapturer? {
         val deviceNames = enumerator.deviceNames
@@ -128,7 +148,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     }
 
-    fun isBusy(context: Context) = currentCallState != CallState.STATE_IDLE
+    fun isBusy(context: Context) = currentConnectionState != CallState.STATE_IDLE
             || context.getSystemService(TelephonyManager::class.java).callState  != TelephonyManager.CALL_STATE_IDLE
 
     fun initializeVideo(context: Context) {
@@ -162,14 +182,14 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun setAudioEnabled(isEnabled: Boolean) {
-        currentCallState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
+        currentConnectionState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
             peerConnectionWrapper?.setAudioEnabled(isEnabled)
             _audioEvents.value = StateEvent.AudioEnabled(true)
         }
     }
 
     fun setVideoEnabled(isEnabled: Boolean) {
-        currentCallState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
+        currentConnectionState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
             peerConnectionWrapper?.setVideoEnabled(isEnabled)
             _audioEvents.value = StateEvent.AudioEnabled(true)
         }
@@ -236,7 +256,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun stop() {
-        signalAudioManager.stop(currentCallState in OUTGOING_STATES)
+        signalAudioManager.stop(currentConnectionState in OUTGOING_STATES)
         peerConnectionWrapper?.dispose()
         peerConnectionWrapper = null
 

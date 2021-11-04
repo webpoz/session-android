@@ -11,7 +11,6 @@ import android.view.MenuItem
 import android.view.Window
 import android.view.WindowManager
 import androidx.activity.viewModels
-import androidx.core.view.isVisible
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
@@ -25,7 +24,6 @@ import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.utilities.Address
-import org.session.libsession.utilities.Debouncer
 import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
@@ -35,7 +33,7 @@ import org.webrtc.*
 import java.util.*
 
 @AndroidEntryPoint
-class WebRtcTestsActivity: PassphraseRequiredActionBarActivity() {
+class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     companion object {
         const val CALL_ID = "call_id_session"
@@ -48,6 +46,8 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity() {
         const val EXTRA_SDP = "WebRtcTestsActivity_EXTRA_SDP"
         const val EXTRA_ADDRESS = "WebRtcTestsActivity_EXTRA_ADDRESS"
         const val EXTRA_CALL_ID = "WebRtcTestsActivity_EXTRA_CALL_ID"
+
+        const val BUSY_SIGNAL_DELAY_FINISH = 5500L
     }
 
     private val viewModel by viewModels<CallViewModel>()
@@ -135,7 +135,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity() {
                 }
                 if (answer != null) {
                     peerConnection.setRemoteDescription(
-                        this@WebRtcTestsActivity,
+                        this@WebRtcCallActivity,
                         SessionDescription(SessionDescription.Type.ANSWER, answer.sdps[0])
                     )
                     break
@@ -153,7 +153,7 @@ class WebRtcTestsActivity: PassphraseRequiredActionBarActivity() {
         lifecycleScope.launchWhenResumed {
             while (this.isActive) {
                 delay(2_000L)
-                peerConnection.getStats(this@WebRtcTestsActivity)
+                peerConnection.getStats(this@WebRtcCallActivity)
                 synchronized(WebRtcUtils.callCache) {
                     val set = WebRtcUtils.callCache[callId] ?: mutableSetOf()
                     set.filter { it.hashCode() !in acceptedCallMessageHashes

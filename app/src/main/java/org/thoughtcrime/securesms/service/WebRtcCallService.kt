@@ -6,18 +6,32 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
+import android.os.Build
 import android.os.IBinder
 import android.os.ResultReceiver
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
+import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.FutureTaskListener
+import org.session.libsession.utilities.Util
+import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.utilities.Log
+import org.thoughtcrime.securesms.calls.WebRtcCallActivity
+import org.thoughtcrime.securesms.util.CallNotificationBuilder
+import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_ESTABLISHED
+import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_CONNECTING
+import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_RINGING
+import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_OUTGOING_RINGING
 import org.thoughtcrime.securesms.webrtc.*
+import org.thoughtcrime.securesms.webrtc.CallManager.CallState.*
+import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
+import java.lang.AssertionError
 import java.util.*
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -26,6 +40,9 @@ class WebRtcCallService: Service() {
     @Inject lateinit var callManager: CallManager
 
     companion object {
+
+        private val TAG = Log.tag(WebRtcCallService::class.java)
+
         const val ACTION_INCOMING_CALL = "CALL_INCOMING"
         const val ACTION_OUTGOING_CALL = "CALL_OUTGOING"
         const val ACTION_ANSWER_CALL = "ANSWER_CALL"
@@ -167,6 +184,100 @@ class WebRtcCallService: Service() {
         wiredHeadsetStateReceiver = WiredHeadsetStateReceiver()
         registerReceiver(wiredHeadsetStateReceiver, IntentFilter(AudioManager.ACTION_HEADSET_PLUG))
     }
+
+    private fun handleBusyCall(intent: Intent) {
+        val recipient = getRemoteRecipient(intent)
+        val callId = getCallId(intent)
+        val callState = callManager.currentConnectionState
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            when (callState) {
+                STATE_DIALING,
+                STATE_REMOTE_RINGING -> setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
+                STATE_IDLE -> setCallInProgressNotification(TYPE_INCOMING_CONNECTING, recipient)
+                STATE_ANSWERING -> setCallInProgressNotification(TYPE_INCOMING_CONNECTING, callManager.recipient)
+                STATE_LOCAL_RINGING -> setCallInProgressNotification(TYPE_INCOMING_RINGING, callManager.recipient)
+                STATE_CONNECTED -> setCallInProgressNotification(TYPE_ESTABLISHED, callManager.recipient)
+                else -> throw AssertionError()
+            }
+        }
+
+        if (callState == STATE_IDLE) {
+            stopForeground(true)
+        }
+
+        // TODO: send hangup via messageSender
+        insertMissedCall(getRemoteRecipient(intent), false)
+    }
+
+    private fun handleBusyMessage(intent: Intent) {
+        val recipient = getRemoteRecipient(intent)
+        val callId = getCallId(intent)
+        if (callManager.currentConnectionState != STATE_DIALING || callManager.callId != callManager.callId || callManager.recipient != callManager.recipient) {
+            Log.w(TAG,"Got busy message for inactive session...")
+            return
+        }
+        callManager.postViewModelState(CallViewModel.State.CALL_BUSY)
+        callManager.startOutgoingRinger(OutgoingRinger.Type.BUSY)
+        Util.runOnMainDelayed({
+            startService(
+                    Intent(this, WebRtcCallService::class.java)
+                            .setAction(ACTION_LOCAL_HANGUP)
+            )
+        }, WebRtcCallActivity.BUSY_SIGNAL_DELAY_FINISH)
+    }
+
+    private fun handleIncomingCall(intent: Intent) {
+        if (callManager.currentConnectionState != STATE_IDLE) throw IllegalStateException("Incoming on non-idle")
+
+        val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION)
+        callManager.postConnectionEvent(STATE_ANSWERING)
+        callManager.callId = getCallId(intent)
+        callManager.clearPendingIceUpdates()
+        val recipient = getRemoteRecipient(intent)
+        callManager.recipient = recipient
+        if (isIncomingMessageExpired(intent)) {
+            insertMissedCall(recipient, true)
+        }
+    }
+
+    private fun handleCheckTimeout(intent: Intent) {
+        val callId = callManager.callId ?: return
+        val callState = callManager.currentConnectionState
+
+        if (callId == getCallId(intent) && callState != STATE_CONNECTED) {
+            Log.w(TAG, "Timing out call: $callId")
+            callManager.postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
+        }
+    }
+
+    private fun setCallInProgressNotification(type: Int, recipient: Recipient?) {
+        startForeground(
+                CallNotificationBuilder.WEBRTC_NOTIFICATION,
+                CallNotificationBuilder.getCallInProgressNotification(this, type, recipient)
+        )
+    }
+
+    private fun getRemoteRecipient(intent: Intent): Recipient {
+        val remoteAddress = intent.getParcelableExtra<Address>(EXTRA_RECIPIENT_ADDRESS)
+                ?: throw AssertionError("No recipient in intent!")
+
+        return Recipient.from(this, remoteAddress, true)
+    }
+
+    private fun getCallId(intent: Intent) : UUID {
+        return intent.getSerializableExtra(EXTRA_CALL_ID) as? UUID
+                ?: throw AssertionError("No callId in intent!")
+    }
+
+    private fun insertMissedCall(recipient: Recipient, signal: Boolean) {
+        // TODO
+//        val messageAndThreadId = DatabaseComponent.get(this).smsDatabase().insertReceivedCall(recipient.address)
+//        MessageNotifier.updateNotification(this, messageAndThreadId.second, signal)
+    }
+
+    private fun isIncomingMessageExpired(intent: Intent) =
+            System.currentTimeMillis() - intent.getLongExtra(EXTRA_TIMESTAMP, -1) > TimeUnit.MINUTES.toMillis(2)
 
     override fun onDestroy() {
         super.onDestroy()

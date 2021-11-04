@@ -36,7 +36,7 @@ import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.utilities.guava.Optional
 import org.session.libsignal.utilities.toHexString
 import org.thoughtcrime.securesms.*
-import org.thoughtcrime.securesms.calls.WebRtcTestsActivity
+import org.thoughtcrime.securesms.calls.WebRtcCallActivity
 import org.thoughtcrime.securesms.contacts.SelectContactsActivity
 import org.thoughtcrime.securesms.conversation.v2.ConversationActivityV2
 import org.thoughtcrime.securesms.conversation.v2.utilities.NotificationUtils
@@ -187,15 +187,15 @@ object ConversationMenuHelper {
             .setTitle("Call")
             .setMessage("Use relay?")
             .setPositiveButton("Use Relay") { d, w ->
-                val intent = Intent(context, WebRtcTestsActivity::class.java)
-                intent.putExtra(WebRtcTestsActivity.EXTRA_CALL_ID, UUID.randomUUID().toString())
-                intent.putExtra(WebRtcTestsActivity.EXTRA_ADDRESS, thread.address)
+                val intent = Intent(context, WebRtcCallActivity::class.java)
+                intent.putExtra(WebRtcCallActivity.EXTRA_CALL_ID, UUID.randomUUID().toString())
+                intent.putExtra(WebRtcCallActivity.EXTRA_ADDRESS, thread.address)
                 val activity = context as AppCompatActivity
                 activity.startActivity(intent)
             }
             .setNeutralButton("P2P only") { d, w ->
-                val intent = Intent(context, WebRtcTestsActivity::class.java)
-                intent.putExtra(WebRtcTestsActivity.EXTRA_ADDRESS, thread.address)
+                val intent = Intent(context, WebRtcCallActivity::class.java)
+                intent.putExtra(WebRtcCallActivity.EXTRA_ADDRESS, thread.address)
                 val activity = context as AppCompatActivity
                 activity.startActivity(intent)
             }
