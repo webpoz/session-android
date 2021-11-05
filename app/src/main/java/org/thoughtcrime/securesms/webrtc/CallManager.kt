@@ -5,6 +5,8 @@ import android.content.Intent
 import android.telephony.TelephonyManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import nl.komponents.kovenant.Promise
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
@@ -15,10 +17,13 @@ import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.audio.AudioManagerCompat
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice
+import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
 import org.webrtc.*
 import java.lang.NullPointerException
+import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.Executors
 
@@ -37,6 +42,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     companion object {
+
+        val VIDEO_DISABLED_JSON by lazy { buildJsonObject { put("video", false) } }
+        val VIDEO_ENABLED_JSON by lazy { buildJsonObject { put("video", true) } }
+
         private val TAG = Log.tag(CallManager::class.java)
         val CONNECTED_STATES = arrayOf(CallState.STATE_CONNECTED)
         val PENDING_CONNECTION_STATES = arrayOf(
@@ -50,10 +59,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
                 CallState.STATE_REMOTE_RINGING,
                 CallState.STATE_CONNECTED
         )
-        val DISCONNECTED_STATES = arrayOf(CallState.STATE_IDLE)
         private const val DATA_CHANNEL_NAME = "signaling"
     }
-
 
     private val signalAudioManager: SignalAudioManager = SignalAudioManager(context, this, audioManager)
 
@@ -97,11 +104,11 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun initializeAudioForCall() {
-        signalAudioManager.initializeAudioForCall()
+        signalAudioManager.handleCommand(AudioManagerCommand.Initialize)
     }
 
     fun startOutgoingRinger(ringerType: OutgoingRinger.Type) {
-        signalAudioManager.startOutgoingRinger(ringerType)
+        signalAudioManager.handleCommand(AudioManagerCommand.StartOutgoingRinger(ringerType))
     }
 
     fun postConnectionEvent(newState: CallState) {
@@ -110,36 +117,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     fun postViewModelState(newState: CallViewModel.State) {
         _callStateEvents.value = newState
-    }
-
-    private fun createCameraCapturer(enumerator: CameraEnumerator): CameraVideoCapturer? {
-        val deviceNames = enumerator.deviceNames
-
-        // First, try to find front facing camera
-        Log.d("Loki-RTC-vid", "Looking for front facing cameras.")
-        for (deviceName in deviceNames) {
-            if (enumerator.isFrontFacing(deviceName)) {
-                Log.d("Loki-RTC-vid", "Creating front facing camera capturer.")
-                val videoCapturer = enumerator.createCapturer(deviceName, null)
-                if (videoCapturer != null) {
-                    return videoCapturer
-                }
-            }
-        }
-
-        // Front facing camera not found, try something else
-        Log.d("Loki-RTC-vid", "Looking for other cameras.")
-        for (deviceName in deviceNames) {
-            if (!enumerator.isFrontFacing(deviceName)) {
-                Log.d("Loki-RTC-vid", "Creating other camera capturer.")
-                val videoCapturer = enumerator.createCapturer(deviceName, null)
-                if (videoCapturer != null) {
-                    return videoCapturer
-                }
-            }
-        }
-
-        return null
     }
 
     override fun newCallMessage(callMessage: SignalServiceProtos.CallMessage) {
@@ -262,7 +239,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         TODO("interpret the data channel buffer and check for signals")
     }
 
-    override fun onAudioDeviceChanged(activeDevice: SignalAudioManager.AudioDevice, devices: Set<SignalAudioManager.AudioDevice>) {
+    override fun onAudioDeviceChanged(activeDevice: AudioDevice, devices: Set<AudioDevice>) {
         signalAudioManager.handleCommand(AudioManagerCommand())
     }
 
@@ -279,7 +256,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun stop() {
-        signalAudioManager.stop(currentConnectionState in OUTGOING_STATES)
+        signalAudioManager.handleCommand(AudioManagerCommand.Stop(currentConnectionState in OUTGOING_STATES))
         peerConnection?.dispose()
         peerConnection = null
 
@@ -295,8 +272,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         localCameraState = CameraState.UNKNOWN
         recipient = null
         callId = null
-        microphoneEnabled = true
-        remoteVideoEnabled = false
+        _audioEvents.value = StateEvent.AudioEnabled(false)
+        _videoEvents.value = StateEvent.VideoEnabled(false)
         pendingOutgoingIceUpdates.clear()
         pendingIncomingIceUpdates.clear()
     }
@@ -410,10 +387,93 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         peerConnection?.setAudioEnabled(_audioEvents.value.isEnabled)
     }
 
-    fun handleSetMuteVideo(muted: Boolean) {
+    fun handleSetMuteVideo(muted: Boolean, lockManager: LockManager) {
         _videoEvents.value = StateEvent.VideoEnabled(!muted)
         peerConnection?.setVideoEnabled(_videoEvents.value.isEnabled)
-        TODO()
+        dataChannel?.let { channel ->
+            val toSend = if (muted) VIDEO_DISABLED_JSON else VIDEO_ENABLED_JSON
+            val buffer = DataChannel.Buffer(ByteBuffer.wrap(toSend.toString().encodeToByteArray()), false)
+            channel.send(buffer)
+        }
+
+        if (currentConnectionState == CallState.STATE_CONNECTED) {
+            if (localCameraState.enabled) lockManager.updatePhoneState(LockManager.PhoneState.IN_VIDEO)
+            else lockManager.updatePhoneState(LockManager.PhoneState.IN_CALL)
+        }
+
+        if (localCameraState.enabled
+                && !signalAudioManager.isSpeakerphoneOn()
+                && !signalAudioManager.isBluetoothScoOn()
+                && !signalAudioManager.isWiredHeadsetOn()
+        ) {
+            signalAudioManager.handleCommand(AudioManagerCommand.SetUserDevice(AudioDevice.SPEAKER_PHONE))
+        }
+    }
+
+    fun handleSetCameraFlip() {
+        if (!localCameraState.enabled) return
+        peerConnection?.let { connection ->
+            connection.flipCamera()
+            localCameraState = connection.getCameraState()
+        }
+    }
+
+    fun postBluetoothAvailable(available: Boolean) {
+        // TODO: _bluetoothEnabled.value = available
+    }
+
+    fun handleWiredHeadsetChanged(present: Boolean) {
+        if (currentConnectionState in arrayOf(CallState.STATE_CONNECTED,
+                        CallState.STATE_DIALING,
+                        CallState.STATE_REMOTE_RINGING)) {
+            if (present && signalAudioManager.isSpeakerphoneOn()) {
+                signalAudioManager.handleCommand(AudioManagerCommand.SetUserDevice(AudioDevice.WIRED_HEADSET))
+            } else if (!present && !signalAudioManager.isSpeakerphoneOn() && !signalAudioManager.isBluetoothScoOn() && localCameraState.enabled) {
+                signalAudioManager.handleCommand(AudioManagerCommand.SetUserDevice(AudioDevice.SPEAKER_PHONE))
+            }
+        }
+    }
+
+    fun handleScreenOffChange() {
+        if (currentConnectionState in arrayOf(CallState.STATE_ANSWERING, CallState.STATE_LOCAL_RINGING)) {
+            signalAudioManager.handleCommand(AudioManagerCommand.SilenceIncomingRinger)
+        }
+    }
+
+    fun handleRemoteVideoMute(muted: Boolean, intentCallId: UUID) {
+        val recipient = recipient ?: return
+        val callId = callId ?: return
+        if (currentConnectionState != CallState.STATE_CONNECTED || callId != intentCallId) {
+            Log.w(TAG,"Got video toggle for inactive call, ignoring..")
+            return
+        }
+
+        _remoteVideoEvents.value = StateEvent.VideoEnabled(!muted)
+    }
+
+    fun handleResponseMessage(recipient: Recipient, callId: UUID, answer: SessionDescription) {
+        if (currentConnectionState != CallState.STATE_DIALING || recipient != this.recipient || callId != this.callId) {
+            Log.w(TAG,"Got answer for recipient and call ID we're not currently dialing")
+            return
+        }
+
+        val connection = peerConnection ?: throw AssertionError("assert")
+
+        connection.setRemoteDescription(answer)
+    }
+
+    fun handleRemoteIceCandidate(iceCandidates: List<IceCandidate>, callId: UUID) {
+        if (callId != this.callId) {
+            Log.w(TAG, "Got remote ice candidates for a call that isn't active")
+        }
+
+        peerConnection?.let { connection ->
+            iceCandidates.forEach { candidate ->
+                connection.addIceCandidate(candidate)
+            }
+        } ?: run {
+            pendingIncomingIceUpdates.addAll(iceCandidates)
+        }
     }
 
 }

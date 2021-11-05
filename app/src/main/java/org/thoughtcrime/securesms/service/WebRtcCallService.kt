@@ -19,7 +19,6 @@ import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.calls.WebRtcCallActivity
-import org.thoughtcrime.securesms.dependencies.DatabaseComponent
 import org.thoughtcrime.securesms.util.CallNotificationBuilder
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_ESTABLISHED
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_CONNECTING
@@ -28,6 +27,8 @@ import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_OU
 import org.thoughtcrime.securesms.webrtc.*
 import org.thoughtcrime.securesms.webrtc.CallManager.CallState.*
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
+import org.thoughtcrime.securesms.webrtc.locks.LockManager
+import org.webrtc.SessionDescription
 import java.lang.AssertionError
 import java.util.*
 import java.util.concurrent.ExecutionException
@@ -52,6 +53,7 @@ class WebRtcCallService: Service() {
         const val ACTION_SET_MUTE_AUDIO = "SET_MUTE_AUDIO"
         const val ACTION_SET_MUTE_VIDEO = "SET_MUTE_VIDEO"
         const val ACTION_FLIP_CAMERA = "FLIP_CAMERA"
+        const val ACTION_BLUETOOTH_CHANGE = "BLUETOOTH_CHANGE"
         const val ACTION_UPDATE_AUDIO = "UPDATE_AUDIO"
         const val ACTION_WIRED_HEADSET_CHANGE = "WIRED_HEADSET_CHANGE"
         const val ACTION_SCREEN_OFF = "SCREEN_OFF"
@@ -107,6 +109,7 @@ class WebRtcCallService: Service() {
     private var lastNotificationId: Int = INVALID_NOTIFICATION_ID
     private var lastNotification: Notification? = null
 
+    private val lockManager by lazy { LockManager(this) }
     private val serviceExecutor = Executors.newSingleThreadExecutor()
     private val timeoutExecutor = Executors.newScheduledThreadPool(1)
     private val hangupOnCallAnswered = HangUpRtcOnPstnCallAnsweredListener {
@@ -145,9 +148,9 @@ class WebRtcCallService: Service() {
                 action == ACTION_REMOTE_HANGUP -> handleRemoteHangup(intent)
                 action == ACTION_SET_MUTE_AUDIO -> handleSetMuteAudio(intent)
                 action == ACTION_SET_MUTE_VIDEO -> handleSetMuteVideo(intent)
-                action == ACTION_FLIP_CAMERA -> handlesetCameraFlip(intent)
-//                action == ACTION_BLUETOOTH_CHANGE -> handleBluetoothChange(intent)
-//                action == ACTION_WIRED_HEADSET_CHANGE -> handleWiredHeadsetChange(intent)
+                action == ACTION_FLIP_CAMERA -> handleSetCameraFlip(intent)
+                action == ACTION_BLUETOOTH_CHANGE -> handleBluetoothChange(intent)
+                action == ACTION_WIRED_HEADSET_CHANGE -> handleWiredHeadsetChanged(intent)
                 action == ACTION_SCREEN_OFF -> handleScreenOffChange(intent)
                 action == ACTION_REMOTE_VIDEO_MUTE -> handleRemoteVideoMute(intent)
                 action == ACTION_RESPONSE_MESSAGE -> handleResponseMessage(intent)
@@ -369,8 +372,63 @@ class WebRtcCallService: Service() {
 
     private fun handleSetMuteVideo(intent: Intent) {
         val muted = intent.getBooleanExtra(EXTRA_MUTE, false)
-        callManager.handleSetMuteVideo(muted)
+        callManager.handleSetMuteVideo(muted, lockManager)
     }
+
+    private fun handleSetCameraFlip(intent: Intent) {
+        callManager.handleSetCameraFlip()
+    }
+
+    private fun handleBluetoothChange(intent: Intent) {
+        val bluetoothAvailable = intent.getBooleanExtra(EXTRA_AVAILABLE, false)
+        callManager.postBluetoothAvailable(bluetoothAvailable)
+    }
+
+    private fun handleWiredHeadsetChanged(intent: Intent) {
+        callManager.handleWiredHeadsetChanged(intent.getBooleanExtra(EXTRA_AVAILABLE, false))
+    }
+
+    private fun handleScreenOffChange(intent: Intent) {
+        callManager.handleScreenOffChange()
+    }
+
+    private fun handleRemoteVideoMute(intent: Intent) {
+        val muted = intent.getBooleanExtra(EXTRA_MUTE, false)
+        val callId = intent.getSerializableExtra(EXTRA_CALL_ID) as UUID
+
+        callManager.handleRemoteVideoMute(muted, callId)
+    }
+
+
+    private fun handleResponseMessage(intent: Intent) {
+        try {
+            val recipient = getRemoteRecipient(intent)
+            val callId = getCallId(intent)
+            val description = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION)
+            callManager.handleResponseMessage(recipient, callId, SessionDescription(SessionDescription.Type.ANSWER, description))
+        } catch (e: PeerConnectionException) {
+            terminate()
+        }
+    }
+
+    private fun handleRemoteIceCandidate(intent: Intent) {
+
+    }
+
+    private fun handleLocalIceCandidate(intent: Intent) {
+
+    }
+
+    private fun handleCallConnected(intent: Intent) {
+
+    }
+
+    private fun handleIsInCallQuery(intent: Intent) {
+
+    }
+
+
+
 
     private fun handleCheckTimeout(intent: Intent) {
         val callId = callManager.callId ?: return

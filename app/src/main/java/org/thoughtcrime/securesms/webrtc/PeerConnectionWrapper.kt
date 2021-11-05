@@ -81,7 +81,10 @@ class PeerConnectionWrapper(context: Context,
     }
 
     fun createDataChannel(channelName: String): DataChannel {
-
+        val dataChannelConfiguration = DataChannel.Init().apply {
+            ordered = true
+        }
+        return peerConnection.createDataChannel(channelName, dataChannelConfiguration)
     }
 
     fun addIceCandidate(candidate: IceCandidate) {
@@ -226,6 +229,10 @@ class PeerConnectionWrapper(context: Context,
             track.setEnabled(isEnabled)
             camera.enabled = isEnabled
         }
+    }
+
+    fun flipCamera() {
+        camera.flip()
     }
 
 }

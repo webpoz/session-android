@@ -75,7 +75,7 @@ class SignalAudioManager(private val context: Context,
                 is AudioManagerCommand.SetUserDevice -> selectAudioDevice(command.device)
                 is AudioManagerCommand.StartIncomingRinger -> startIncomingRinger(command.vibrate)
                 is AudioManagerCommand.SilenceIncomingRinger -> silenceIncomingRinger()
-                is AudioManagerCommand.StartOutgoingRinger -> startOutgoingRinger()
+                is AudioManagerCommand.StartOutgoingRinger -> startOutgoingRinger(command.type)
             }
         }
     }
@@ -128,7 +128,7 @@ class SignalAudioManager(private val context: Context,
         Log.d(TAG, "Started")
     }
 
-    fun stop(playDisconnect: Boolean) {
+    private fun stop(playDisconnect: Boolean) {
         Log.d(TAG, "Stopping. state: $state")
         if (state == State.UNINITIALIZED) {
             Log.i(TAG, "Trying to stop AudioManager in incorrect state: $state")
@@ -166,7 +166,7 @@ class SignalAudioManager(private val context: Context,
         Log.d(TAG, "Stopped")
     }
 
-    fun shutdown() {
+    private fun shutdown() {
         handler.post {
             stop(false)
             if (commandAndControlThread != null) {
@@ -177,7 +177,7 @@ class SignalAudioManager(private val context: Context,
         }
     }
 
-    fun updateAudioDeviceState() {
+    private fun updateAudioDeviceState() {
         handler.assertHandlerThread()
 
         Log.i(
@@ -342,13 +342,13 @@ class SignalAudioManager(private val context: Context,
         incomingRinger.stop()
     }
 
-    fun startOutgoingRinger(type: OutgoingRinger.Type) {
+    private fun startOutgoingRinger(type: OutgoingRinger.Type) {
         Log.i(TAG, "startOutgoingRinger(): currentDevice: $selectedAudioDevice")
 
         androidAudioManager.mode = AudioManager.MODE_IN_COMMUNICATION
         setMicrophoneMute(false)
 
-        outgoingRinger.start(OutgoingRinger.Type.RINGING)
+        outgoingRinger.start(type)
     }
 
     private fun onWiredHeadsetChange(pluggedIn: Boolean, hasMic: Boolean) {
@@ -357,10 +357,11 @@ class SignalAudioManager(private val context: Context,
         updateAudioDeviceState()
     }
 
-    fun initializeAudioForCall() {
-        val audioManager: AudioManager = ServiceUtil.getAudioManager(context)
-        audioManager.requestAudioFocus(null, AudioManager.STREAM_VOICE_CALL, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
-    }
+    fun isSpeakerphoneOn(): Boolean = androidAudioManager.isSpeakerphoneOn
+
+    fun isBluetoothScoOn(): Boolean = androidAudioManager.isBluetoothScoOn
+
+    fun isWiredHeadsetOn(): Boolean = androidAudioManager.isWiredHeadsetOn
 
     private inner class WiredHeadsetReceiver : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {

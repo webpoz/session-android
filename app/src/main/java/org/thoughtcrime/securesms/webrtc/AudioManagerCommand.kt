@@ -2,6 +2,7 @@ package org.thoughtcrime.securesms.webrtc
 
 import android.os.Parcelable
 import kotlinx.android.parcel.Parcelize
+import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
 
 @Parcelize
@@ -10,7 +11,7 @@ open class AudioManagerCommand: Parcelable {
     object Initialize: AudioManagerCommand()
 
     @Parcelize
-    object StartOutgoingRinger: AudioManagerCommand()
+    data class StartOutgoingRinger(val type: OutgoingRinger.Type): AudioManagerCommand()
 
     @Parcelize
     object SilenceIncomingRinger: AudioManagerCommand()
