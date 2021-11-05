@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import org.session.libsignal.utilities.Log
+import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import java.util.concurrent.TimeUnit
 
 /**
@@ -181,7 +182,7 @@ class SignalBluetoothManager(
     }
 
     private fun updateAudioDeviceState() {
-        audioManager.updateAudioDeviceState()
+        audioManager.handleCommand(AudioManagerCommand.UpdateAudioDeviceState)
     }
 
     private fun startTimer() {

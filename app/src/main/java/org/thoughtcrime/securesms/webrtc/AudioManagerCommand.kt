@@ -11,6 +11,12 @@ open class AudioManagerCommand: Parcelable {
     object Initialize: AudioManagerCommand()
 
     @Parcelize
+    object Shutdown: AudioManagerCommand()
+
+    @Parcelize
+    object UpdateAudioDeviceState: AudioManagerCommand()
+
+    @Parcelize
     data class StartOutgoingRinger(val type: OutgoingRinger.Type): AudioManagerCommand()
 
     @Parcelize

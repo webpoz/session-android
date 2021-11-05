@@ -1,7 +1,6 @@
 package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
-import android.content.Intent
 import android.telephony.TelephonyManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -63,6 +62,16 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     private val signalAudioManager: SignalAudioManager = SignalAudioManager(context, this, audioManager)
+
+    private val peerConnectionObservers = mutableSetOf<PeerConnection.Observer>()
+
+    fun registerListener(listener: PeerConnection.Observer) {
+        peerConnectionObservers.add(listener)
+    }
+
+    fun unregisterListener(listener: PeerConnection.Observer) {
+        peerConnectionObservers.remove(listener)
+    }
 
     private val _audioEvents = MutableStateFlow(StateEvent.AudioEnabled(false))
     val audioEvents = _audioEvents.asSharedFlow()
@@ -183,47 +192,47 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     override fun onSignalingChange(newState: PeerConnection.SignalingState) {
-
+        peerConnectionObservers.forEach { listener -> listener.onSignalingChange(newState) }
     }
 
     override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState) {
-
+        peerConnectionObservers.forEach { listener -> listener.onIceConnectionChange(newState) }
     }
 
     override fun onIceConnectionReceivingChange(receiving: Boolean) {
-
+        peerConnectionObservers.forEach { listener -> listener.onIceConnectionReceivingChange(receiving) }
     }
 
     override fun onIceGatheringChange(newState: PeerConnection.IceGatheringState) {
-
+        peerConnectionObservers.forEach { listener -> listener.onIceGatheringChange(newState) }
     }
 
-    override fun onIceCandidate(p0: IceCandidate?) {
-
+    override fun onIceCandidate(iceCandidate: IceCandidate?) {
+        peerConnectionObservers.forEach { listener -> listener.onIceCandidate(iceCandidate) }
     }
 
-    override fun onIceCandidatesRemoved(p0: Array<out IceCandidate>?) {
-
+    override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {
+        peerConnectionObservers.forEach { listener -> listener.onIceCandidatesRemoved(candidates) }
     }
 
     override fun onAddStream(p0: MediaStream?) {
-
+        peerConnectionObservers.forEach { listener -> listener.onAddStream(p0) }
     }
 
     override fun onRemoveStream(p0: MediaStream?) {
-
+        peerConnectionObservers.forEach { listener -> listener.onRemoveStream(p0) }
     }
 
     override fun onDataChannel(p0: DataChannel?) {
-
+        peerConnectionObservers.forEach { listener -> listener.onDataChannel(p0) }
     }
 
     override fun onRenegotiationNeeded() {
-
+        peerConnectionObservers.forEach { listener -> listener.onRenegotiationNeeded() }
     }
 
     override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) {
-
+        peerConnectionObservers.forEach { listener -> listener.onAddTrack(p0, p1) }
     }
 
     override fun onBufferedAmountChange(l: Long) {
@@ -474,6 +483,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         } ?: run {
             pendingIncomingIceUpdates.addAll(iceCandidates)
         }
+    }
+
+    fun onDestroy() {
+        signalAudioManager.handleCommand(AudioManagerCommand.Shutdown)
     }
 
 }

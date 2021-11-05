@@ -37,7 +37,7 @@ class SignalAudioManager(private val context: Context,
                          private val androidAudioManager: AudioManagerCompat) {
 
     private var commandAndControlThread: HandlerThread? = HandlerThread("call-audio").apply { start() }
-    private val handler = SignalAudioHandler(commandAndControlThread!!.looper)
+    private var handler = SignalAudioHandler(commandAndControlThread!!.looper)
 
     private val signalBluetoothManager = SignalBluetoothManager(context, this, androidAudioManager, handler)
 
@@ -69,6 +69,8 @@ class SignalAudioManager(private val context: Context,
         handler.post {
             when (command) {
                 is AudioManagerCommand.Initialize -> initialize()
+                is AudioManagerCommand.Shutdown -> shutdown()
+                is AudioManagerCommand.UpdateAudioDeviceState -> updateAudioDeviceState()
                 is AudioManagerCommand.Start -> start()
                 is AudioManagerCommand.Stop -> stop(command.playDisconnect)
                 is AudioManagerCommand.SetDefaultDevice -> setDefaultAudioDevice(command.device, command.clearUserEarpieceSelection)
@@ -84,6 +86,9 @@ class SignalAudioManager(private val context: Context,
         Log.i(TAG, "Initializing audio manager state: $state")
 
         if (state == State.UNINITIALIZED) {
+            commandAndControlThread = HandlerThread("call-audio").apply { start() }
+            handler = SignalAudioHandler(commandAndControlThread!!.looper)
+
             savedAudioMode = androidAudioManager.mode
             savedIsSpeakerPhoneOn = androidAudioManager.isSpeakerphoneOn
             savedIsMicrophoneMute = androidAudioManager.isMicrophoneMute

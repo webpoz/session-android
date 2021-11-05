@@ -141,10 +141,6 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
         return (ApplicationContext) context.getApplicationContext();
     }
 
-    public CallComponent getCallComponent() {
-        return EntryPoints.get(getApplicationContext(), CallComponent.class);
-    }
-
     public DatabaseComponent getDatabaseComponent() {
         return EntryPoints.get(getApplicationContext(), DatabaseComponent.class);
     }

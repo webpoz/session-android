@@ -14,7 +14,6 @@ import org.thoughtcrime.securesms.crypto.AttachmentSecretProvider
 import org.thoughtcrime.securesms.crypto.DatabaseSecretProvider
 import org.thoughtcrime.securesms.database.*
 import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper
-import org.thoughtcrime.securesms.webrtc.data.SessionCallDataProvider
 import javax.inject.Singleton
 
 @Module

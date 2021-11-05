@@ -187,17 +187,10 @@ object ConversationMenuHelper {
             .setTitle("Call")
             .setMessage("Use relay?")
             .setPositiveButton("Use Relay") { d, w ->
-                val intent = Intent(context, WebRtcCallActivity::class.java)
-                intent.putExtra(WebRtcCallActivity.EXTRA_CALL_ID, UUID.randomUUID().toString())
-                intent.putExtra(WebRtcCallActivity.EXTRA_ADDRESS, thread.address)
-                val activity = context as AppCompatActivity
-                activity.startActivity(intent)
+                TODO()
             }
             .setNeutralButton("P2P only") { d, w ->
-                val intent = Intent(context, WebRtcCallActivity::class.java)
-                intent.putExtra(WebRtcCallActivity.EXTRA_ADDRESS, thread.address)
-                val activity = context as AppCompatActivity
-                activity.startActivity(intent)
+                TODO()
             }
             .show()
     }

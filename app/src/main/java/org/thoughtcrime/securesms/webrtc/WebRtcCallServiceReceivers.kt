@@ -8,6 +8,7 @@ import android.telephony.TelephonyManager
 import dagger.hilt.android.AndroidEntryPoint
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.service.WebRtcCallService
+import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import javax.inject.Inject
 
 
@@ -26,11 +27,11 @@ class HangUpRtcOnPstnCallAnsweredListener(private val hangupListener: ()->Unit):
     }
 }
 
-@AndroidEntryPoint
+//@AndroidEntryPoint
 class NetworkReceiver: BroadcastReceiver() {
 
-    @Inject
-    lateinit var callManager: CallManager
+//    @Inject
+//    lateinit var callManager: CallManager
 
     override fun onReceive(context: Context, intent: Intent) {
         TODO("Not yet implemented")
@@ -47,13 +48,13 @@ class PowerButtonReceiver : BroadcastReceiver() {
     }
 }
 
-class ProximityLockRelease: Thread.UncaughtExceptionHandler {
+class ProximityLockRelease(private val lockManager: LockManager): Thread.UncaughtExceptionHandler {
     companion object {
         private val TAG = Log.tag(ProximityLockRelease::class.java)
     }
     override fun uncaughtException(t: Thread, e: Throwable) {
         Log.e(TAG,"Uncaught exception - releasing proximity lock", e)
-        // lockManager update phone state
+        lockManager.updatePhoneState(LockManager.PhoneState.IDLE)
     }
 }
 

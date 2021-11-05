@@ -28,7 +28,8 @@ import org.thoughtcrime.securesms.webrtc.*
 import org.thoughtcrime.securesms.webrtc.CallManager.CallState.*
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.locks.LockManager
-import org.webrtc.SessionDescription
+import org.webrtc.*
+import org.webrtc.PeerConnection.IceConnectionState.*
 import java.lang.AssertionError
 import java.util.*
 import java.util.concurrent.ExecutionException
@@ -37,7 +38,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class WebRtcCallService: Service() {
+class WebRtcCallService: Service(), PeerConnection.Observer {
 
     @Inject lateinit var callManager: CallManager
 
@@ -62,7 +63,6 @@ class WebRtcCallService: Service() {
 
         const val ACTION_RESPONSE_MESSAGE = "RESPONSE_MESSAGE"
         const val ACTION_ICE_MESSAGE = "ICE_MESSAGE"
-        const val ACTION_ICE_CANDIDATE = "ICE_CANDIDATE"
         const val ACTION_CALL_CONNECTED = "CALL_CONNECTED"
         const val ACTION_REMOTE_HANGUP = "REMOTE_HANGUP"
         const val ACTION_REMOTE_BUSY = "REMOTE_BUSY"
@@ -118,6 +118,7 @@ class WebRtcCallService: Service() {
 
     private var callReceiver: IncomingPstnCallReceiver? = null
     private var wiredHeadsetStateReceiver: WiredHeadsetStateReceiver? = null
+    private var uncaughtExceptionHandlerManager: UncaughtExceptionHandlerManager? = null
 
     @Synchronized
     private fun terminate() {
@@ -155,7 +156,7 @@ class WebRtcCallService: Service() {
                 action == ACTION_REMOTE_VIDEO_MUTE -> handleRemoteVideoMute(intent)
                 action == ACTION_RESPONSE_MESSAGE -> handleResponseMessage(intent)
                 action == ACTION_ICE_MESSAGE -> handleRemoteIceCandidate(intent)
-                action == ACTION_ICE_CANDIDATE -> handleLocalIceCandidate(intent)
+                action == ACTION_ICE_CONNECTED -> handleIceConnected(intent)
                 action == ACTION_CALL_CONNECTED -> handleCallConnected(intent)
                 action == ACTION_CHECK_TIMEOUT -> handleCheckTimeout(intent)
                 action == ACTION_IS_IN_CALL_QUERY -> handleIsInCallQuery(intent)
@@ -166,15 +167,18 @@ class WebRtcCallService: Service() {
 
     override fun onCreate() {
         super.onCreate()
-        // create audio manager
+        callManager.registerListener(this)
         registerIncomingPstnCallReceiver()
         registerWiredHeadsetStateReceiver()
         getSystemService(TelephonyManager::class.java)
                 .listen(hangupOnCallAnswered, PhoneStateListener.LISTEN_CALL_STATE)
-        // reset call notification
-        // register uncaught exception handler
-        // register network receiver
-        // telephony listen to call state
+        registerUncaughtExceptionHandler()
+    }
+
+    private fun registerUncaughtExceptionHandler() {
+        uncaughtExceptionHandlerManager = UncaughtExceptionHandlerManager().apply {
+            registerHandler(ProximityLockRelease(lockManager))
+        }
     }
 
     private fun registerIncomingPstnCallReceiver() {
@@ -215,7 +219,7 @@ class WebRtcCallService: Service() {
     private fun handleBusyMessage(intent: Intent) {
         val recipient = getRemoteRecipient(intent)
         val callId = getCallId(intent)
-        if (callManager.currentConnectionState != STATE_DIALING || callManager.callId != callManager.callId || callManager.recipient != callManager.recipient) {
+        if (callManager.currentConnectionState != STATE_DIALING || callManager.callId != callId || callManager.recipient != recipient) {
             Log.w(TAG,"Got busy message for inactive session...")
             return
         }
@@ -412,10 +416,25 @@ class WebRtcCallService: Service() {
     }
 
     private fun handleRemoteIceCandidate(intent: Intent) {
-
+        val callId = getCallId(intent)
+        val sdpMids = intent.getStringArrayExtra(EXTRA_ICE_SDP_MID) ?: return
+        val sdpLineIndexes = intent.getIntArrayExtra(EXTRA_ICE_SDP_LINE_INDEX) ?: return
+        val sdps = intent.getStringArrayExtra(EXTRA_ICE_SDP) ?: return
+        if (sdpMids.size != sdpLineIndexes.size || sdpLineIndexes.size != sdps.size) {
+            Log.w(TAG,"sdp info not of equal length")
+            return
+        }
+        val iceCandidates = (0 until sdpMids.size).map { index ->
+            IceCandidate(
+                    sdpMids[index],
+                    sdpLineIndexes[index],
+                    sdps[index]
+            )
+        }
+        callManager.handleRemoteIceCandidate(iceCandidates, callId)
     }
 
-    private fun handleLocalIceCandidate(intent: Intent) {
+    private fun handleIceConnected(intent: Intent) {
 
     }
 
@@ -469,12 +488,14 @@ class WebRtcCallService: Service() {
             System.currentTimeMillis() - intent.getLongExtra(EXTRA_TIMESTAMP, -1) > TimeUnit.MINUTES.toMillis(2)
 
     override fun onDestroy() {
-        super.onDestroy()
+        callManager.unregisterListener(this)
         callReceiver?.let { receiver ->
             unregisterReceiver(receiver)
         }
         callReceiver = null
-        // unregister exception handler
+        uncaughtExceptionHandlerManager?.unregister()
+        callManager.onDestroy()
+        super.onDestroy()
         // shutdown audiomanager
         // unregister network receiver
         // unregister power button
@@ -553,4 +574,37 @@ class WebRtcCallService: Service() {
         return expectedState == currentState && expectedCallId == currentCallId
     }
 
+    override fun onSignalingChange(p0: PeerConnection.SignalingState?) {}
+
+    override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
+        if (newState in arrayOf(CONNECTED, COMPLETED)) {
+            val intent = Intent(this, WebRtcCallService::class.java)
+                    .setAction(ACTION_ICE_CONNECTED)
+            startService(intent)
+        } else if (newState == FAILED) {
+            val intent = Intent(this, WebRtcCallService::class.java)
+                    .setAction(ACTION_REMOTE_HANGUP)
+                    .putExtra(EXTRA_CALL_ID, callManager.callId)
+
+            startService(intent)
+        }
+    }
+
+    override fun onIceConnectionReceivingChange(p0: Boolean) {}
+
+    override fun onIceGatheringChange(p0: PeerConnection.IceGatheringState?) {}
+
+    override fun onIceCandidate(p0: IceCandidate?) {}
+
+    override fun onIceCandidatesRemoved(p0: Array<out IceCandidate>?) {}
+
+    override fun onAddStream(p0: MediaStream?) {}
+
+    override fun onRemoveStream(p0: MediaStream?) {}
+
+    override fun onDataChannel(p0: DataChannel?) {}
+
+    override fun onRenegotiationNeeded() {}
+
+    override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) {}
 }
