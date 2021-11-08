@@ -54,7 +54,6 @@ import org.thoughtcrime.securesms.crypto.KeyPairUtilities;
 import org.thoughtcrime.securesms.database.JobDatabase;
 import org.thoughtcrime.securesms.database.LokiAPIDatabase;
 import org.thoughtcrime.securesms.database.Storage;
-import org.thoughtcrime.securesms.dependencies.CallComponent;
 import org.thoughtcrime.securesms.dependencies.DatabaseComponent;
 import org.thoughtcrime.securesms.dependencies.DatabaseModule;
 import org.thoughtcrime.securesms.groups.OpenGroupManager;
@@ -82,6 +81,7 @@ import org.thoughtcrime.securesms.sskenvironment.TypingStatusRepository;
 import org.thoughtcrime.securesms.util.Broadcaster;
 import org.thoughtcrime.securesms.util.UiModeUtilities;
 import org.thoughtcrime.securesms.util.dynamiclanguage.LocaleParseHelper;
+import org.thoughtcrime.securesms.webrtc.CallMessageProcessor;
 import org.webrtc.PeerConnectionFactory;
 import org.webrtc.PeerConnectionFactory.InitializationOptions;
 import org.webrtc.voiceengine.WebRtcAudioManager;
@@ -134,6 +134,7 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
     @Inject Storage storage;
     @Inject MessageDataProvider messageDataProvider;
     @Inject JobDatabase jobDatabase;
+    CallMessageProcessor callMessageProcessor;
 
     private volatile boolean isAppVisible;
 
@@ -160,6 +161,7 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
     public void onCreate() {
         DatabaseModule.init(this);
         super.onCreate();
+        callMessageProcessor = new CallMessageProcessor(this, ProcessLifecycleOwner.get().getLifecycle());
         Log.i(TAG, "onCreate()");
         startKovenant();
         initializeSecurityProvider();

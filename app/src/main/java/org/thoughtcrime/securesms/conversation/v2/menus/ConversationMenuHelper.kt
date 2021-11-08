@@ -43,10 +43,10 @@ import org.thoughtcrime.securesms.conversation.v2.utilities.NotificationUtils
 import org.thoughtcrime.securesms.dependencies.DatabaseComponent
 import org.thoughtcrime.securesms.groups.EditClosedGroupActivity
 import org.thoughtcrime.securesms.groups.EditClosedGroupActivity.Companion.groupIDKey
+import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.thoughtcrime.securesms.util.BitmapUtil
 import org.thoughtcrime.securesms.util.getColorWithID
 import java.io.IOException
-import java.util.*
 
 object ConversationMenuHelper {
     
@@ -183,16 +183,14 @@ object ConversationMenuHelper {
     }
 
     private fun call(context: Context, thread: Recipient) {
-        AlertDialog.Builder(context)
-            .setTitle("Call")
-            .setMessage("Use relay?")
-            .setPositiveButton("Use Relay") { d, w ->
-                TODO()
-            }
-            .setNeutralButton("P2P only") { d, w ->
-                TODO()
-            }
-            .show()
+        val service = WebRtcCallService.createCall(context, thread)
+        context.startService(service)
+
+        val activity = Intent(context, WebRtcCallActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(activity)
+
     }
 
     @SuppressLint("StaticFieldLeak")

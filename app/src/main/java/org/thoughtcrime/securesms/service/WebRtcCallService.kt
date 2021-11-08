@@ -86,6 +86,17 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
         fun acceptCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_ANSWER_CALL)
 
+        fun createCall(context: Context, recipient: Recipient) = Intent(context, WebRtcCallService::class.java)
+                .setAction(ACTION_OUTGOING_CALL)
+                .putExtra(EXTRA_RECIPIENT_ADDRESS, recipient.address)
+
+        fun incomingCall(context: Context, address: Address, sdp: String, callId: UUID) =
+                Intent(context, WebRtcCallService::class.java)
+                        .setAction(ACTION_INCOMING_CALL)
+                        .putExtra(EXTRA_RECIPIENT_ADDRESS, address)
+                        .putExtra(EXTRA_CALL_ID, callId)
+                        .putExtra(EXTRA_REMOTE_DESCRIPTION, sdp)
+
         fun denyCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_DENY_CALL)
 
         fun hangupIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_LOCAL_HANGUP)
@@ -122,15 +133,14 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
     @Synchronized
     private fun terminate() {
-        stopForeground(true)
+        sendBroadcast(Intent(WebRtcCallActivity.ACTION_END))
         callManager.stop()
+        stopForeground(true)
     }
 
     private fun isBusy() = callManager.isBusy(this)
 
-    private fun initializeVideo() {
-        callManager.initializeVideo(this)
-    }
+    private fun isIdle() = callManager.isIdle()
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -142,7 +152,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                 action == ACTION_INCOMING_CALL && isBusy() -> handleBusyCall(intent)
                 action == ACTION_REMOTE_BUSY -> handleBusyMessage(intent)
                 action == ACTION_INCOMING_CALL -> handleIncomingCall(intent)
-                action == ACTION_OUTGOING_CALL -> handleOutgoingCall(intent)
+                action == ACTION_OUTGOING_CALL && isIdle() -> handleOutgoingCall(intent)
                 action == ACTION_ANSWER_CALL -> handleAnswerCall(intent)
                 action == ACTION_DENY_CALL -> handleDenyCall(intent)
                 action == ACTION_LOCAL_HANGUP -> handleLocalHangup(intent)
@@ -288,12 +298,11 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.initializeVideo(this)
 
         callManager.postViewModelState(CallViewModel.State.CALL_OUTGOING)
-        // update phone state IN_CALL
+        lockManager.updatePhoneState(LockManager.PhoneState.IN_CALL)
         callManager.initializeAudioForCall()
         callManager.startOutgoingRinger(OutgoingRinger.Type.RINGING)
-        // bluetoothStateManager.setWantsConnection(true)
         setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
-//        DatabaseComponent.get(this).insertOutgoingCall(callManager.recipient!!.address)
+        // TODO: DatabaseComponent.get(this).insertOutgoingCall(callManager.recipient!!.address)
         timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
 
         val expectedState = callManager.currentConnectionState

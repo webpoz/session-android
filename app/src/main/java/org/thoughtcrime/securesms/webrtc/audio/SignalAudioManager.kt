@@ -37,9 +37,9 @@ class SignalAudioManager(private val context: Context,
                          private val androidAudioManager: AudioManagerCompat) {
 
     private var commandAndControlThread: HandlerThread? = HandlerThread("call-audio").apply { start() }
-    private var handler = SignalAudioHandler(commandAndControlThread!!.looper)
+    private var handler: SignalAudioHandler? = null
 
-    private val signalBluetoothManager = SignalBluetoothManager(context, this, androidAudioManager, handler)
+    private var signalBluetoothManager: SignalBluetoothManager? = null
 
     private var state: State = State.UNINITIALIZED
 
@@ -66,7 +66,7 @@ class SignalAudioManager(private val context: Context,
     private var wiredHeadsetReceiver: WiredHeadsetReceiver? = null
 
     fun handleCommand(command: AudioManagerCommand) {
-        handler.post {
+        handler?.post {
             when (command) {
                 is AudioManagerCommand.Initialize -> initialize()
                 is AudioManagerCommand.Shutdown -> shutdown()
@@ -89,27 +89,32 @@ class SignalAudioManager(private val context: Context,
             commandAndControlThread = HandlerThread("call-audio").apply { start() }
             handler = SignalAudioHandler(commandAndControlThread!!.looper)
 
-            savedAudioMode = androidAudioManager.mode
-            savedIsSpeakerPhoneOn = androidAudioManager.isSpeakerphoneOn
-            savedIsMicrophoneMute = androidAudioManager.isMicrophoneMute
-            hasWiredHeadset = androidAudioManager.isWiredHeadsetOn
+            signalBluetoothManager = SignalBluetoothManager(context, this, androidAudioManager, handler!!)
 
-            androidAudioManager.requestCallAudioFocus()
+            handler!!.post {
 
-            setMicrophoneMute(false)
+                savedAudioMode = androidAudioManager.mode
+                savedIsSpeakerPhoneOn = androidAudioManager.isSpeakerphoneOn
+                savedIsMicrophoneMute = androidAudioManager.isMicrophoneMute
+                hasWiredHeadset = androidAudioManager.isWiredHeadsetOn
 
-            audioDevices.clear()
+                androidAudioManager.requestCallAudioFocus()
 
-            signalBluetoothManager.start()
+                setMicrophoneMute(false)
 
-            updateAudioDeviceState()
+                audioDevices.clear()
 
-            wiredHeadsetReceiver = WiredHeadsetReceiver()
-            context.registerReceiver(wiredHeadsetReceiver, IntentFilter(if (Build.VERSION.SDK_INT >= 21) AudioManager.ACTION_HEADSET_PLUG else Intent.ACTION_HEADSET_PLUG))
+                signalBluetoothManager!!.start()
 
-            state = State.PREINITIALIZED
+                updateAudioDeviceState()
 
-            Log.d(TAG, "Initialized")
+                wiredHeadsetReceiver = WiredHeadsetReceiver()
+                context.registerReceiver(wiredHeadsetReceiver, IntentFilter(if (Build.VERSION.SDK_INT >= 21) AudioManager.ACTION_HEADSET_PLUG else Intent.ACTION_HEADSET_PLUG))
+
+                state = State.PREINITIALIZED
+
+                Log.d(TAG, "Initialized")
+            }
         }
     }
 
@@ -159,7 +164,7 @@ class SignalAudioManager(private val context: Context,
         }
         wiredHeadsetReceiver = null
 
-        signalBluetoothManager.stop()
+        signalBluetoothManager?.stop()
 
         setSpeakerphoneOn(savedIsSpeakerPhoneOn)
         setMicrophoneMute(savedIsMicrophoneMute)
@@ -172,7 +177,7 @@ class SignalAudioManager(private val context: Context,
     }
 
     private fun shutdown() {
-        handler.post {
+        handler?.post {
             stop(false)
             if (commandAndControlThread != null) {
                 Log.i(TAG, "Shutting down command and control")
@@ -183,25 +188,25 @@ class SignalAudioManager(private val context: Context,
     }
 
     private fun updateAudioDeviceState() {
-        handler.assertHandlerThread()
+        handler!!.assertHandlerThread()
 
         Log.i(
                 TAG,
                 "updateAudioDeviceState(): " +
                         "wired: $hasWiredHeadset " +
-                        "bt: ${signalBluetoothManager.state} " +
+                        "bt: ${signalBluetoothManager!!.state} " +
                         "available: $audioDevices " +
                         "selected: $selectedAudioDevice " +
                         "userSelected: $userSelectedAudioDevice"
         )
 
-        if (signalBluetoothManager.state.shouldUpdate()) {
-            signalBluetoothManager.updateDevice()
+        if (signalBluetoothManager!!.state.shouldUpdate()) {
+            signalBluetoothManager!!.updateDevice()
         }
 
         val newAudioDevices = mutableSetOf(AudioDevice.SPEAKER_PHONE)
 
-        if (signalBluetoothManager.state.hasDevice()) {
+        if (signalBluetoothManager!!.state.hasDevice()) {
             newAudioDevices += AudioDevice.BLUETOOTH
         }
 
@@ -217,7 +222,7 @@ class SignalAudioManager(private val context: Context,
         var audioDeviceSetUpdated = audioDevices != newAudioDevices
         audioDevices = newAudioDevices
 
-        if (signalBluetoothManager.state == SignalBluetoothManager.State.UNAVAILABLE && userSelectedAudioDevice == AudioDevice.BLUETOOTH) {
+        if (signalBluetoothManager!!.state == SignalBluetoothManager.State.UNAVAILABLE && userSelectedAudioDevice == AudioDevice.BLUETOOTH) {
             userSelectedAudioDevice = AudioDevice.NONE
         }
 
@@ -230,33 +235,33 @@ class SignalAudioManager(private val context: Context,
             userSelectedAudioDevice = AudioDevice.NONE
         }
 
-        val needBluetoothAudioStart = signalBluetoothManager.state == SignalBluetoothManager.State.AVAILABLE &&
+        val needBluetoothAudioStart = signalBluetoothManager!!.state == SignalBluetoothManager.State.AVAILABLE &&
                 (userSelectedAudioDevice == AudioDevice.NONE || userSelectedAudioDevice == AudioDevice.BLUETOOTH || autoSwitchToBluetooth)
 
-        val needBluetoothAudioStop = (signalBluetoothManager.state == SignalBluetoothManager.State.CONNECTED || signalBluetoothManager.state == SignalBluetoothManager.State.CONNECTING) &&
+        val needBluetoothAudioStop = (signalBluetoothManager!!.state == SignalBluetoothManager.State.CONNECTED || signalBluetoothManager!!.state == SignalBluetoothManager.State.CONNECTING) &&
                 (userSelectedAudioDevice != AudioDevice.NONE && userSelectedAudioDevice != AudioDevice.BLUETOOTH)
 
-        if (signalBluetoothManager.state.hasDevice()) {
-            Log.i(TAG, "Need bluetooth audio: state: ${signalBluetoothManager.state} start: $needBluetoothAudioStart stop: $needBluetoothAudioStop")
+        if (signalBluetoothManager!!.state.hasDevice()) {
+            Log.i(TAG, "Need bluetooth audio: state: ${signalBluetoothManager!!.state} start: $needBluetoothAudioStart stop: $needBluetoothAudioStop")
         }
 
         if (needBluetoothAudioStop) {
-            signalBluetoothManager.stopScoAudio()
-            signalBluetoothManager.updateDevice()
+            signalBluetoothManager!!.stopScoAudio()
+            signalBluetoothManager!!.updateDevice()
         }
 
-        if (!autoSwitchToBluetooth && signalBluetoothManager.state == SignalBluetoothManager.State.UNAVAILABLE) {
+        if (!autoSwitchToBluetooth && signalBluetoothManager!!.state == SignalBluetoothManager.State.UNAVAILABLE) {
             autoSwitchToBluetooth = true
         }
 
         if (needBluetoothAudioStart && !needBluetoothAudioStop) {
-            if (!signalBluetoothManager.startScoAudio()) {
+            if (!signalBluetoothManager!!.startScoAudio()) {
                 audioDevices.remove(AudioDevice.BLUETOOTH)
                 audioDeviceSetUpdated = true
             }
         }
 
-        if (autoSwitchToBluetooth && signalBluetoothManager.state == SignalBluetoothManager.State.CONNECTED) {
+        if (autoSwitchToBluetooth && signalBluetoothManager!!.state == SignalBluetoothManager.State.CONNECTED) {
             userSelectedAudioDevice = AudioDevice.BLUETOOTH
             autoSwitchToBluetooth = false
         }
@@ -373,7 +378,7 @@ class SignalAudioManager(private val context: Context,
             val pluggedIn = intent.getIntExtra("state", 0) == 1
             val hasMic = intent.getIntExtra("microphone", 0) == 1
 
-            handler.post { onWiredHeadsetChange(pluggedIn, hasMic) }
+            handler?.post { onWiredHeadsetChange(pluggedIn, hasMic) }
         }
     }
 

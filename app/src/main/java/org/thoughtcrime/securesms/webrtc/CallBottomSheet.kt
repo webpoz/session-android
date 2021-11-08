@@ -54,17 +54,17 @@ class CallBottomSheet: BottomSheetDialogFragment() {
         nameTextView.text = recipient.name ?: address.serialize()
 
         acceptButton.setOnClickListener {
-            val intent = Intent(requireContext(), WebRtcCallActivity::class.java)
-            val bundle = bundleOf(
-                WebRtcCallActivity.EXTRA_ADDRESS to address,
-                WebRtcCallActivity.EXTRA_CALL_ID to callId
-            )
-            intent.action = WebRtcCallActivity.ACTION_ANSWER
-            bundle.putStringArray(WebRtcCallActivity.EXTRA_SDP, sdp)
-
-            intent.putExtras(bundle)
-            startActivity(intent)
-            dismiss()
+//            val intent = Intent(requireContext(), WebRtcCallActivity::class.java)
+//            val bundle = bundleOf(
+//                WebRtcCallActivity.EXTRA_ADDRESS to address,
+//                WebRtcCallActivity.EXTRA_CALL_ID to callId
+//            )
+//            intent.action = WebRtcCallActivity.ACTION_ANSWER
+//            bundle.putStringArray(WebRtcCallActivity.EXTRA_SDP, sdp)
+//
+//            intent.putExtras(bundle)
+//            startActivity(intent)
+//            dismiss()
         }
 
         declineButton.setOnClickListener {

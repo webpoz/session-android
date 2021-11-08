@@ -147,6 +147,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     fun isBusy(context: Context) = currentConnectionState != CallState.STATE_IDLE
             || context.getSystemService(TelephonyManager::class.java).callState  != TelephonyManager.CALL_STATE_IDLE
 
+    fun isIdle() = currentConnectionState == CallState.STATE_IDLE
+
     fun initializeVideo(context: Context) {
         Util.runOnMainSync {
             val base = EglBase.create()

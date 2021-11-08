@@ -165,7 +165,7 @@ class PeerConnectionWrapper(context: Context,
     fun createOffer(mediaConstraints: MediaConstraints): SessionDescription {
         val future = SettableFuture<SessionDescription>()
 
-        peerConnection.createAnswer(object:SdpObserver {
+        peerConnection.createOffer(object:SdpObserver {
             override fun onCreateSuccess(sdp: SessionDescription?) {
                 future.set(sdp)
             }

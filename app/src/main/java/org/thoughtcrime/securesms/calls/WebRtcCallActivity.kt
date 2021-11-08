@@ -8,28 +8,17 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Bundle
 import android.view.MenuItem
-import android.view.Window
 import android.view.WindowManager
 import androidx.activity.viewModels
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.lifecycle.repeatOnLifecycle
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.android.synthetic.main.activity_webrtc_tests.*
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import network.loki.messenger.R
-import org.session.libsession.messaging.messages.control.CallMessage
-import org.session.libsession.messaging.sending_receiving.MessageSender
-import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.utilities.Address
-import org.session.libsignal.protos.SignalServiceProtos
-import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
 import org.thoughtcrime.securesms.permissions.Permissions
 import org.thoughtcrime.securesms.webrtc.CallViewModel
-import org.webrtc.*
+import org.webrtc.IceCandidate
 import java.util.*
 
 @AndroidEntryPoint
@@ -67,7 +56,6 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         super.onCreate(savedInstanceState, ready)
         window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        requestWindowFeature(Window.FEATURE_NO_TITLE)
         setContentView(R.layout.activity_webrtc_tests)
         volumeControlStream = AudioManager.STREAM_VOICE_CALL
 
@@ -81,16 +69,16 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             .execute()
 
         lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel
-            }
+            // repeat on start or something
         }
+
+
 
         registerReceiver(object: BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 finish()
             }
-        }, IntentFilter(ACTION_END))
+        },IntentFilter(ACTION_END))
     }
 
     private fun initializeResources() {

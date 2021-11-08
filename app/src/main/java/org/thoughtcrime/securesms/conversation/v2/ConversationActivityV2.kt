@@ -24,7 +24,6 @@ import androidx.core.view.children
 import androidx.core.view.isVisible
 import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProvider
-import androidx.lifecycle.ViewModelProviders
 import androidx.loader.app.LoaderManager
 import androidx.loader.content.Loader
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -457,7 +456,7 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
     }
 
     private fun setUpLinkPreviewObserver() {
-        val linkPreviewViewModel = ViewModelProviders.of(this, LinkPreviewViewModel.Factory(LinkPreviewRepository()))[LinkPreviewViewModel::class.java]
+        val linkPreviewViewModel = ViewModelProvider(this, LinkPreviewViewModel.Factory(LinkPreviewRepository()))[LinkPreviewViewModel::class.java]
         this.linkPreviewViewModel = linkPreviewViewModel
         if (!TextSecurePreferences.isLinkPreviewsEnabled(this)) {
             linkPreviewViewModel.onUserCancel(); return

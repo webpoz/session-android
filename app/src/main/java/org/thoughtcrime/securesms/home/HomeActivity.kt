@@ -148,49 +148,6 @@ class HomeActivity : PassphraseRequiredActionBarActivity(), ConversationClickLis
         }
         this.broadcastReceiver = broadcastReceiver
         LocalBroadcastManager.getInstance(this).registerReceiver(broadcastReceiver, IntentFilter("blockedContactsChanged"))
-        lifecycleScope.launchWhenCreated {
-            // web rtc channel handling
-            for (message in WebRtcUtils.SIGNAL_QUEUE) {
-                // TODO: check errors here in the
-                val sender = Address.fromSerialized(message.sender!!)
-                val callId = message.callId!!
-                synchronized(WebRtcUtils.callCache) {
-                    val set = WebRtcUtils.callCache[callId] ?: mutableSetOf()
-                    set += message
-                    WebRtcUtils.callCache[callId] = set
-                }
-                when (message.type) {
-                    SignalServiceProtos.CallMessage.Type.OFFER -> {
-                        // show bottom sheet
-                        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                            CallBottomSheet().apply {
-                                arguments = bundleOf(
-                                    CallBottomSheet.ARGUMENT_ADDRESS to sender,
-                                    CallBottomSheet.ARGUMENT_SDP to message.sdps.toTypedArray(),
-                                    CallBottomSheet.ARGUMENT_TYPE to message.type!!.number,
-                                    CallBottomSheet.ARGUMENT_CALL_ID to callId.toString()
-                                )
-                                show(this@HomeActivity.supportFragmentManager,"call-sheet")
-                            }
-                        }
-                    }
-                    SignalServiceProtos.CallMessage.Type.END_CALL -> {
-                        // dismiss the call sheet
-                        supportFragmentManager.findFragmentByTag("call-sheet")?.let { callSheet ->
-                            if (callSheet is BottomSheetDialogFragment) {
-                                callSheet.dismiss()
-                            }
-                        }
-                        // clear the callCache for this sender
-                        synchronized(WebRtcUtils.callCache) {
-                            WebRtcUtils.callCache[callId] = mutableSetOf()
-                        }
-                        sendBroadcast(Intent(WebRtcCallActivity.ACTION_END))
-                    }
-                    else -> { /* do nothing */ }
-                }
-            }
-        }
 
         lifecycleScope.launchWhenStarted {
             launch(Dispatchers.IO) {
