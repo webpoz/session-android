@@ -96,6 +96,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                         .putExtra(EXTRA_RECIPIENT_ADDRESS, address)
                         .putExtra(EXTRA_CALL_ID, callId)
                         .putExtra(EXTRA_REMOTE_DESCRIPTION, sdp)
+                        .putExtra(EXTRA_TIMESTAMP, System.currentTimeMillis())
 
         fun denyCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_DENY_CALL)
 
