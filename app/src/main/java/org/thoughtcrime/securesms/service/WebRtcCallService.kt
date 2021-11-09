@@ -13,6 +13,8 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
+import org.session.libsession.messaging.messages.control.CallMessage
+import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.FutureTaskListener
 import org.session.libsession.utilities.Util
@@ -46,7 +48,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
         private val TAG = Log.tag(WebRtcCallService::class.java)
 
-        const val ACTION_INCOMING_CALL = "CALL_INCOMING"
+        const val ACTION_INCOMING_RING = "RING_INCOMING"
         const val ACTION_OUTGOING_CALL = "CALL_OUTGOING"
         const val ACTION_ANSWER_CALL = "ANSWER_CALL"
         const val ACTION_DENY_CALL = "DENY_CALL"
@@ -90,15 +92,34 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                 .setAction(ACTION_OUTGOING_CALL)
                 .putExtra(EXTRA_RECIPIENT_ADDRESS, recipient.address)
 
-        fun incomingCall(context: Context, address: Address, sdp: String, callId: UUID) =
+        fun incomingCall(context: Context, address: Address, sdp: String, callId: UUID, callTime: Long) =
                 Intent(context, WebRtcCallService::class.java)
-                        .setAction(ACTION_INCOMING_CALL)
+                        .setAction(ACTION_INCOMING_RING)
                         .putExtra(EXTRA_RECIPIENT_ADDRESS, address)
                         .putExtra(EXTRA_CALL_ID, callId)
                         .putExtra(EXTRA_REMOTE_DESCRIPTION, sdp)
-                        .putExtra(EXTRA_TIMESTAMP, System.currentTimeMillis())
+                        .putExtra(EXTRA_TIMESTAMP, callTime)
+
+        fun incomingAnswer(context: Context, address: Address, sdp: String, callId: UUID) =
+                Intent(context, WebRtcCallService::class.java)
+                        .setAction(ACTION_RESPONSE_MESSAGE)
+                        .putExtra(EXTRA_RECIPIENT_ADDRESS, address)
+                        .putExtra(EXTRA_CALL_ID, callId)
+                        .putExtra(EXTRA_REMOTE_DESCRIPTION, sdp)
+
+        fun iceCandidates(context: Context, iceCandidates: List<IceCandidate>, callId: UUID) =
+                Intent(context, WebRtcCallService::class.java)
+                        .setAction(ACTION_ICE_MESSAGE)
+                        .putExtra(EXTRA_CALL_ID, callId)
+                        .putExtra(EXTRA_ICE_SDP, iceCandidates.map(IceCandidate::sdp).toTypedArray())
+                        .putExtra(EXTRA_ICE_SDP_LINE_INDEX, iceCandidates.map(IceCandidate::sdpMLineIndex).toIntArray())
+                        .putExtra(EXTRA_ICE_SDP_MID, iceCandidates.map(IceCandidate::sdpMid).toTypedArray())
 
         fun denyCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_DENY_CALL)
+
+        fun remoteHangupIntent(context: Context, callId: UUID) = Intent(context, WebRtcCallService::class.java)
+                .setAction(ACTION_REMOTE_HANGUP)
+                .putExtra(EXTRA_CALL_ID, callId)
 
         fun hangupIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_LOCAL_HANGUP)
 
@@ -149,10 +170,11 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         if (intent == null || intent.action == null) return START_NOT_STICKY
         serviceExecutor.execute {
             val action = intent.action
+            Log.d("Loki", "Handling ${intent.action}")
             when {
-                action == ACTION_INCOMING_CALL && isBusy() -> handleBusyCall(intent)
+                action == ACTION_INCOMING_RING && isBusy() -> handleBusyCall(intent)
                 action == ACTION_REMOTE_BUSY -> handleBusyMessage(intent)
-                action == ACTION_INCOMING_CALL -> handleIncomingCall(intent)
+                action == ACTION_INCOMING_RING && isIdle() -> handleIncomingRing(intent)
                 action == ACTION_OUTGOING_CALL && isIdle() -> handleOutgoingCall(intent)
                 action == ACTION_ANSWER_CALL -> handleAnswerCall(intent)
                 action == ACTION_DENY_CALL -> handleDenyCall(intent)
@@ -204,7 +226,6 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
     private fun handleBusyCall(intent: Intent) {
         val recipient = getRemoteRecipient(intent)
-        val callId = getCallId(intent)
         val callState = callManager.currentConnectionState
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -215,7 +236,6 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                 STATE_ANSWERING -> setCallInProgressNotification(TYPE_INCOMING_CONNECTING, callManager.recipient)
                 STATE_LOCAL_RINGING -> setCallInProgressNotification(TYPE_INCOMING_RINGING, callManager.recipient)
                 STATE_CONNECTED -> setCallInProgressNotification(TYPE_ESTABLISHED, callManager.recipient)
-                else -> throw AssertionError()
             }
         }
 
@@ -244,48 +264,19 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         }, WebRtcCallActivity.BUSY_SIGNAL_DELAY_FINISH)
     }
 
-    private fun handleIncomingCall(intent: Intent) {
-        if (callManager.currentConnectionState != STATE_IDLE) throw IllegalStateException("Incoming on non-idle")
+    private fun handleIncomingRing(intent: Intent) {
+        if (callManager.currentConnectionState != STATE_IDLE) throw IllegalStateException("Incoming ring on non-idle")
 
-        val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION) ?: return
-        callManager.postConnectionEvent(STATE_ANSWERING)
         val callId = getCallId(intent)
-        callManager.callId = callId
-        callManager.clearPendingIceUpdates()
         val recipient = getRemoteRecipient(intent)
-        callManager.recipient = recipient
-        if (isIncomingMessageExpired(intent)) {
-            insertMissedCall(recipient, true)
-            terminate()
-            return
-        }
-
+        val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION) ?: return
+        val timestamp = intent.getLongExtra(EXTRA_TIMESTAMP, -1)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            setCallInProgressNotification(TYPE_INCOMING_CONNECTING, recipient)
+            setCallInProgressNotification(TYPE_INCOMING_RINGING, recipient)
         }
-
-        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
-
-        callManager.initializeVideo(this)
-
-        val expectedState = callManager.currentConnectionState
-        val expectedCallId = callManager.callId
-
-        try {
-            val answerFuture = callManager.onIncomingCall(offer, this) // add is always turn here
-            answerFuture.fail { e ->
-                if (isConsistentState(expectedState,expectedCallId, callManager.currentConnectionState, callManager.callId)) {
-                    Log.e(TAG, e)
-                    insertMissedCall(recipient, true)
-                    terminate()
-                }
-            }
-            callManager.postViewModelState(CallViewModel.State.CALL_INCOMING)
-            // lock manager update phone state processing here
-        } catch (e: Exception) {
-            Log.e(TAG,e)
-            terminate()
-        }
+        callManager.onIncomingRing(offer, callId, recipient, timestamp)
+        callManager.clearPendingIceUpdates()
+        callManager.postConnectionEvent(STATE_LOCAL_RINGING)
     }
 
     private fun handleOutgoingCall(intent: Intent) {
@@ -304,7 +295,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.startOutgoingRinger(OutgoingRinger.Type.RINGING)
         setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
         // TODO: DatabaseComponent.get(this).insertOutgoingCall(callManager.recipient!!.address)
-        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 5, TimeUnit.MINUTES)
 
         val expectedState = callManager.currentConnectionState
         val expectedCallId = callManager.callId
@@ -330,17 +321,50 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
             return
         }
 
-        if (callManager.callNotSetup()) {
-            throw AssertionError("assert")
-        }
-
-        // DatabaseComponent.get(this).smsDatabase().insertReceivedCall(recipient)
-
-        val (callId, recipient) = callManager.handleAnswerCall()
+        val pending = callManager.pendingOffer ?: return
+        val callId = callManager.callId ?: return
+        val recipient = callManager.recipient ?: return
+        val timestamp = callManager.pendingOfferTime
 
         intent.putExtra(EXTRA_CALL_ID, callId)
         intent.putExtra(EXTRA_RECIPIENT_ADDRESS, recipient.address)
-        handleCallConnected(intent)
+        intent.putExtra(EXTRA_REMOTE_DESCRIPTION, pending)
+        intent.putExtra(EXTRA_TIMESTAMP, timestamp)
+
+        callManager.postConnectionEvent(STATE_ANSWERING)
+
+        if (isIncomingMessageExpired(intent)) {
+            insertMissedCall(recipient, true)
+            terminate()
+            return
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            setCallInProgressNotification(TYPE_INCOMING_CONNECTING, recipient)
+        }
+
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 5, TimeUnit.MINUTES)
+
+        callManager.initializeVideo(this)
+
+        val expectedState = callManager.currentConnectionState
+        val expectedCallId = callManager.callId
+
+        try {
+            val answerFuture = callManager.onIncomingCall(this) // add is always turn here
+            answerFuture.fail { e ->
+                if (isConsistentState(expectedState,expectedCallId, callManager.currentConnectionState, callManager.callId)) {
+                    Log.e(TAG, e)
+                    insertMissedCall(recipient, true)
+                    terminate()
+                }
+            }
+            callManager.postViewModelState(CallViewModel.State.CALL_INCOMING)
+            lockManager.updatePhoneState(LockManager.PhoneState.PROCESSING)
+        } catch (e: Exception) {
+            Log.e(TAG,e)
+            terminate()
+        }
+        // DatabaseComponent.get(this).smsDatabase().insertReceivedCall(recipient)
     }
 
     private fun handleDenyCall(intent: Intent) {
@@ -367,16 +391,18 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     private fun handleRemoteHangup(intent: Intent) {
         if (callManager.callId != getCallId(intent)) {
             Log.e(TAG, "Hangup for non-active call...")
+            terminate()
             return
         }
 
         callManager.handleRemoteHangup()
 
-        if (callManager.currentConnectionState in arrayOf(STATE_ANSWERING, STATE_LOCAL_RINGING)) {
+        if (callManager.currentConnectionState in arrayOf(STATE_REMOTE_RINGING, STATE_ANSWERING, STATE_LOCAL_RINGING)) {
             callManager.recipient?.let { recipient ->
                 insertMissedCall(recipient, true)
             }
         }
+        terminate()
     }
 
     private fun handleSetMuteAudio(intent: Intent) {
@@ -445,7 +471,10 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     }
 
     private fun handleIceConnected(intent: Intent) {
-
+        if (callManager.currentConnectionState == STATE_ANSWERING) {
+            val recipient = callManager.recipient ?: return
+            callManager.postConnectionEvent(STATE_CONNECTED)
+        }
     }
 
     private fun handleCallConnected(intent: Intent) {

@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.view.MenuItem
 import android.view.WindowManager
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
@@ -17,6 +18,7 @@ import network.loki.messenger.R
 import org.session.libsession.utilities.Address
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
 import org.thoughtcrime.securesms.permissions.Permissions
+import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.thoughtcrime.securesms.webrtc.CallViewModel
 import org.webrtc.IceCandidate
 import java.util.*
@@ -72,7 +74,11 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             // repeat on start or something
         }
 
-
+        if (intent.action == ACTION_ANSWER) {
+            // answer via ViewModel
+            val answerIntent = WebRtcCallService.acceptCallIntent(this)
+            startService(answerIntent)
+        }
 
         registerReceiver(object: BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {

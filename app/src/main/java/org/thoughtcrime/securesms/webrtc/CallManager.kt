@@ -9,9 +9,11 @@ import kotlinx.serialization.json.put
 import nl.komponents.kovenant.Promise
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
+import org.session.libsession.utilities.Debouncer
 import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.protos.SignalServiceProtos
+import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.audio.AudioManagerCompat
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
@@ -86,12 +88,15 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     private var localCameraState: CameraState = CameraState.UNKNOWN
     private var bluetoothAvailable = false
 
-    val currentConnectionState = (_connectionEvents.value as StateEvent.CallStateUpdate).state
+    val currentConnectionState
+        get() = (_connectionEvents.value as StateEvent.CallStateUpdate).state
 
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
     private var eglBase: EglBase? = null
 
+    var pendingOffer: String? = null
+    var pendingOfferTime: Long = -1
     var callId: UUID? = null
     var recipient: Recipient? = null
 
@@ -102,6 +107,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     private val pendingOutgoingIceUpdates = ArrayDeque<IceCandidate>()
     private val pendingIncomingIceUpdates = ArrayDeque<IceCandidate>()
+
+    private val outgoingIceDebouncer = Debouncer(2_000L)
 
     private var localRenderer: SurfaceViewRenderer? = null
     private var remoteRenderer: SurfaceViewRenderer? = null
@@ -117,6 +124,9 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun startOutgoingRinger(ringerType: OutgoingRinger.Type) {
+        if (ringerType == OutgoingRinger.Type.RINGING) {
+            signalAudioManager.handleCommand(AudioManagerCommand.UpdateAudioDeviceState)
+        }
         signalAudioManager.handleCommand(AudioManagerCommand.StartOutgoingRinger(ringerType))
     }
 
@@ -209,16 +219,49 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         peerConnectionObservers.forEach { listener -> listener.onIceGatheringChange(newState) }
     }
 
-    override fun onIceCandidate(iceCandidate: IceCandidate?) {
+    override fun onIceCandidate(iceCandidate: IceCandidate) {
         peerConnectionObservers.forEach { listener -> listener.onIceCandidate(iceCandidate) }
+        val expectedCallId = this.callId ?: return
+        val expectedRecipient = this.recipient ?: return
+        pendingOutgoingIceUpdates.add(iceCandidate)
+        outgoingIceDebouncer.publish {
+            val currentCallId = this.callId ?: return@publish
+            val currentRecipient = this.recipient ?: return@publish
+            if (currentCallId == expectedCallId && expectedRecipient == currentRecipient) {
+                val currentPendings = mutableSetOf<IceCandidate>()
+                while (pendingOutgoingIceUpdates.isNotEmpty()) {
+                    currentPendings.add(pendingOutgoingIceUpdates.pop())
+                }
+                val sdps = currentPendings.map { it.sdp }
+                val sdpMLineIndexes = currentPendings.map { it.sdpMLineIndex }
+                val sdpMids = currentPendings.map { it.sdpMid }
+
+                MessageSender.sendNonDurably(CallMessage(
+                        ICE_CANDIDATES,
+                        sdps = sdps,
+                        sdpMLineIndexes = sdpMLineIndexes,
+                        sdpMids = sdpMids,
+                        currentCallId
+                ), currentRecipient.address)
+            }
+        }
     }
 
     override fun onIceCandidatesRemoved(candidates: Array<out IceCandidate>?) {
         peerConnectionObservers.forEach { listener -> listener.onIceCandidatesRemoved(candidates) }
     }
 
-    override fun onAddStream(p0: MediaStream?) {
-        peerConnectionObservers.forEach { listener -> listener.onAddStream(p0) }
+    override fun onAddStream(stream: MediaStream) {
+        peerConnectionObservers.forEach { listener -> listener.onAddStream(stream) }
+        for (track in stream.audioTracks) {
+            track.setEnabled(true)
+        }
+
+        if (stream.videoTracks != null && stream.videoTracks.size == 1) {
+            val videoTrack = stream.videoTracks.first()
+            videoTrack.setEnabled(true)
+            videoTrack.addSink(remoteRenderer)
+        }
     }
 
     override fun onRemoveStream(p0: MediaStream?) {
@@ -254,13 +297,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         signalAudioManager.handleCommand(AudioManagerCommand())
     }
 
-    private fun CallMessage.iceCandidates(): List<IceCandidate> {
-        val candidateSize = sdpMids.size
-        return (0 until candidateSize).map { i ->
-            IceCandidate(sdpMids[i], sdpMLineIndexes[i], sdps[i])
-        }
-    }
-
     private fun CallState.withState(vararg expected: CallState, transition: () -> Unit) {
         if (this in expected) transition()
         else Log.w(TAG,"Tried to transition state $this but expected $expected")
@@ -293,9 +329,19 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         localCameraState = newCameraState
     }
 
-    fun onIncomingCall(offer: String, context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {
+    fun onIncomingRing(offer: String, callId: UUID, recipient: Recipient, callTime: Long) {
+        if (currentConnectionState != CallState.STATE_IDLE) return
+
+        this.callId = callId
+        this.recipient = recipient
+        this.pendingOffer = offer
+        this.pendingOfferTime = callTime
+    }
+
+    fun onIncomingCall(context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {
         val callId = callId ?: return Promise.ofFail(NullPointerException("callId is null"))
         val recipient = recipient ?: return Promise.ofFail(NullPointerException("recipient is null"))
+        val offer = pendingOffer ?: return Promise.ofFail(NullPointerException("pendingOffer is null"))
         val factory = peerConnectionFactory ?: return Promise.ofFail(NullPointerException("peerConnectionFactory is null"))
         val local = localRenderer ?: return Promise.ofFail(NullPointerException("localRenderer is null"))
         val base = eglBase ?: return Promise.ofFail(NullPointerException("eglBase is null"))
@@ -310,6 +356,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         )
         peerConnection = connection
         localCameraState = connection.getCameraState()
+        val dataChannel = connection.createDataChannel(DATA_CHANNEL_NAME)
+        dataChannel.registerObserver(this)
         connection.setRemoteDescription(SessionDescription(SessionDescription.Type.OFFER, offer))
         val answer = connection.createAnswer(MediaConstraints())
         connection.setLocalDescription(answer)
@@ -323,7 +371,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
             val candidate = pendingIncomingIceUpdates.pop() ?: break
             connection.addIceCandidate(candidate)
         }
-        return answerMessage // TODO: maybe add success state update
+        return answerMessage.success {
+            pendingOffer = null
+            pendingOfferTime = -1
+        } // TODO: maybe add success state update
     }
 
     fun onOutgoingCall(context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {
@@ -346,6 +397,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
                 isAlwaysTurn
         )
 
+        peerConnection = connection
         localCameraState = connection.getCameraState()
         val dataChannel = connection.createDataChannel(DATA_CHANNEL_NAME)
         dataChannel.registerObserver(this)
@@ -362,14 +414,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     fun callNotSetup(): Boolean =
             peerConnection == null || dataChannel == null || recipient == null || callId == null
-
-    fun handleAnswerCall(): Pair<UUID, Recipient> {
-        peerConnection?.let { connection ->
-            connection.setAudioEnabled(true)
-            connection.setVideoEnabled(true)
-        }
-        return callId!! to recipient!!
-    }
 
     fun handleDenyCall() {
         val callId = callId ?: return
@@ -476,6 +520,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     fun handleRemoteIceCandidate(iceCandidates: List<IceCandidate>, callId: UUID) {
         if (callId != this.callId) {
             Log.w(TAG, "Got remote ice candidates for a call that isn't active")
+            return
         }
 
         peerConnection?.let { connection ->
