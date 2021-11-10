@@ -13,8 +13,6 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.AndroidEntryPoint
-import org.session.libsession.messaging.messages.control.CallMessage
-import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.FutureTaskListener
 import org.session.libsession.utilities.TextSecurePreferences
@@ -113,13 +111,14 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                         .putExtra(EXTRA_CALL_ID, callId)
                         .putExtra(EXTRA_REMOTE_DESCRIPTION, sdp)
 
-        fun iceCandidates(context: Context, iceCandidates: List<IceCandidate>, callId: UUID) =
+        fun iceCandidates(context: Context, address: Address, iceCandidates: List<IceCandidate>, callId: UUID) =
                 Intent(context, WebRtcCallService::class.java)
                         .setAction(ACTION_ICE_MESSAGE)
                         .putExtra(EXTRA_CALL_ID, callId)
                         .putExtra(EXTRA_ICE_SDP, iceCandidates.map(IceCandidate::sdp).toTypedArray())
                         .putExtra(EXTRA_ICE_SDP_LINE_INDEX, iceCandidates.map(IceCandidate::sdpMLineIndex).toIntArray())
                         .putExtra(EXTRA_ICE_SDP_MID, iceCandidates.map(IceCandidate::sdpMid).toTypedArray())
+                        .putExtra(EXTRA_RECIPIENT_ADDRESS, address)
 
         fun denyCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_DENY_CALL)
 
@@ -283,8 +282,8 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             setCallInProgressNotification(TYPE_INCOMING_RINGING, recipient)
         }
-        callManager.onIncomingRing(offer, callId, recipient, timestamp)
         callManager.clearPendingIceUpdates()
+        callManager.onIncomingRing(offer, callId, recipient, timestamp)
         callManager.postConnectionEvent(STATE_LOCAL_RINGING)
         if (TextSecurePreferences.isCallNotificationsEnabled(this)) {
             callManager.startIncomingRinger()
@@ -481,7 +480,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
     private fun handleIceConnected(intent: Intent) {
         val recipient = callManager.recipient ?: return
-        if (callManager.currentConnectionState in arrayOf(STATE_ANSWERING, STATE_LOCAL_RINGING)) {
+        if (callManager.currentConnectionState in arrayOf(STATE_ANSWERING, STATE_DIALING)) {
             callManager.postConnectionEvent(STATE_CONNECTED)
             callManager.postViewModelState(CallViewModel.State.CALL_CONNECTED)
         } else {
@@ -646,7 +645,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
             startService(intent)
         } else if (newState == FAILED) {
             val intent = Intent(this, WebRtcCallService::class.java)
-                    .setAction(ACTION_REMOTE_HANGUP)
+                    .setAction(ACTION_LOCAL_HANGUP)
                     .putExtra(EXTRA_CALL_ID, callManager.callId)
 
             startService(intent)

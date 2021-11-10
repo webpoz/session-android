@@ -24,6 +24,9 @@ class PeerConnectionWrapper(context: Context,
     private val videoSource: VideoSource?
     private val videoTrack: VideoTrack?
 
+    val readyForIce
+    get() = peerConnection.localDescription != null && peerConnection.remoteDescription != null
+
     init {
         val stun = PeerConnection.IceServer.builder("stun:freyr.getsession.org:5349").createIceServer()
         val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org:5349").setUsername("webrtc").setPassword("webrtc").createIceServer()

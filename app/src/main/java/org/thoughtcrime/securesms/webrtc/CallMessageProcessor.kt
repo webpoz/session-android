@@ -55,6 +55,7 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
 
     private fun handleIceCandidates(callMessage: CallMessage) {
         val callId = callMessage.callId ?: return
+        val sender = callMessage.sender ?: return
 
         val iceCandidates = callMessage.iceCandidates()
         if (iceCandidates.isEmpty()) return
@@ -62,7 +63,8 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
         val iceIntent = WebRtcCallService.iceCandidates(
                 context = context,
                 iceCandidates = iceCandidates,
-                callId = callId
+                callId = callId,
+                address = Address.fromSerialized(sender)
         )
         context.startService(iceIntent)
     }

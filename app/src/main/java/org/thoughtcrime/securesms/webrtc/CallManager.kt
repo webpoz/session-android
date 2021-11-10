@@ -108,7 +108,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     private val pendingOutgoingIceUpdates = ArrayDeque<IceCandidate>()
     private val pendingIncomingIceUpdates = ArrayDeque<IceCandidate>()
 
-    private val outgoingIceDebouncer = Debouncer(2_000L)
+    private val outgoingIceDebouncer = Debouncer(200L)
 
     var localRenderer: SurfaceViewRenderer? = null
     var remoteRenderer: SurfaceViewRenderer? = null
@@ -224,6 +224,13 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         val expectedCallId = this.callId ?: return
         val expectedRecipient = this.recipient ?: return
         pendingOutgoingIceUpdates.add(iceCandidate)
+
+        if (peerConnection?.readyForIce != true) return
+
+        queueOutgoingIce(expectedCallId, expectedRecipient)
+    }
+
+    private fun queueOutgoingIce(expectedCallId: UUID, expectedRecipient: Recipient) {
         outgoingIceDebouncer.publish {
             val currentCallId = this.callId ?: return@publish
             val currentRecipient = this.recipient ?: return@publish
@@ -331,10 +338,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         localCameraState = newCameraState
     }
 
-    fun enableLocalCamera() {
-        setVideoEnabled(true)
-    }
-
     fun onIncomingRing(offer: String, callId: UUID, recipient: Recipient, callTime: Long) {
         if (currentConnectionState != CallState.STATE_IDLE) return
 
@@ -342,6 +345,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         this.recipient = recipient
         this.pendingOffer = offer
         this.pendingOfferTime = callTime
+        startIncomingRinger()
     }
 
     fun onIncomingCall(context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {
@@ -523,6 +527,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         val connection = peerConnection ?: throw AssertionError("assert")
 
         connection.setRemoteDescription(answer)
+        while (pendingIncomingIceUpdates.isNotEmpty()) {
+            connection.addIceCandidate(pendingIncomingIceUpdates.pop())
+        }
+        queueOutgoingIce(callId, recipient)
     }
 
     fun handleRemoteIceCandidate(iceCandidates: List<IceCandidate>, callId: UUID) {
@@ -531,11 +539,12 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
             return
         }
 
-        peerConnection?.let { connection ->
+        val connection = peerConnection
+        if (connection != null && connection.readyForIce) {
             iceCandidates.forEach { candidate ->
                 connection.addIceCandidate(candidate)
             }
-        } ?: run {
+        } else {
             pendingIncomingIceUpdates.addAll(iceCandidates)
         }
     }
