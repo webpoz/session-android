@@ -11,8 +11,13 @@ import android.view.MenuItem
 import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import com.jakewharton.rxbinding3.view.clicks
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.android.synthetic.main.activity_webrtc_tests.*
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import network.loki.messenger.R
 import org.session.libsession.utilities.Address
@@ -39,12 +44,12 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     private val viewModel by viewModels<CallViewModel>()
 
-    private val acceptedCallMessageHashes = mutableSetOf<Int>()
-
     private val candidates: MutableList<IceCandidate> = mutableListOf()
 
     private lateinit var callAddress: Address
     private lateinit var callId: UUID
+
+    private var uiJob: Job? = null
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
@@ -70,10 +75,6 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             }
             .execute()
 
-        lifecycleScope.launch {
-            // repeat on start or something
-        }
-
         if (intent.action == ACTION_ANSWER) {
             // answer via ViewModel
             val answerIntent = WebRtcCallService.acceptCallIntent(this)
@@ -85,6 +86,20 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                 finish()
             }
         },IntentFilter(ACTION_END))
+
+        enableCameraButton.setOnClickListener {
+            startService(WebRtcCallService.cameraEnabled(this, true))
+        }
+
+        switchCameraButton.setOnClickListener {
+            startService(WebRtcCallService.flipCamera(this))
+        }
+
+        endCallButton.setOnClickListener {
+            startService(WebRtcCallService.hangupIntent(this))
+        }
+
+
     }
 
     private fun initializeResources() {
@@ -95,4 +110,29 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     }
 
+    override fun onStart() {
+        super.onStart()
+
+        uiJob = lifecycleScope.launch {
+
+            viewModel.callState.collect { state ->
+                if (state == CallViewModel.State.CALL_CONNECTED) {
+                    // call connected, render the surfaces
+                    remote_renderer.removeAllViews()
+                    local_renderer.removeAllViews()
+                    viewModel.remoteRenderer?.let { remote_renderer.addView(it) }
+                    viewModel.localRenderer?.let { local_renderer.addView(it) }
+                }
+            }
+
+            viewModel.remoteVideoEnabledState.collect {
+
+            }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        uiJob?.cancel()
+    }
 }

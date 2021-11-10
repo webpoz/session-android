@@ -89,6 +89,7 @@ object TextSecurePreferences {
     const val CONFIGURATION_SYNCED = "pref_configuration_synced"
     private const val LAST_PROFILE_UPDATE_TIME = "pref_last_profile_update_time"
     private const val LAST_OPEN_DATE = "pref_last_open_date"
+    private const val CALL_NOTIFICATIONS_ENABLED = "pref_call_notifications_enabled"
 
     @JvmStatic
     fun getLastConfigurationSyncTime(context: Context): Long {
@@ -735,5 +736,10 @@ object TextSecurePreferences {
     @JvmStatic
     fun clearAll(context: Context) {
         getDefaultSharedPreferences(context).edit().clear().commit()
+    }
+
+    @JvmStatic
+    fun isCallNotificationsEnabled(context: Context): Boolean {
+        return getBooleanPreference(context, CALL_NOTIFICATIONS_ENABLED, false)
     }
 }

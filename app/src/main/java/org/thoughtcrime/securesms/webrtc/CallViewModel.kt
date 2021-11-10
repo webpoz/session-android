@@ -3,10 +3,17 @@ package org.thoughtcrime.securesms.webrtc
 import androidx.lifecycle.ViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.map
+import org.webrtc.SurfaceViewRenderer
 import javax.inject.Inject
 
 @HiltViewModel
 class CallViewModel @Inject constructor(private val callManager: CallManager): ViewModel() {
+
+    val localRenderer: SurfaceViewRenderer?
+    get() = callManager.localRenderer
+
+    val remoteRenderer: SurfaceViewRenderer?
+    get() = callManager.remoteRenderer
 
     enum class State {
         CALL_PENDING,

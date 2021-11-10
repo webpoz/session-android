@@ -6,44 +6,10 @@
     android:layout_height="match_parent"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <TextView
-        android:padding="@dimen/small_spacing"
-        android:elevation="8dp"
-        tools:visibility="visible"
-        android:textColor="@color/white"
-        tools:text="relay"
-        android:visibility="gone"
-        android:background="@drawable/pill"
-        android:backgroundTint="@color/black"
-        android:layout_marginTop="@dimen/medium_spacing"
-        android:id="@+id/local_candidate_info"
-        app:layout_constraintEnd_toStartOf="@id/remote_candidate_info"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintStart_toStartOf="parent"/>
-
-    <TextView
-        android:padding="@dimen/small_spacing"
-        android:elevation="8dp"
-        tools:visibility="visible"
-        tools:text="relay"
-        android:visibility="gone"
-        android:textColor="@color/white"
-        android:background="@drawable/pill"
-        android:backgroundTint="@color/black"
-        android:layout_marginTop="@dimen/medium_spacing"
-        android:id="@+id/remote_candidate_info"
-        app:layout_constraintStart_toEndOf="@id/local_candidate_info"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"/>
-
     <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent">
-        <org.webrtc.SurfaceViewRenderer
+        <FrameLayout
             android:id="@+id/remote_renderer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -69,7 +35,8 @@
         app:layout_constraintWidth_percent="0.2"
         android:layout_height="0dp"
         android:layout_width="0dp">
-        <org.webrtc.SurfaceViewRenderer
+        <FrameLayout
+            android:elevation="8dp"
             android:id="@+id/local_renderer"
             android:layout_width="match_parent"
             android:layout_height="match_parent"/>
@@ -85,7 +52,7 @@
     </FrameLayout>
 
     <ImageView
-        android:id="@+id/end_call_button"
+        android:id="@+id/endCallButton"
         android:background="@drawable/circle_tintable"
         android:src="@drawable/ic_baseline_call_end_24"
         android:padding="@dimen/small_spacing"
@@ -100,7 +67,7 @@
         />
 
     <ImageView
-        android:id="@+id/switch_camera_button"
+        android:id="@+id/switchCameraButton"
         android:background="@drawable/circle_tintable"
         android:src="@drawable/ic_baseline_flip_camera_android_24"
         android:padding="@dimen/small_spacing"
@@ -116,7 +83,23 @@
         />
 
     <ImageView
-        android:id="@+id/switch_audio_button"
+        android:id="@+id/enableCameraButton"
+        android:background="@drawable/circle_tintable"
+        android:src="@drawable/ic_baseline_photo_camera_48"
+        android:padding="@dimen/small_spacing"
+        app:tint="@color/unimportant"
+        android:backgroundTint="@color/unimportant_button_background"
+        android:layout_width="@dimen/large_button_height"
+        android:layout_height="@dimen/large_button_height"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginBottom="@dimen/large_spacing"
+        app:layout_constraintHorizontal_bias="0.2"
+        />
+
+    <ImageView
+        android:id="@+id/speakerPhoneButton"
         android:background="@drawable/circle_tintable"
         android:src="@drawable/ic_audio_light"
         android:padding="@dimen/small_spacing"

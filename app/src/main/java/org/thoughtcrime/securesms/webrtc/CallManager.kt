@@ -110,8 +110,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     private val outgoingIceDebouncer = Debouncer(2_000L)
 
-    private var localRenderer: SurfaceViewRenderer? = null
-    private var remoteRenderer: SurfaceViewRenderer? = null
+    var localRenderer: SurfaceViewRenderer? = null
+    var remoteRenderer: SurfaceViewRenderer? = null
     private var peerConnectionFactory: PeerConnectionFactory? = null
 
     fun clearPendingIceUpdates() {
@@ -175,7 +175,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
             peerConnectionFactory = PeerConnectionFactory.builder()
                     .setOptions(object: PeerConnectionFactory.Options() {
                         init {
-                            networkIgnoreMask = 1 shl 4
+//                            networkIgnoreMask = 1 shl 4
                         }
                     })
                     .setVideoEncoderFactory(encoderFactory)
@@ -199,7 +199,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     fun setVideoEnabled(isEnabled: Boolean) {
         currentConnectionState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
             peerConnection?.setVideoEnabled(isEnabled)
-            _audioEvents.value = StateEvent.AudioEnabled(true)
+            _videoEvents.value = StateEvent.VideoEnabled(true)
         }
     }
 
@@ -290,7 +290,9 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     override fun onMessage(buffer: DataChannel.Buffer?) {
         Log.i(TAG,"onMessage...")
-        TODO("interpret the data channel buffer and check for signals")
+        buffer ?: return
+
+        Log.i(TAG,"received: ${buffer.data}")
     }
 
     override fun onAudioDeviceChanged(activeDevice: AudioDevice, devices: Set<AudioDevice>) {
@@ -329,6 +331,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         localCameraState = newCameraState
     }
 
+    fun enableLocalCamera() {
+        setVideoEnabled(true)
+    }
+
     fun onIncomingRing(offer: String, callId: UUID, recipient: Recipient, callTime: Long) {
         if (currentConnectionState != CallState.STATE_IDLE) return
 
@@ -357,6 +363,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         peerConnection = connection
         localCameraState = connection.getCameraState()
         val dataChannel = connection.createDataChannel(DATA_CHANNEL_NAME)
+        this.dataChannel = dataChannel
         dataChannel.registerObserver(this)
         connection.setRemoteDescription(SessionDescription(SessionDescription.Type.OFFER, offer))
         val answer = connection.createAnswer(MediaConstraints())
@@ -401,6 +408,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         localCameraState = connection.getCameraState()
         val dataChannel = connection.createDataChannel(DATA_CHANNEL_NAME)
         dataChannel.registerObserver(this)
+        this.dataChannel = dataChannel
         val offer = connection.createOffer(MediaConstraints())
         connection.setLocalDescription(offer)
 
@@ -534,6 +542,20 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     fun onDestroy() {
         signalAudioManager.handleCommand(AudioManagerCommand.Shutdown)
+    }
+
+    fun startIncomingRinger() {
+        signalAudioManager.handleCommand(AudioManagerCommand.StartIncomingRinger(true))
+    }
+
+    fun startCommunication(lockManager: LockManager) {
+        signalAudioManager.handleCommand(AudioManagerCommand.Start)
+        val connection = peerConnection ?: return
+        if (localCameraState.enabled) lockManager.updatePhoneState(LockManager.PhoneState.IN_VIDEO)
+        else lockManager.updatePhoneState(LockManager.PhoneState.IN_CALL)
+        connection.setCommunicationMode()
+        connection.setAudioEnabled(_audioEvents.value.isEnabled)
+        connection.setVideoEnabled(localCameraState.enabled)
     }
 
 }

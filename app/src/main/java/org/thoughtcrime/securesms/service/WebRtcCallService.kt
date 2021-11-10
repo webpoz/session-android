@@ -17,6 +17,7 @@ import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.FutureTaskListener
+import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.utilities.Log
@@ -41,8 +42,6 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class WebRtcCallService: Service(), PeerConnection.Observer {
-
-    @Inject lateinit var callManager: CallManager
 
     companion object {
 
@@ -85,6 +84,13 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         const val EXTRA_RESULT_RECEIVER = "result_receiver"
 
         const val INVALID_NOTIFICATION_ID = -1
+
+        fun cameraEnabled(context: Context, enabled: Boolean) = Intent(context, WebRtcCallService::class.java)
+                .setAction(ACTION_SET_MUTE_VIDEO)
+                .putExtra(EXTRA_MUTE, !enabled)
+
+        fun flipCamera(context: Context) = Intent(context, WebRtcCallService::class.java)
+                .setAction(ACTION_FLIP_CAMERA)
 
         fun acceptCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_ANSWER_CALL)
 
@@ -139,6 +145,8 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         }
     }
 
+    @Inject lateinit var callManager: CallManager
+
     private var lastNotificationId: Int = INVALID_NOTIFICATION_ID
     private var lastNotification: Notification? = null
 
@@ -152,6 +160,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     private var callReceiver: IncomingPstnCallReceiver? = null
     private var wiredHeadsetStateReceiver: WiredHeadsetStateReceiver? = null
     private var uncaughtExceptionHandlerManager: UncaughtExceptionHandlerManager? = null
+    private var powerButtonReceiver: PowerButtonReceiver? = null
 
     @Synchronized
     private fun terminate() {
@@ -277,6 +286,10 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.onIncomingRing(offer, callId, recipient, timestamp)
         callManager.clearPendingIceUpdates()
         callManager.postConnectionEvent(STATE_LOCAL_RINGING)
+        if (TextSecurePreferences.isCallNotificationsEnabled(this)) {
+            callManager.startIncomingRinger()
+        }
+        registerPowerButtonReceiver()
     }
 
     private fun handleOutgoingCall(intent: Intent) {
@@ -344,6 +357,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
         timeoutExecutor.schedule(TimeoutRunnable(callId, this), 5, TimeUnit.MINUTES)
 
+        callManager.initializeAudioForCall()
         callManager.initializeVideo(this)
 
         val expectedState = callManager.currentConnectionState
@@ -373,12 +387,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
             return
         }
 
-        if (callManager.callNotSetup()) {
-            throw AssertionError("assert")
-        }
-
         callManager.handleDenyCall()
-
         // DatabaseComponent.get(this).smsDatabase().insertMissedCall(recipient)
         terminate()
     }
@@ -471,10 +480,17 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     }
 
     private fun handleIceConnected(intent: Intent) {
-        if (callManager.currentConnectionState == STATE_ANSWERING) {
-            val recipient = callManager.recipient ?: return
+        val recipient = callManager.recipient ?: return
+        if (callManager.currentConnectionState in arrayOf(STATE_ANSWERING, STATE_LOCAL_RINGING)) {
             callManager.postConnectionEvent(STATE_CONNECTED)
+            callManager.postViewModelState(CallViewModel.State.CALL_CONNECTED)
+        } else {
+            Log.w(TAG, "Got ice connected out of state")
         }
+
+        setCallInProgressNotification(TYPE_ESTABLISHED, recipient)
+
+        callManager.startCommunication(lockManager)
     }
 
     private fun handleCallConnected(intent: Intent) {
@@ -483,6 +499,14 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
     private fun handleIsInCallQuery(intent: Intent) {
 
+    }
+
+    private fun registerPowerButtonReceiver() {
+        if (powerButtonReceiver == null) {
+            powerButtonReceiver = PowerButtonReceiver()
+
+            registerReceiver(powerButtonReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
+        }
     }
 
 
@@ -643,7 +667,9 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
     override fun onDataChannel(p0: DataChannel?) {}
 
-    override fun onRenegotiationNeeded() {}
+    override fun onRenegotiationNeeded() {
+        Log.w(TAG,"onRenegotiationNeeded was called!")
+    }
 
     override fun onAddTrack(p0: RtpReceiver?, p1: Array<out MediaStream>?) {}
 }

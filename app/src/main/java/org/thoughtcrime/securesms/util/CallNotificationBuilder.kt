@@ -58,6 +58,7 @@ class CallNotificationBuilder {
                             R.drawable.ic_phone_grey600_32dp,
                             R.string.NotificationBarManager__answer_call
                     ))
+                    builder.priority = NotificationCompat.PRIORITY_HIGH
                 }
                 TYPE_OUTGOING_RINGING -> {
                     builder.setContentText(context.getString(R.string.NotificationBarManager__establishing_signal_call))

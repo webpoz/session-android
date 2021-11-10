@@ -83,6 +83,8 @@ class PeerConnectionWrapper(context: Context,
     fun createDataChannel(channelName: String): DataChannel {
         val dataChannelConfiguration = DataChannel.Init().apply {
             ordered = true
+            negotiated = true
+            id = 548
         }
         return peerConnection.createDataChannel(channelName, dataChannelConfiguration)
     }
@@ -218,6 +220,11 @@ class PeerConnectionWrapper(context: Context,
         } catch(e: ExecutionException) {
             throw PeerConnectionException(e)
         }
+    }
+
+    fun setCommunicationMode() {
+        peerConnection.setAudioPlayout(true)
+        peerConnection.setAudioRecording(true)
     }
 
     fun setAudioEnabled(isEnabled: Boolean) {
