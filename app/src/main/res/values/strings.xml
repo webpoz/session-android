@@ -911,5 +911,7 @@
     <string name="NotificationBarManager__cancel_call">Cancel call</string>
     <string name="NotificationBarManager__establishing_signal_call">Establishing call</string>
     <string name="NotificationBarManager__end_call">End call</string>
+    <string name="accept_call">Accept Call</string>
+    <string name="decline_call">Decline call</string>
 
 </resources>

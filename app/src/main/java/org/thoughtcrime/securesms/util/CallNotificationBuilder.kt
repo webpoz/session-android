@@ -46,6 +46,7 @@ class CallNotificationBuilder {
                 }
                 TYPE_INCOMING_RINGING -> {
                     builder.setContentText(context.getString(R.string.NotificationBarManager__incoming_signal_call))
+                            .setCategory(NotificationCompat.CATEGORY_CALL)
                     builder.addAction(getServiceNotificationAction(
                             context,
                             WebRtcCallService.ACTION_DENY_CALL,

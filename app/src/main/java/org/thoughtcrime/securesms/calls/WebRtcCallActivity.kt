@@ -5,11 +5,14 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.drawable.ColorDrawable
 import android.media.AudioManager
 import android.os.Bundle
 import android.view.MenuItem
+import android.view.View
 import android.view.WindowManager
 import androidx.activity.viewModels
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.load.engine.DiskCacheStrategy
@@ -65,6 +68,14 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         return super.onOptionsItemSelected(item)
     }
 
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (intent?.action == ACTION_ANSWER) {
+            val answerIntent = WebRtcCallService.acceptCallIntent(this)
+            ContextCompat.startForegroundService(this,answerIntent)
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
         super.onCreate(savedInstanceState, ready)
         window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
@@ -82,9 +93,18 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             .execute()
 
         if (intent.action == ACTION_ANSWER) {
-            // answer via ViewModel
             val answerIntent = WebRtcCallService.acceptCallIntent(this)
-            startService(answerIntent)
+            ContextCompat.startForegroundService(this,answerIntent)
+        }
+
+        acceptCallButton.setOnClickListener {
+            val answerIntent = WebRtcCallService.acceptCallIntent(this)
+            ContextCompat.startForegroundService(this,answerIntent)
+        }
+
+        declineCallButton.setOnClickListener {
+            val declineIntent = WebRtcCallService.hangupIntent(this)
+            startService(declineIntent)
         }
 
         registerReceiver(object: BroadcastReceiver() {
@@ -128,7 +148,20 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
             launch {
                 viewModel.callState.collect { state ->
-                    remote_loading_view.isVisible = state != CALL_CONNECTED
+                    when (state) {
+                        CALL_RINGING -> {
+
+                        }
+                        CALL_OUTGOING -> {
+
+                        }
+                        CALL_CONNECTED -> {
+
+                        }
+                    }
+                    controlGroup.isVisible = state in listOf(CALL_CONNECTED, CALL_OUTGOING, CALL_INCOMING)
+                    remote_loading_view.isVisible = state !in listOf(CALL_CONNECTED, CALL_RINGING)
+                    incomingControlGroup.isVisible = state == CALL_RINGING
                 }
             }
 
@@ -165,9 +198,10 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                     }
                     local_renderer.isVisible = isEnabled
                     enableCameraButton.setImageResource(
-                            if (isEnabled) R.drawable.ic_baseline_videocam_off_24
-                            else R.drawable.ic_baseline_videocam_24
+                            if (isEnabled) R.drawable.ic_outline_videocam_off_24
+                            else R.drawable.ic_outline_videocam_24
                     )
+                    enableCameraButton.styleEnabled(isEnabled)
                 }
             }
 
@@ -184,7 +218,15 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         }
     }
 
-    fun getUserDisplayName(publicKey: String): String {
+    fun View.styleEnabled(isEnabled: Boolean) {
+        if (isEnabled) {
+            setBackgroundResource(R.drawable.call_controls_selected)
+        } else {
+            setBackgroundResource(R.drawable.call_controls_unselected)
+        }
+    }
+
+    private fun getUserDisplayName(publicKey: String): String {
         val contact = DatabaseComponent.get(this).sessionContactDatabase().getContactWithSessionID(publicKey)
         return contact?.displayName(Contact.ContactContext.REGULAR) ?: publicKey
     }

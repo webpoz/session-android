@@ -95,6 +95,13 @@
         <item name="android:drawableTint" tools:ignore="NewApi">?android:textColorPrimary</item>
     </style>
 
+    <style name="Widget.Session.Button.Common.UnimportantDestructive">
+        <item name="android:background">@drawable/unimportant_outline_button_medium_background</item>
+        <item name="android:textColor">@color/destructive</item>
+        <item name="android:backgroundTint" tools:ignore="NewApi">@color/destructive</item>
+        <item name="android:drawableTint" tools:ignore="NewApi">@color/destructive</item>
+    </style>
+
     <style name="Widget.Session.Button.Dialog" parent="">
         <item name="android:textAllCaps">false</item>
         <item name="android:textSize">@dimen/small_font_size</item>

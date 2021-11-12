@@ -337,23 +337,23 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         val recipient = callManager.recipient ?: return
         val timestamp = callManager.pendingOfferTime
 
+        setCallInProgressNotification(TYPE_INCOMING_CONNECTING, recipient)
+
         intent.putExtra(EXTRA_CALL_ID, callId)
         intent.putExtra(EXTRA_RECIPIENT_ADDRESS, recipient.address)
         intent.putExtra(EXTRA_REMOTE_DESCRIPTION, pending)
         intent.putExtra(EXTRA_TIMESTAMP, timestamp)
 
         callManager.postConnectionEvent(STATE_ANSWERING)
+        callManager.postViewModelState(CallViewModel.State.CALL_INCOMING)
 
         if (isIncomingMessageExpired(intent)) {
             insertMissedCall(recipient, true)
             terminate()
             return
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            setCallInProgressNotification(TYPE_INCOMING_CONNECTING, recipient)
-        }
 
-        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 5, TimeUnit.MINUTES)
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
 
         callManager.initializeAudioForCall()
         callManager.initializeVideo(this)
@@ -370,7 +370,6 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                     terminate()
                 }
             }
-            callManager.postViewModelState(CallViewModel.State.CALL_INCOMING)
             lockManager.updatePhoneState(LockManager.PhoneState.PROCESSING)
         } catch (e: Exception) {
             Log.e(TAG,e)
