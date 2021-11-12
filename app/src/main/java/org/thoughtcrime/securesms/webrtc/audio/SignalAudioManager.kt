@@ -66,9 +66,12 @@ class SignalAudioManager(private val context: Context,
     private var wiredHeadsetReceiver: WiredHeadsetReceiver? = null
 
     fun handleCommand(command: AudioManagerCommand) {
+        if (command == AudioManagerCommand.Initialize) {
+            initialize()
+            return
+        }
         handler?.post {
             when (command) {
-                is AudioManagerCommand.Initialize -> initialize()
                 is AudioManagerCommand.Shutdown -> shutdown()
                 is AudioManagerCommand.UpdateAudioDeviceState -> updateAudioDeviceState()
                 is AudioManagerCommand.Start -> start()

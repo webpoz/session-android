@@ -15,8 +15,8 @@ class CallMessage(): ControlMessage() {
 
     override val ttl: Long = 300000L // 30s
 
-    override fun isValid(): Boolean = super.isValid() && type != null
-            && (!sdps.isNullOrEmpty() || type == SignalServiceProtos.CallMessage.Type.END_CALL)
+    override fun isValid(): Boolean = super.isValid() && type != null && callId != null
+            && (!sdps.isNullOrEmpty() || type in listOf(SignalServiceProtos.CallMessage.Type.END_CALL,SignalServiceProtos.CallMessage.Type.PRE_OFFER))
 
     constructor(type: SignalServiceProtos.CallMessage.Type,
                 sdps: List<String>,
@@ -35,6 +35,13 @@ class CallMessage(): ControlMessage() {
 
         fun answer(sdp: String, callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.ANSWER,
                 listOf(sdp),
+                listOf(),
+                listOf(),
+                callId
+        )
+
+        fun preOffer(callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.PRE_OFFER,
+                listOf(),
                 listOf(),
                 listOf(),
                 callId

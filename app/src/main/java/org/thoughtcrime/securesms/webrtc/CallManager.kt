@@ -2,11 +2,18 @@ package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
 import android.telephony.TelephonyManager
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import nl.komponents.kovenant.Promise
+import nl.komponents.kovenant.functional.bind
+import nl.komponents.kovenant.task
+import nl.komponents.kovenant.then
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Debouncer
@@ -15,6 +22,7 @@ import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES
 import org.session.libsignal.utilities.Log
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.*
 import org.thoughtcrime.securesms.webrtc.audio.AudioManagerCompat
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
@@ -23,7 +31,6 @@ import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
 import org.webrtc.*
-import java.lang.NullPointerException
 import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.Executors
@@ -40,6 +47,11 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         data class AudioEnabled(val isEnabled: Boolean): StateEvent()
         data class VideoEnabled(val isEnabled: Boolean): StateEvent()
         data class CallStateUpdate(val state: CallState): StateEvent()
+        data class RecipientUpdate(val recipient: Recipient?): StateEvent() {
+            companion object {
+                val UNKNOWN = RecipientUpdate(recipient = null)
+            }
+        }
     }
 
     companion object {
@@ -75,21 +87,23 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         peerConnectionObservers.remove(listener)
     }
 
-    private val _audioEvents = MutableStateFlow(StateEvent.AudioEnabled(false))
+    private val _audioEvents = MutableStateFlow(AudioEnabled(false))
     val audioEvents = _audioEvents.asSharedFlow()
-    private val _videoEvents = MutableStateFlow(StateEvent.VideoEnabled(false))
+    private val _videoEvents = MutableStateFlow(VideoEnabled(false))
     val videoEvents = _videoEvents.asSharedFlow()
-    private val _remoteVideoEvents = MutableStateFlow(StateEvent.VideoEnabled(false))
+    private val _remoteVideoEvents = MutableStateFlow(VideoEnabled(false))
     val remoteVideoEvents = _remoteVideoEvents.asSharedFlow()
-    private val _connectionEvents = MutableStateFlow<StateEvent>(StateEvent.CallStateUpdate(CallState.STATE_IDLE))
+    private val _connectionEvents = MutableStateFlow<StateEvent>(CallStateUpdate(CallState.STATE_IDLE))
     val connectionEvents = _connectionEvents.asSharedFlow()
     private val _callStateEvents = MutableStateFlow(CallViewModel.State.CALL_PENDING)
     val callStateEvents = _callStateEvents.asSharedFlow()
+    private val _recipientEvents = MutableStateFlow(RecipientUpdate.UNKNOWN)
+    val recipientEvents = _recipientEvents.asSharedFlow()
     private var localCameraState: CameraState = CameraState.UNKNOWN
     private var bluetoothAvailable = false
 
     val currentConnectionState
-        get() = (_connectionEvents.value as StateEvent.CallStateUpdate).state
+        get() = (_connectionEvents.value as CallStateUpdate).state
 
     private val networkExecutor = Executors.newSingleThreadExecutor()
 
@@ -99,6 +113,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     var pendingOfferTime: Long = -1
     var callId: UUID? = null
     var recipient: Recipient? = null
+    set(value) {
+        field = value
+        _recipientEvents.value = StateEvent.RecipientUpdate(value)
+    }
 
     fun getCurrentCallState(): Pair<CallState, UUID?> = currentConnectionState to callId
 
@@ -131,7 +149,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun postConnectionEvent(newState: CallState) {
-        _connectionEvents.value = StateEvent.CallStateUpdate(newState)
+        _connectionEvents.value = CallStateUpdate(newState)
     }
 
     fun postViewModelState(newState: CallViewModel.State) {
@@ -192,14 +210,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     fun setAudioEnabled(isEnabled: Boolean) {
         currentConnectionState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
             peerConnection?.setAudioEnabled(isEnabled)
-            _audioEvents.value = StateEvent.AudioEnabled(true)
-        }
-    }
-
-    fun setVideoEnabled(isEnabled: Boolean) {
-        currentConnectionState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
-            peerConnection?.setVideoEnabled(isEnabled)
-            _videoEvents.value = StateEvent.VideoEnabled(true)
+            _audioEvents.value = AudioEnabled(true)
         }
     }
 
@@ -299,7 +310,13 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         Log.i(TAG,"onMessage...")
         buffer ?: return
 
-        Log.i(TAG,"received: ${buffer.data}")
+        try {
+            val byteArray = ByteArray(buffer.data.remaining()) { buffer.data[it] }
+            val videoEnabled = Json.decodeFromString(VideoEnabledMessage.serializer(), byteArray.decodeToString())
+            _remoteVideoEvents.value = VideoEnabled(videoEnabled.video)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to deserialize data channel message", e)
+        }
     }
 
     override fun onAudioDeviceChanged(activeDevice: AudioDevice, devices: Set<AudioDevice>) {
@@ -324,12 +341,13 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         remoteRenderer = null
         eglBase = null
 
-        _connectionEvents.value = StateEvent.CallStateUpdate(CallState.STATE_IDLE)
+        _connectionEvents.value = CallStateUpdate(CallState.STATE_IDLE)
         localCameraState = CameraState.UNKNOWN
         recipient = null
         callId = null
-        _audioEvents.value = StateEvent.AudioEnabled(false)
-        _videoEvents.value = StateEvent.VideoEnabled(false)
+        _audioEvents.value = AudioEnabled(false)
+        _videoEvents.value = VideoEnabled(false)
+        _remoteVideoEvents.value = VideoEnabled(false)
         pendingOutgoingIceUpdates.clear()
         pendingIncomingIceUpdates.clear()
     }
@@ -346,6 +364,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         this.pendingOffer = offer
         this.pendingOfferTime = callTime
         startIncomingRinger()
+    }
+
+    fun onReconnect(newOffer: String): Promise<Unit, Exception> {
+        return task {}
     }
 
     fun onIncomingCall(context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {
@@ -418,10 +440,14 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
         Log.i(TAG, "Sending offer: ${offer.description}")
 
-        return MessageSender.sendNonDurably(CallMessage.offer(
-                offer.description,
+        return MessageSender.sendNonDurably(CallMessage.preOffer(
                 callId
-        ), recipient.address)
+        ), recipient.address).bind {
+            MessageSender.sendNonDurably(CallMessage.offer(
+                    offer.description,
+                    callId
+            ), recipient.address)
+        }
     }
 
     fun callNotSetup(): Boolean =
@@ -450,13 +476,13 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun handleSetMuteAudio(muted: Boolean) {
-        _audioEvents.value = StateEvent.AudioEnabled(!muted)
-        peerConnection?.setAudioEnabled(_audioEvents.value.isEnabled)
+        _audioEvents.value = AudioEnabled(!muted)
+        peerConnection?.setAudioEnabled(!muted)
     }
 
     fun handleSetMuteVideo(muted: Boolean, lockManager: LockManager) {
-        _videoEvents.value = StateEvent.VideoEnabled(!muted)
-        peerConnection?.setVideoEnabled(_videoEvents.value.isEnabled)
+        _videoEvents.value = VideoEnabled(!muted)
+        peerConnection?.setVideoEnabled(!muted)
         dataChannel?.let { channel ->
             val toSend = if (muted) VIDEO_DISABLED_JSON else VIDEO_ENABLED_JSON
             val buffer = DataChannel.Buffer(ByteBuffer.wrap(toSend.toString().encodeToByteArray()), false)
@@ -507,17 +533,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         }
     }
 
-    fun handleRemoteVideoMute(muted: Boolean, intentCallId: UUID) {
-        val recipient = recipient ?: return
-        val callId = callId ?: return
-        if (currentConnectionState != CallState.STATE_CONNECTED || callId != intentCallId) {
-            Log.w(TAG,"Got video toggle for inactive call, ignoring..")
-            return
-        }
-
-        _remoteVideoEvents.value = StateEvent.VideoEnabled(!muted)
-    }
-
     fun handleResponseMessage(recipient: Recipient, callId: UUID, answer: SessionDescription) {
         if (currentConnectionState != CallState.STATE_DIALING || recipient != this.recipient || callId != this.callId) {
             Log.w(TAG,"Got answer for recipient and call ID we're not currently dialing")
@@ -563,8 +578,15 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         if (localCameraState.enabled) lockManager.updatePhoneState(LockManager.PhoneState.IN_VIDEO)
         else lockManager.updatePhoneState(LockManager.PhoneState.IN_CALL)
         connection.setCommunicationMode()
-        connection.setAudioEnabled(_audioEvents.value.isEnabled)
-        connection.setVideoEnabled(localCameraState.enabled)
+        setAudioEnabled(true)
+        dataChannel?.let { channel ->
+            val toSend = if (!_videoEvents.value.isEnabled) VIDEO_DISABLED_JSON else VIDEO_ENABLED_JSON
+            val buffer = DataChannel.Buffer(ByteBuffer.wrap(toSend.toString().encodeToByteArray()), false)
+            channel.send(buffer)
+        }
     }
+
+    @Serializable
+    data class VideoEnabledMessage(val video: Boolean)
 
 }

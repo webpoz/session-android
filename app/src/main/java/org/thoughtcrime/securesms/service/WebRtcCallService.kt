@@ -194,11 +194,9 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                 action == ACTION_BLUETOOTH_CHANGE -> handleBluetoothChange(intent)
                 action == ACTION_WIRED_HEADSET_CHANGE -> handleWiredHeadsetChanged(intent)
                 action == ACTION_SCREEN_OFF -> handleScreenOffChange(intent)
-                action == ACTION_REMOTE_VIDEO_MUTE -> handleRemoteVideoMute(intent)
                 action == ACTION_RESPONSE_MESSAGE -> handleResponseMessage(intent)
                 action == ACTION_ICE_MESSAGE -> handleRemoteIceCandidate(intent)
                 action == ACTION_ICE_CONNECTED -> handleIceConnected(intent)
-                action == ACTION_CALL_CONNECTED -> handleCallConnected(intent)
                 action == ACTION_CHECK_TIMEOUT -> handleCheckTimeout(intent)
                 action == ACTION_IS_IN_CALL_QUERY -> handleIsInCallQuery(intent)
             }
@@ -285,6 +283,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.clearPendingIceUpdates()
         callManager.onIncomingRing(offer, callId, recipient, timestamp)
         callManager.postConnectionEvent(STATE_LOCAL_RINGING)
+        callManager.postViewModelState(CallViewModel.State.CALL_RINGING)
         if (TextSecurePreferences.isCallNotificationsEnabled(this)) {
             callManager.startIncomingRinger()
         }
@@ -440,14 +439,6 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.handleScreenOffChange()
     }
 
-    private fun handleRemoteVideoMute(intent: Intent) {
-        val muted = intent.getBooleanExtra(EXTRA_MUTE, false)
-        val callId = intent.getSerializableExtra(EXTRA_CALL_ID) as UUID
-
-        callManager.handleRemoteVideoMute(muted, callId)
-    }
-
-
     private fun handleResponseMessage(intent: Intent) {
         try {
             val recipient = getRemoteRecipient(intent)
@@ -492,10 +483,6 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.startCommunication(lockManager)
     }
 
-    private fun handleCallConnected(intent: Intent) {
-
-    }
-
     private fun handleIsInCallQuery(intent: Intent) {
 
     }
@@ -507,9 +494,6 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
             registerReceiver(powerButtonReceiver, IntentFilter(Intent.ACTION_SCREEN_OFF))
         }
     }
-
-
-
 
     private fun handleCheckTimeout(intent: Intent) {
         val callId = callManager.callId ?: return

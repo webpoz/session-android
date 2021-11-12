@@ -32,6 +32,8 @@ class SignalBluetoothManager(
         }
         private set
 
+    private fun hasPermission() = false
+
     private var bluetoothAdapter: BluetoothAdapter? = null
     private var bluetoothDevice: BluetoothDevice? = null
     private var bluetoothHeadset: BluetoothHeadset? = null
@@ -90,7 +92,7 @@ class SignalBluetoothManager(
 
         Log.d(TAG, "stop(): state: $state")
 
-        if (bluetoothAdapter == null) {
+        if (bluetoothAdapter == null || !hasPermission()) {
             return
         }
 
@@ -123,6 +125,7 @@ class SignalBluetoothManager(
 
     fun startScoAudio(): Boolean {
         handler.assertHandlerThread()
+        if (!hasPermission()) return false
 
         Log.i(TAG, "startScoAudio(): $state attempts: $scoConnectionAttempts")
 
@@ -147,6 +150,7 @@ class SignalBluetoothManager(
 
     fun stopScoAudio() {
         handler.assertHandlerThread()
+        if (!hasPermission()) return
 
         Log.i(TAG, "stopScoAudio(): $state")
 
@@ -162,6 +166,7 @@ class SignalBluetoothManager(
 
     fun updateDevice() {
         handler.assertHandlerThread()
+        if (!hasPermission()) return
 
         Log.d(TAG, "updateDevice(): state: $state")
 
@@ -195,6 +200,7 @@ class SignalBluetoothManager(
 
     private fun onBluetoothTimeout() {
         Log.i(TAG, "onBluetoothTimeout: state: $state bluetoothHeadset: $bluetoothHeadset")
+        if (!hasPermission()) return
 
         if (state == State.UNINITIALIZED || bluetoothHeadset == null || state != State.CONNECTING) {
             return

@@ -28,11 +28,11 @@ class PeerConnectionWrapper(context: Context,
     get() = peerConnection.localDescription != null && peerConnection.remoteDescription != null
 
     init {
-        val stun = PeerConnection.IceServer.builder("stun:freyr.getsession.org:5349").createIceServer()
-        val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org:5349").setUsername("webrtc").setPassword("webrtc").createIceServer()
-        val iceServers = listOf(stun,turn)
+        val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org").setUsername("session").setPassword("session").createIceServer()
+        val iceServers = listOf(turn)
 
         val constraints = MediaConstraints().apply {
+            optional.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
             optional.add(MediaConstraints.KeyValuePair("DtlsSrtpKeyAgreement", "true"))
         }
         val audioConstraints = MediaConstraints().apply {

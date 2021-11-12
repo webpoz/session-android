@@ -21,13 +21,13 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
         lifecycle.coroutineScope.launch {
             while (isActive) {
                 val nextMessage = WebRtcUtils.SIGNAL_QUEUE.receive()
-                Log.d("Loki", nextMessage.toString())
+                Log.d("Loki", nextMessage.type?.name ?: "CALL MESSAGE RECEIVED")
                 when (nextMessage.type) {
                     OFFER -> incomingCall(nextMessage)
                     ANSWER -> incomingAnswer(nextMessage)
                     END_CALL -> incomingHangup(nextMessage)
                     ICE_CANDIDATES -> handleIceCandidates(nextMessage)
-                    PRE_OFFER -> incomingCall(nextMessage)
+                    PRE_OFFER -> incomingPreOffer(nextMessage)
                     PROVISIONAL_ANSWER -> {} // TODO: if necessary
                 }
             }
@@ -67,6 +67,10 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
                 address = Address.fromSerialized(sender)
         )
         context.startService(iceIntent)
+    }
+
+    private fun incomingPreOffer(callMessage: CallMessage) {
+        // handle notification state
     }
 
     private fun incomingCall(callMessage: CallMessage) {

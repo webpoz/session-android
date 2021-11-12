@@ -10,21 +10,26 @@ import android.os.Bundle
 import android.view.MenuItem
 import android.view.WindowManager
 import androidx.activity.viewModels
-import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
-import com.jakewharton.rxbinding3.view.clicks
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.android.synthetic.main.activity_webrtc_tests.*
+import kotlinx.android.synthetic.main.activity_webrtc.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import network.loki.messenger.R
+import org.session.libsession.avatars.ProfileContactPhoto
+import org.session.libsession.messaging.contacts.Contact
 import org.session.libsession.utilities.Address
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
+import org.thoughtcrime.securesms.dependencies.DatabaseComponent
+import org.thoughtcrime.securesms.mms.GlideApp
 import org.thoughtcrime.securesms.permissions.Permissions
 import org.thoughtcrime.securesms.service.WebRtcCallService
+import org.thoughtcrime.securesms.util.AvatarPlaceholderGenerator
 import org.thoughtcrime.securesms.webrtc.CallViewModel
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
 import org.webrtc.IceCandidate
 import java.util.*
 
@@ -45,6 +50,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
     private val viewModel by viewModels<CallViewModel>()
 
     private val candidates: MutableList<IceCandidate> = mutableListOf()
+    private val glide by lazy { GlideApp.with(this) }
 
     private lateinit var callAddress: Address
     private lateinit var callId: UUID
@@ -63,7 +69,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         super.onCreate(savedInstanceState, ready)
         window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        setContentView(R.layout.activity_webrtc_tests)
+        setContentView(R.layout.activity_webrtc)
         volumeControlStream = AudioManager.STREAM_VOICE_CALL
 
         initializeResources()
@@ -88,7 +94,13 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         },IntentFilter(ACTION_END))
 
         enableCameraButton.setOnClickListener {
-            startService(WebRtcCallService.cameraEnabled(this, true))
+            Permissions.with(this)
+                    .request(Manifest.permission.CAMERA)
+                    .onAllGranted {
+                        val intent = WebRtcCallService.cameraEnabled(this, !viewModel.videoEnabled)
+                        startService(intent)
+                    }
+                    .execute()
         }
 
         switchCameraButton.setOnClickListener {
@@ -98,7 +110,6 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         endCallButton.setOnClickListener {
             startService(WebRtcCallService.hangupIntent(this))
         }
-
 
     }
 
@@ -115,20 +126,67 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
         uiJob = lifecycleScope.launch {
 
-            viewModel.callState.collect { state ->
-                if (state == CallViewModel.State.CALL_CONNECTED) {
-                    // call connected, render the surfaces
-                    remote_renderer.removeAllViews()
-                    local_renderer.removeAllViews()
-                    viewModel.remoteRenderer?.let { remote_renderer.addView(it) }
-                    viewModel.localRenderer?.let { local_renderer.addView(it) }
+            launch {
+                viewModel.callState.collect { state ->
+                    remote_loading_view.isVisible = state != CALL_CONNECTED
                 }
             }
 
-            viewModel.remoteVideoEnabledState.collect {
+            launch {
+                viewModel.recipient.collect { latestRecipient ->
+                    if (latestRecipient.recipient != null) {
+                        val signalProfilePicture = latestRecipient.recipient.contactPhoto
+                        val avatar = (signalProfilePicture as? ProfileContactPhoto)?.avatarObject
+                        if (signalProfilePicture != null && avatar != "0" && avatar != "") {
+                            glide.clear(remote_recipient)
+                            glide.load(signalProfilePicture).diskCacheStrategy(DiskCacheStrategy.AUTOMATIC).circleCrop().into(remote_recipient)
+                        } else {
+                            val publicKey = latestRecipient.recipient.address.serialize()
+                            val displayName = getUserDisplayName(publicKey)
+                            val sizeInPX = resources.getDimensionPixelSize(R.dimen.extra_large_profile_picture_size)
+                            glide.clear(remote_recipient)
+                            glide.load(AvatarPlaceholderGenerator.generate(this@WebRtcCallActivity, sizeInPX, publicKey, displayName))
+                                    .diskCacheStrategy(DiskCacheStrategy.ALL).circleCrop().into(remote_recipient)
+                        }
+                    } else {
+                        glide.clear(remote_recipient)
+                    }
+                }
+            }
 
+            launch {
+                viewModel.localVideoEnabledState.collect { isEnabled ->
+                    local_renderer.removeAllViews()
+                    if (isEnabled) {
+                        viewModel.localRenderer?.let { surfaceView ->
+                            surfaceView.setZOrderOnTop(true)
+                            local_renderer.addView(surfaceView)
+                        }
+                    }
+                    local_renderer.isVisible = isEnabled
+                    enableCameraButton.setImageResource(
+                            if (isEnabled) R.drawable.ic_baseline_videocam_off_24
+                            else R.drawable.ic_baseline_videocam_24
+                    )
+                }
+            }
+
+            launch {
+                viewModel.remoteVideoEnabledState.collect { isEnabled ->
+                    remote_renderer.removeAllViews()
+                    if (isEnabled) {
+                        viewModel.remoteRenderer?.let { remote_renderer.addView(it) }
+                    }
+                    remote_renderer.isVisible = isEnabled
+                    remote_recipient.isVisible = !isEnabled
+                }
             }
         }
+    }
+
+    fun getUserDisplayName(publicKey: String): String {
+        val contact = DatabaseComponent.get(this).sessionContactDatabase().getContactWithSessionID(publicKey)
+        return contact?.displayName(Contact.ContactContext.REGULAR) ?: publicKey
     }
 
     override fun onStop() {
