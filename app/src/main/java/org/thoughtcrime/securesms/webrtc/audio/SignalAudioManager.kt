@@ -15,6 +15,7 @@ import org.session.libsession.utilities.ServiceUtil
 import org.session.libsession.utilities.concurrent.SignalExecutors
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
+import org.thoughtcrime.securesms.webrtc.audio.SignalBluetoothManager.State
 
 private val TAG = Log.tag(SignalAudioManager::class.java)
 
@@ -60,8 +61,8 @@ class SignalAudioManager(private val context: Context,
     private val connectedSoundId = soundPool.load(context, R.raw.webrtc_completed, 1)
     private val disconnectedSoundId = soundPool.load(context, R.raw.webrtc_disconnected, 1)
 
-    val incomingRinger = IncomingRinger(context)
-    val outgoingRinger = OutgoingRinger(context)
+    private val incomingRinger = IncomingRinger(context)
+    private val outgoingRinger = OutgoingRinger(context)
 
     private var wiredHeadsetReceiver: WiredHeadsetReceiver? = null
 
@@ -181,6 +182,8 @@ class SignalAudioManager(private val context: Context,
 
     private fun shutdown() {
         handler?.post {
+            incomingRinger.stop()
+            outgoingRinger.stop()
             stop(false)
             if (commandAndControlThread != null) {
                 Log.i(TAG, "Shutting down command and control")

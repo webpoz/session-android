@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
+import android.net.ConnectivityManager
 import android.os.Build
 import android.os.IBinder
 import android.os.ResultReceiver
@@ -90,7 +91,11 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         fun flipCamera(context: Context) = Intent(context, WebRtcCallService::class.java)
                 .setAction(ACTION_FLIP_CAMERA)
 
-        fun acceptCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java).setAction(ACTION_ANSWER_CALL)
+        fun acceptCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java)
+                .setAction(ACTION_ANSWER_CALL)
+
+        fun speakerIntent(context: Context, enable: Boolean) = Intent(context, WebRtcCallService::class.java)
+                .setAction(ACTION_UPDATE_AUDIO)
 
         fun createCall(context: Context, recipient: Recipient) = Intent(context, WebRtcCallService::class.java)
                 .setAction(ACTION_OUTGOING_CALL)
@@ -132,7 +137,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
             val intent = Intent(context, WebRtcCallService::class.java)
                 .setAction(ACTION_UPDATE_AUDIO)
                 .putExtra(EXTRA_AUDIO_COMMAND, command)
-            ContextCompat.startForegroundService(context, intent)
+            context.startService(intent)
         }
 
         @JvmStatic
@@ -156,6 +161,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         startService(hangupIntent(this))
     }
 
+    private var networkChangedReceiver: NetworkChangeReceiver? = null
     private var callReceiver: IncomingPstnCallReceiver? = null
     private var wiredHeadsetStateReceiver: WiredHeadsetStateReceiver? = null
     private var uncaughtExceptionHandlerManager: UncaughtExceptionHandlerManager? = null
@@ -166,6 +172,11 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         sendBroadcast(Intent(WebRtcCallActivity.ACTION_END))
         callManager.stop()
         stopForeground(true)
+    }
+
+    private fun isSameCall(intent: Intent): Boolean {
+        val expectedCallId = getCallId(intent)
+        return callManager.callId == expectedCallId
     }
 
     private fun isBusy() = callManager.isBusy(this)
@@ -180,6 +191,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
             val action = intent.action
             Log.d("Loki", "Handling ${intent.action}")
             when {
+                action == ACTION_INCOMING_RING && isSameCall(intent) -> handleNewOffer(intent)
                 action == ACTION_INCOMING_RING && isBusy() -> handleBusyCall(intent)
                 action == ACTION_REMOTE_BUSY -> handleBusyMessage(intent)
                 action == ACTION_INCOMING_RING && isIdle() -> handleIncomingRing(intent)
@@ -199,6 +211,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                 action == ACTION_ICE_CONNECTED -> handleIceConnected(intent)
                 action == ACTION_CHECK_TIMEOUT -> handleCheckTimeout(intent)
                 action == ACTION_IS_IN_CALL_QUERY -> handleIsInCallQuery(intent)
+                action == ACTION_UPDATE_AUDIO -> handleUpdateAudio(intent)
             }
         }
         return START_NOT_STICKY
@@ -212,6 +225,13 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         getSystemService(TelephonyManager::class.java)
                 .listen(hangupOnCallAnswered, PhoneStateListener.LISTEN_CALL_STATE)
         registerUncaughtExceptionHandler()
+        networkChangedReceiver = NetworkChangeReceiver { available ->
+            networkChange(available)
+        }
+        registerReceiver(networkChangedReceiver, IntentFilter().apply {
+            addAction("android.net.conn.CONNECTIVITY_CHANGE")
+            addAction("android.net.wifi.WIFI_STATE_CHANGED")
+        })
     }
 
     private fun registerUncaughtExceptionHandler() {
@@ -232,25 +252,24 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
     private fun handleBusyCall(intent: Intent) {
         val recipient = getRemoteRecipient(intent)
+        val callId = getCallId(intent)
         val callState = callManager.currentConnectionState
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            when (callState) {
-                STATE_DIALING,
-                STATE_REMOTE_RINGING -> setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
-                STATE_IDLE -> setCallInProgressNotification(TYPE_INCOMING_CONNECTING, recipient)
-                STATE_ANSWERING -> setCallInProgressNotification(TYPE_INCOMING_CONNECTING, callManager.recipient)
-                STATE_LOCAL_RINGING -> setCallInProgressNotification(TYPE_INCOMING_RINGING, callManager.recipient)
-                STATE_CONNECTED -> setCallInProgressNotification(TYPE_ESTABLISHED, callManager.recipient)
-            }
-        }
+        callManager.handleBusyCall(callId, recipient)
+        insertMissedCall(recipient, false)
 
         if (callState == STATE_IDLE) {
             stopForeground(true)
         }
+    }
 
-        // TODO: send hangup via messageSender
-        insertMissedCall(getRemoteRecipient(intent), false)
+    private fun handleUpdateAudio(intent: Intent) {
+        val audioCommand = intent.getParcelableExtra<AudioManagerCommand>(EXTRA_AUDIO_COMMAND)!!
+        if (callManager.currentConnectionState !in arrayOf(STATE_DIALING, STATE_CONNECTED, STATE_LOCAL_RINGING)) {
+            Log.w(TAG, "handling audio command not in call")
+            return
+        }
+        callManager.handleAudioCommand(audioCommand)
     }
 
     private fun handleBusyMessage(intent: Intent) {
@@ -268,6 +287,19 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                             .setAction(ACTION_LOCAL_HANGUP)
             )
         }, WebRtcCallActivity.BUSY_SIGNAL_DELAY_FINISH)
+    }
+
+    private fun handleNewOffer(intent: Intent) {
+        if (callManager.currentConnectionState !in arrayOf(STATE_CONNECTED, STATE_DIALING, STATE_ANSWERING)) {
+            Log.w(TAG,"trying to handle new offer from non-connecting state")
+            return
+        }
+
+        val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION) ?: return
+        val callId = getCallId(intent)
+        val recipient = getRemoteRecipient(intent)
+        callManager.clearPendingIceUpdates()
+        callManager.onNewOffer(offer, callId, recipient)
     }
 
     private fun handleIncomingRing(intent: Intent) {
@@ -344,6 +376,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         intent.putExtra(EXTRA_REMOTE_DESCRIPTION, pending)
         intent.putExtra(EXTRA_TIMESTAMP, timestamp)
 
+        callManager.silenceIncomingRinger()
         callManager.postConnectionEvent(STATE_ANSWERING)
         callManager.postViewModelState(CallViewModel.State.CALL_INCOMING)
 
@@ -537,6 +570,10 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callReceiver?.let { receiver ->
             unregisterReceiver(receiver)
         }
+        networkChangedReceiver?.let { receiver ->
+            unregisterReceiver(receiver)
+        }
+        networkChangedReceiver = null
         callReceiver = null
         uncaughtExceptionHandlerManager?.unregister()
         callManager.onDestroy()
@@ -544,6 +581,12 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         // shutdown audiomanager
         // unregister network receiver
         // unregister power button
+    }
+
+    fun networkChange(networkAvailable: Boolean) {
+        if (networkAvailable && callManager.currentConnectionState in arrayOf(STATE_CONNECTED, STATE_ANSWERING, STATE_DIALING)) {
+            callManager.networkReestablished()
+        }
     }
 
     private class TimeoutRunnable(private val callId: UUID, private val context: Context): Runnable {

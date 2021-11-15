@@ -34,7 +34,6 @@ class SignalBluetoothManager(
         private set
 
     private var bluetoothAdapter: BluetoothAdapter? = null
-    private var bluetoothDevice: BluetoothDevice? = null
     private var bluetoothHeadset: BluetoothHeadset? = null
     private var scoConnectionAttempts = 0
 
@@ -54,7 +53,6 @@ class SignalBluetoothManager(
         }
 
         bluetoothHeadset = null
-        bluetoothDevice = null
         scoConnectionAttempts = 0
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter()
@@ -112,13 +110,10 @@ class SignalBluetoothManager(
 
         cancelTimer()
 
-        if (bluetoothHeadset != null) {
-            bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HEADSET, bluetoothHeadset)
-            bluetoothHeadset = null
-        }
+        bluetoothAdapter?.closeProfileProxy(BluetoothProfile.HEADSET, bluetoothHeadset)
+        bluetoothHeadset = null
 
         bluetoothAdapter = null
-        bluetoothDevice = null
         state = State.UNINITIALIZED
     }
 
@@ -170,15 +165,12 @@ class SignalBluetoothManager(
             return
         }
 
-        val devices: List<BluetoothDevice>? = bluetoothHeadset?.connectedDevices
-        if (devices == null || devices.isEmpty()) {
-            bluetoothDevice = null
+        if (bluetoothAdapter!!.getProfileConnectionState(BluetoothProfile.HEADSET) !in arrayOf(BluetoothProfile.STATE_CONNECTING, BluetoothProfile.STATE_CONNECTED)) {
             state = State.UNAVAILABLE
             Log.i(TAG, "No connected bluetooth headset")
         } else {
-            bluetoothDevice = devices[0]
             state = State.AVAILABLE
-            Log.i(TAG, "Connected bluetooth headset. headsetState: ${bluetoothHeadset?.getConnectionState(bluetoothDevice)?.toStateString()} scoAudio: ${bluetoothHeadset?.isAudioConnected(bluetoothDevice)}")
+            Log.i(TAG, "Connected bluetooth headset.")
         }
     }
 
@@ -202,16 +194,12 @@ class SignalBluetoothManager(
         }
 
         var scoConnected = false
-        val devices: List<BluetoothDevice>? = bluetoothHeadset?.connectedDevices
 
-        if (devices != null && devices.isNotEmpty()) {
-            bluetoothDevice = devices[0]
-            if (bluetoothHeadset?.isAudioConnected(bluetoothDevice) == true) {
-                Log.d(TAG, "Connected with $bluetoothDevice")
-                scoConnected = true
-            } else {
-                Log.d(TAG, "Not connected with $bluetoothDevice")
-            }
+        if (audioManager.isBluetoothScoOn()) {
+            Log.d(TAG, "Connected with device")
+            scoConnected = true
+        } else {
+            Log.d(TAG, "Not connected with device")
         }
 
         if (scoConnected) {
@@ -234,7 +222,6 @@ class SignalBluetoothManager(
     private fun onServiceDisconnected() {
         stopScoAudio()
         bluetoothHeadset = null
-        bluetoothDevice = null
         state = State.UNAVAILABLE
         updateAudioDeviceState()
     }

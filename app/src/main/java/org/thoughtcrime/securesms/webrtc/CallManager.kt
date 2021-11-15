@@ -2,8 +2,6 @@ package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
 import android.telephony.TelephonyManager
-import kotlinx.coroutines.channels.BufferOverflow
-import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.Serializable
@@ -13,7 +11,6 @@ import kotlinx.serialization.json.put
 import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.functional.bind
 import nl.komponents.kovenant.task
-import nl.komponents.kovenant.then
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Debouncer
@@ -47,6 +44,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         data class AudioEnabled(val isEnabled: Boolean): StateEvent()
         data class VideoEnabled(val isEnabled: Boolean): StateEvent()
         data class CallStateUpdate(val state: CallState): StateEvent()
+        data class AudioDeviceUpdate(val selectedDevice: AudioDevice, val audioDevices: Set<AudioDevice>): StateEvent()
         data class RecipientUpdate(val recipient: Recipient?): StateEvent() {
             companion object {
                 val UNKNOWN = RecipientUpdate(recipient = null)
@@ -100,7 +98,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     private val _recipientEvents = MutableStateFlow(RecipientUpdate.UNKNOWN)
     val recipientEvents = _recipientEvents.asSharedFlow()
     private var localCameraState: CameraState = CameraState.UNKNOWN
-    private var bluetoothAvailable = false
+
+    private val _audioDeviceEvents = MutableStateFlow(AudioDeviceUpdate(AudioDevice.NONE, setOf()))
+    val audioDeviceEvents = _audioDeviceEvents.asSharedFlow()
+
 
     val currentConnectionState
         get() = (_connectionEvents.value as CallStateUpdate).state
@@ -117,6 +118,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         field = value
         _recipientEvents.value = StateEvent.RecipientUpdate(value)
     }
+    var isReestablishing: Boolean = false
 
     fun getCurrentCallState(): Pair<CallState, UUID?> = currentConnectionState to callId
 
@@ -148,6 +150,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         signalAudioManager.handleCommand(AudioManagerCommand.StartOutgoingRinger(ringerType))
     }
 
+    fun silenceIncomingRinger() {
+        signalAudioManager.handleCommand(AudioManagerCommand.SilenceIncomingRinger)
+    }
+
     fun postConnectionEvent(newState: CallState) {
         _connectionEvents.value = CallStateUpdate(newState)
     }
@@ -157,18 +163,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     override fun newCallMessage(callMessage: SignalServiceProtos.CallMessage) {
-
-    }
-
-    fun networkChange(networkAvailable: Boolean) {
-
-    }
-
-    fun acceptCall() {
-
-    }
-
-    fun declineCall() {
 
     }
 
@@ -320,7 +314,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     override fun onAudioDeviceChanged(activeDevice: AudioDevice, devices: Set<AudioDevice>) {
-        signalAudioManager.handleCommand(AudioManagerCommand())
+        _audioDeviceEvents.value = AudioDeviceUpdate(activeDevice, devices)
     }
 
     private fun CallState.withState(vararg expected: CallState, transition: () -> Unit) {
@@ -356,6 +350,19 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         localCameraState = newCameraState
     }
 
+    fun onNewOffer(offer: String, callId: UUID, recipient: Recipient): Promise<Unit, Exception> {
+        if (callId != this.callId) return Promise.ofFail(NullPointerException("No callId"))
+        if (recipient != this.recipient) return Promise.ofFail(NullPointerException("No recipient"))
+
+        val connection = peerConnection ?: return Promise.ofFail(NullPointerException("No peer connection"))
+
+        connection.setNewOffer(SessionDescription(SessionDescription.Type.OFFER, offer))
+        val answer = connection.createAnswer(MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+        })
+        return MessageSender.sendNonDurably(CallMessage.answer(answer.description, callId), recipient.address)
+    }
+
     fun onIncomingRing(offer: String, callId: UUID, recipient: Recipient, callTime: Long) {
         if (currentConnectionState != CallState.STATE_IDLE) return
 
@@ -364,10 +371,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         this.pendingOffer = offer
         this.pendingOfferTime = callTime
         startIncomingRinger()
-    }
-
-    fun onReconnect(newOffer: String): Promise<Unit, Exception> {
-        return task {}
     }
 
     fun onIncomingCall(context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {
@@ -584,6 +587,30 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
             val buffer = DataChannel.Buffer(ByteBuffer.wrap(toSend.toString().encodeToByteArray()), false)
             channel.send(buffer)
         }
+    }
+
+    fun handleBusyCall(callId: UUID, recipient: Recipient): Promise<Unit, Exception> {
+        return MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
+    }
+
+    fun handleAudioCommand(audioCommand: AudioManagerCommand) {
+        signalAudioManager.handleCommand(audioCommand)
+    }
+
+    fun networkReestablished() {
+        val connection = peerConnection ?: return
+        val callId = callId ?: return
+        val recipient = recipient ?: return
+
+        if (isReestablishing) return
+
+        val offer = connection.createOffer(MediaConstraints().apply {
+            mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+        })
+
+        isReestablishing = true
+
+        MessageSender.sendNonDurably(CallMessage.offer(offer.description, callId), recipient.address)
     }
 
     @Serializable

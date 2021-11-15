@@ -107,6 +107,36 @@ class PeerConnectionWrapper(context: Context,
         peerConnection.dispose()
     }
 
+    fun setNewOffer(description: SessionDescription) {
+        val future = SettableFuture<Boolean>()
+
+        peerConnection.setRemoteDescription(object: SdpObserver {
+            override fun onCreateSuccess(p0: SessionDescription?) {
+                throw AssertionError()
+            }
+
+            override fun onCreateFailure(p0: String?) {
+                throw AssertionError()
+            }
+
+            override fun onSetSuccess() {
+                future.set(true)
+            }
+
+            override fun onSetFailure(error: String?) {
+                future.setException(PeerConnectionException(error))
+            }
+        }, description)
+
+        try {
+            future.get()
+        } catch (e: InterruptedException) {
+            throw AssertionError(e)
+        } catch (e: ExecutionException) {
+            throw PeerConnectionException(e)
+        }
+    }
+
     fun setRemoteDescription(description: SessionDescription) {
         val future = SettableFuture<Boolean>()
 

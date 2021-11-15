@@ -5,6 +5,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.BlendMode
+import android.graphics.PorterDuff
 import android.graphics.drawable.ColorDrawable
 import android.media.AudioManager
 import android.os.Bundle
@@ -31,8 +33,11 @@ import org.thoughtcrime.securesms.mms.GlideApp
 import org.thoughtcrime.securesms.permissions.Permissions
 import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.thoughtcrime.securesms.util.AvatarPlaceholderGenerator
+import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallViewModel
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.*
 import org.webrtc.IceCandidate
 import java.util.*
 
@@ -40,10 +45,6 @@ import java.util.*
 class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     companion object {
-        const val CALL_ID = "call_id_session"
-        private const val LOCAL_TRACK_ID = "local_track"
-        private const val LOCAL_STREAM_ID = "local_track"
-
         const val ACTION_ANSWER = "answer"
         const val ACTION_END = "end-call"
 
@@ -51,13 +52,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
     }
 
     private val viewModel by viewModels<CallViewModel>()
-
-    private val candidates: MutableList<IceCandidate> = mutableListOf()
     private val glide by lazy { GlideApp.with(this) }
-
-    private lateinit var callAddress: Address
-    private lateinit var callId: UUID
-
     private var uiJob: Job? = null
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -95,6 +90,11 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         if (intent.action == ACTION_ANSWER) {
             val answerIntent = WebRtcCallService.acceptCallIntent(this)
             ContextCompat.startForegroundService(this,answerIntent)
+        }
+
+        speakerPhoneButton.setOnClickListener {
+            val command = AudioManagerCommand.SetUserDevice( if (viewModel.isSpeaker) EARPIECE else SPEAKER_PHONE)
+            WebRtcCallService.sendAudioManagerCommand(this, command)
         }
 
         acceptCallButton.setOnClickListener {
@@ -147,16 +147,23 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         uiJob = lifecycleScope.launch {
 
             launch {
+                viewModel.audioDeviceState.collect { state ->
+                    val speakerEnabled = state.selectedDevice == SPEAKER_PHONE
+                    speakerPhoneButton.setImageResource(
+                            if (speakerEnabled) R.drawable.ic_baseline_volume_up_24
+                            else R.drawable.ic_baseline_volume_mute_24
+                    )
+                }
+            }
+
+            launch {
                 viewModel.callState.collect { state ->
                     when (state) {
                         CALL_RINGING -> {
-
                         }
                         CALL_OUTGOING -> {
-
                         }
                         CALL_CONNECTED -> {
-
                         }
                     }
                     controlGroup.isVisible = state in listOf(CALL_CONNECTED, CALL_OUTGOING, CALL_INCOMING)
@@ -198,10 +205,9 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                     }
                     local_renderer.isVisible = isEnabled
                     enableCameraButton.setImageResource(
-                            if (isEnabled) R.drawable.ic_outline_videocam_off_24
-                            else R.drawable.ic_outline_videocam_24
+                            if (isEnabled) R.drawable.ic_baseline_videocam_off_24
+                            else R.drawable.ic_baseline_videocam_24
                     )
-                    enableCameraButton.styleEnabled(isEnabled)
                 }
             }
 
@@ -215,14 +221,6 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                     remote_recipient.isVisible = !isEnabled
                 }
             }
-        }
-    }
-
-    fun View.styleEnabled(isEnabled: Boolean) {
-        if (isEnabled) {
-            setBackgroundResource(R.drawable.call_controls_selected)
-        } else {
-            setBackgroundResource(R.drawable.call_controls_unselected)
         }
     }
 

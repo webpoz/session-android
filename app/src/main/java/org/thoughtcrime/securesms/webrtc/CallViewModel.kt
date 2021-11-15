@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.shareIn
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
 import org.webrtc.SurfaceViewRenderer
 import javax.inject.Inject
 
@@ -22,7 +23,12 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
     private var _videoEnabled: Boolean = false
 
     val videoEnabled: Boolean
-    get() = _videoEnabled
+        get() = _videoEnabled
+
+    private var _isSpeaker: Boolean = false
+    val isSpeaker: Boolean
+        get() = _isSpeaker
+
 
     enum class State {
         CALL_PENDING,
@@ -40,17 +46,27 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
         UNTRUSTED_IDENTITY,
     }
 
+    val audioDeviceState
+        get() = callManager.audioDeviceEvents
+                .onEach {
+                    _isSpeaker = it.selectedDevice == SignalAudioManager.AudioDevice.SPEAKER_PHONE
+                }
+
     val localAudioEnabledState
-    get() = callManager.audioEvents.map { it.isEnabled }
+        get() = callManager.audioEvents.map { it.isEnabled }
+
     val localVideoEnabledState
-    get() = callManager.videoEvents
-            .map { it.isEnabled }
-            .onEach { _videoEnabled = it }
+        get() = callManager.videoEvents
+                .map { it.isEnabled }
+                .onEach { _videoEnabled = it }
+
     val remoteVideoEnabledState
-    get() = callManager.remoteVideoEvents.map { it.isEnabled }
+        get() = callManager.remoteVideoEvents.map { it.isEnabled }
+
     val callState
-    get() = callManager.callStateEvents
+        get() = callManager.callStateEvents
+
     val recipient
-    get() = callManager.recipientEvents
+        get() = callManager.recipientEvents
 
 }
