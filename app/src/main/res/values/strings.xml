@@ -913,5 +913,9 @@
     <string name="NotificationBarManager__end_call">End call</string>
     <string name="accept_call">Accept Call</string>
     <string name="decline_call">Decline call</string>
+    <string name="preferences__voice_video_calls">Voice and video calls</string>
+    <string name="preferences__allow_access_voice_video">Allow access to accept voice and video calls from other users</string>
+    <string name="dialog_voice_video_title">Voice / video calls</string>
+    <string name="dialog_voice_video_message">The current implementation of voice / video calls will expose your IP address to the Oxen Foundation servers and the calling / called user</string>
 
 </resources>

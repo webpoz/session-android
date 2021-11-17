@@ -6,13 +6,12 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
-import android.net.ConnectivityManager
 import android.os.Build
 import android.os.IBinder
 import android.os.ResultReceiver
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
-import androidx.core.content.ContextCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dagger.hilt.android.AndroidEntryPoint
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.FutureTaskListener
@@ -32,7 +31,6 @@ import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import org.webrtc.*
 import org.webrtc.PeerConnection.IceConnectionState.*
-import java.lang.AssertionError
 import java.util.*
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
@@ -228,10 +226,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         networkChangedReceiver = NetworkChangeReceiver { available ->
             networkChange(available)
         }
-        registerReceiver(networkChangedReceiver, IntentFilter().apply {
-            addAction("android.net.conn.CONNECTIVITY_CHANGE")
-            addAction("android.net.wifi.WIFI_STATE_CHANGED")
-        })
+        LocalBroadcastManager.getInstance(this).registerReceiver(networkChangedReceiver!!, IntentFilter("pathsBuilt"))
     }
 
     private fun registerUncaughtExceptionHandler() {
@@ -298,7 +293,6 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION) ?: return
         val callId = getCallId(intent)
         val recipient = getRemoteRecipient(intent)
-        callManager.clearPendingIceUpdates()
         callManager.onNewOffer(offer, callId, recipient)
     }
 
@@ -338,7 +332,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.startOutgoingRinger(OutgoingRinger.Type.RINGING)
         setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
         // TODO: DatabaseComponent.get(this).insertOutgoingCall(callManager.recipient!!.address)
-        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 5, TimeUnit.MINUTES)
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
 
         val expectedState = callManager.currentConnectionState
         val expectedCallId = callManager.callId
@@ -533,7 +527,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
         if (callId == getCallId(intent) && callState != STATE_CONNECTED) {
             Log.w(TAG, "Timing out call: $callId")
-            callManager.postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
+            handleLocalHangup(intent)
         }
     }
 
@@ -571,7 +565,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
             unregisterReceiver(receiver)
         }
         networkChangedReceiver?.let { receiver ->
-            unregisterReceiver(receiver)
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
         }
         networkChangedReceiver = null
         callReceiver = null
@@ -584,7 +578,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     }
 
     fun networkChange(networkAvailable: Boolean) {
-        if (networkAvailable && callManager.currentConnectionState in arrayOf(STATE_CONNECTED, STATE_ANSWERING, STATE_DIALING)) {
+        if (!callManager.isReestablishing && callManager.currentConnectionState in arrayOf(STATE_CONNECTED)) {
             callManager.networkReestablished()
         }
     }
@@ -676,6 +670,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
             startService(intent)
         }
+        Log.d(TAG, "onIceConnectionChange: $newState")
     }
 
     override fun onIceConnectionReceivingChange(p0: Boolean) {}

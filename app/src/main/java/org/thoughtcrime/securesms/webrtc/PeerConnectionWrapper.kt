@@ -1,7 +1,6 @@
 package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
-import kotlinx.coroutines.runBlocking
 import org.session.libsignal.utilities.SettableFuture
 import org.thoughtcrime.securesms.webrtc.video.Camera
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
@@ -32,7 +31,6 @@ class PeerConnectionWrapper(context: Context,
         val iceServers = listOf(turn)
 
         val constraints = MediaConstraints().apply {
-            optional.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
             optional.add(MediaConstraints.KeyValuePair("DtlsSrtpKeyAgreement", "true"))
         }
         val audioConstraints = MediaConstraints().apply {

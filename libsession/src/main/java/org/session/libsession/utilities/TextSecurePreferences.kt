@@ -89,7 +89,8 @@ object TextSecurePreferences {
     const val CONFIGURATION_SYNCED = "pref_configuration_synced"
     private const val LAST_PROFILE_UPDATE_TIME = "pref_last_profile_update_time"
     private const val LAST_OPEN_DATE = "pref_last_open_date"
-    private const val CALL_NOTIFICATIONS_ENABLED = "pref_call_notifications_enabled"
+    const val CALL_NOTIFICATIONS_ENABLED = "pref_call_notifications_enabled"
+    private const val SHOWN_CALL_WARNING = "pref_shown_call_warning"
 
     @JvmStatic
     fun getLastConfigurationSyncTime(context: Context): Long {
@@ -742,4 +743,21 @@ object TextSecurePreferences {
     fun isCallNotificationsEnabled(context: Context): Boolean {
         return getBooleanPreference(context, CALL_NOTIFICATIONS_ENABLED, false)
     }
+
+
+    /**
+     * Set the SHOWN_CALL_WARNING preference to `true`
+     * Return `true` if the value did update (it was previously unset)
+     */
+    @JvmStatic
+    fun setShownCallWarning(context: Context) : Boolean {
+        val previousValue = getBooleanPreference(context, SHOWN_CALL_WARNING, false)
+        if (previousValue) {
+            return false
+        }
+        val setValue = true
+        setBooleanPreference(context, SHOWN_CALL_WARNING, setValue)
+        return previousValue != setValue
+    }
+
 }

@@ -10,7 +10,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.functional.bind
-import nl.komponents.kovenant.task
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Debouncer
@@ -116,11 +115,9 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     var recipient: Recipient? = null
     set(value) {
         field = value
-        _recipientEvents.value = StateEvent.RecipientUpdate(value)
+        _recipientEvents.value = RecipientUpdate(value)
     }
     var isReestablishing: Boolean = false
-
-    fun getCurrentCallState(): Pair<CallState, UUID?> = currentConnectionState to callId
 
     private var peerConnection: PeerConnectionWrapper? = null
     private var dataChannel: DataChannel? = null
@@ -537,7 +534,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun handleResponseMessage(recipient: Recipient, callId: UUID, answer: SessionDescription) {
-        if (currentConnectionState != CallState.STATE_DIALING || recipient != this.recipient || callId != this.callId) {
+        if (currentConnectionState !in arrayOf(CallState.STATE_DIALING, CallState.STATE_CONNECTED) || recipient != this.recipient || callId != this.callId) {
             Log.w(TAG,"Got answer for recipient and call ID we're not currently dialing")
             return
         }
@@ -603,14 +600,16 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         val recipient = recipient ?: return
 
         if (isReestablishing) return
+        isReestablishing = true
 
         val offer = connection.createOffer(MediaConstraints().apply {
             mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
         })
+        connection.setLocalDescription(offer)
 
-        isReestablishing = true
-
-        MessageSender.sendNonDurably(CallMessage.offer(offer.description, callId), recipient.address)
+        MessageSender.sendNonDurably(CallMessage.offer(offer.description, callId), recipient.address).success {
+            isReestablishing = false
+        }
     }
 
     @Serializable

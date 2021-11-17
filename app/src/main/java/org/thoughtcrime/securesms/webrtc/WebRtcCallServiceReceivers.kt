@@ -5,11 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
-import dagger.hilt.android.AndroidEntryPoint
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.thoughtcrime.securesms.webrtc.locks.LockManager
-import javax.inject.Inject
 
 
 class HangUpRtcOnPstnCallAnsweredListener(private val hangupListener: ()->Unit): PhoneStateListener() {
@@ -24,17 +22,6 @@ class HangUpRtcOnPstnCallAnsweredListener(private val hangupListener: ()->Unit):
             hangupListener()
             Log.i(TAG, "Device phone call ended Session call.")
         }
-    }
-}
-
-//@AndroidEntryPoint
-class NetworkReceiver: BroadcastReceiver() {
-
-//    @Inject
-//    lateinit var callManager: CallManager
-
-    override fun onReceive(context: Context, intent: Intent) {
-        TODO("Not yet implemented")
     }
 }
 

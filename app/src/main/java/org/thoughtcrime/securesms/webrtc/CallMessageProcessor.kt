@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.utilities.Address
+import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.*
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.service.WebRtcCallService
@@ -22,6 +23,10 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
             while (isActive) {
                 val nextMessage = WebRtcUtils.SIGNAL_QUEUE.receive()
                 Log.d("Loki", nextMessage.type?.name ?: "CALL MESSAGE RECEIVED")
+                if (!TextSecurePreferences.isCallNotificationsEnabled(context)) {
+                    Log.d("Loki","Dropping call message if call notifications disabled")
+                    // TODO: maybe insert a message here saying you missed a call due to permissions
+                }
                 when (nextMessage.type) {
                     OFFER -> incomingCall(nextMessage)
                     ANSWER -> incomingAnswer(nextMessage)
