@@ -26,6 +26,7 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
                 if (!TextSecurePreferences.isCallNotificationsEnabled(context)) {
                     Log.d("Loki","Dropping call message if call notifications disabled")
                     // TODO: maybe insert a message here saying you missed a call due to permissions
+                    continue
                 }
                 when (nextMessage.type) {
                     OFFER -> incomingCall(nextMessage)

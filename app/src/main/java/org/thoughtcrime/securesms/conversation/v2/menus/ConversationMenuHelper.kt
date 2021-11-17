@@ -100,8 +100,7 @@ object ConversationMenuHelper {
             inflater.inflate(R.menu.menu_conversation_notification_settings, menu)
         }
 
-        // TODO: Call Tests
-        if (!isOpenGroup) {
+        if (!thread.isGroupRecipient && TextSecurePreferences.isCallNotificationsEnabled(context)) {
             inflater.inflate(R.menu.menu_conversation_call, menu)
         }
 
