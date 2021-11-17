@@ -15,7 +15,6 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dagger.hilt.android.AndroidEntryPoint
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.FutureTaskListener
-import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.utilities.Log
@@ -310,9 +309,8 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.onIncomingRing(offer, callId, recipient, timestamp)
         callManager.postConnectionEvent(STATE_LOCAL_RINGING)
         callManager.postViewModelState(CallViewModel.State.CALL_RINGING)
-        if (TextSecurePreferences.isCallNotificationsEnabled(this)) {
-            callManager.startIncomingRinger()
-        }
+        callManager.initializeAudioForCall()
+        callManager.startIncomingRinger()
         registerPowerButtonReceiver()
     }
 

@@ -4,18 +4,13 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.media.SoundPool
-import android.net.Uri
 import android.os.Build
 import android.os.HandlerThread
 import network.loki.messenger.R
-import org.session.libsession.utilities.ServiceUtil
-import org.session.libsession.utilities.concurrent.SignalExecutors
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
-import org.thoughtcrime.securesms.webrtc.audio.SignalBluetoothManager.State
 
 private val TAG = Log.tag(SignalAudioManager::class.java)
 
@@ -347,7 +342,6 @@ class SignalAudioManager(private val context: Context,
     private fun startIncomingRinger(vibrate: Boolean) {
         Log.i(TAG, "startIncomingRinger(): vibrate: $vibrate")
         androidAudioManager.mode = AudioManager.MODE_RINGTONE
-        setMicrophoneMute(false)
         setDefaultAudioDevice(AudioDevice.SPEAKER_PHONE, false)
 
         incomingRinger.start(vibrate)

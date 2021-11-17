@@ -28,12 +28,14 @@ class CallNotificationBuilder {
             val contentIntent = Intent(context, WebRtcCallActivity::class.java)
                     .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
 
-            val pendingIntent = PendingIntent.getActivity(context, 0, contentIntent, 0)
+            val pendingIntent = PendingIntent.getActivity(context, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
             val builder = NotificationCompat.Builder(context, NotificationChannels.CALLS)
-                    .setSmallIcon(R.drawable.ic_baseline_call_24)
-                    .setContentIntent(pendingIntent)
-                    .setOngoing(true)
+                .setSound(null)
+                .setSmallIcon(R.drawable.ic_baseline_call_24)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_LOW)
 
             recipient?.name?.let { name ->
                 builder.setContentTitle(name)
@@ -42,7 +44,7 @@ class CallNotificationBuilder {
             when (type) {
                 TYPE_INCOMING_CONNECTING -> {
                     builder.setContentText(context.getString(R.string.CallNotificationBuilder_connecting))
-                    builder.priority = NotificationCompat.PRIORITY_MIN
+                    builder.priority = NotificationCompat.PRIORITY_LOW
                 }
                 TYPE_INCOMING_RINGING -> {
                     builder.setContentText(context.getString(R.string.NotificationBarManager__incoming_signal_call))
@@ -89,7 +91,7 @@ class CallNotificationBuilder {
             val intent = Intent(context, WebRtcCallService::class.java)
                     .setAction(action)
 
-            val pendingIntent = PendingIntent.getService(context, 0, intent, 0)
+            val pendingIntent = PendingIntent.getService(context, 0, intent, PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
             return NotificationCompat.Action(iconResId, context.getString(titleResId), pendingIntent)
         }
@@ -100,7 +102,7 @@ class CallNotificationBuilder {
             val intent = Intent(context, WebRtcCallActivity::class.java)
                     .setAction(action)
 
-            val pendingIntent = PendingIntent.getActivity(context, 0, intent, 0)
+            val pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
             return NotificationCompat.Action(iconResId, context.getString(titleResId), pendingIntent)
         }
