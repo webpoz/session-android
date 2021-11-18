@@ -11,7 +11,7 @@ class CallMessage(): ControlMessage() {
     var sdpMids: List<String> = listOf()
     var callId: UUID? = null
 
-    override val isSelfSendValid: Boolean = false
+    override val isSelfSendValid: Boolean = type in arrayOf(SignalServiceProtos.CallMessage.Type.END_CALL,SignalServiceProtos.CallMessage.Type.ANSWER)
 
     override val ttl: Long = 300000L // 30s
 

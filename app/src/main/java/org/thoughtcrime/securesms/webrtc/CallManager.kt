@@ -407,7 +407,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         return answerMessage.success {
             pendingOffer = null
             pendingOfferTime = -1
-        } // TODO: maybe add success state update
+        }
     }
 
     fun onOutgoingCall(context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {

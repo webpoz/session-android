@@ -387,7 +387,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         val expectedCallId = callManager.callId
 
         try {
-            val answerFuture = callManager.onIncomingCall(this) // add is always turn here
+            val answerFuture = callManager.onIncomingCall(this)
             answerFuture.fail { e ->
                 if (isConsistentState(expectedState,expectedCallId, callManager.currentConnectionState, callManager.callId)) {
                     Log.e(TAG, e)

@@ -152,7 +152,7 @@ class SignalAudioManager(private val context: Context,
             soundPool.play(disconnectedSoundId, volume, volume, 0, 0, 1.0f)
         }
 
-        state = State.UNINITIALIZED
+        state = State.PREINITIALIZED
 
         wiredHeadsetReceiver?.let { receiver ->
             try {
@@ -236,10 +236,10 @@ class SignalAudioManager(private val context: Context,
             userSelectedAudioDevice = AudioDevice.NONE
         }
 
-        val needBluetoothAudioStart = signalBluetoothManager!!.state == SignalBluetoothManager.State.AVAILABLE &&
+        val needBluetoothAudioStart = signalBluetoothManager!!.state == SignalBluetoothManager.State.AVAILABLE && signalBluetoothManager!!.state != SignalBluetoothManager.State.CONNECTING
                 (userSelectedAudioDevice == AudioDevice.NONE || userSelectedAudioDevice == AudioDevice.BLUETOOTH || autoSwitchToBluetooth)
 
-        val needBluetoothAudioStop = (signalBluetoothManager!!.state == SignalBluetoothManager.State.CONNECTED || signalBluetoothManager!!.state == SignalBluetoothManager.State.CONNECTING) &&
+        val needBluetoothAudioStop = (signalBluetoothManager!!.state == SignalBluetoothManager.State.CONNECTED || signalBluetoothManager!!.state != SignalBluetoothManager.State.CONNECTING) &&
                 (userSelectedAudioDevice != AudioDevice.NONE && userSelectedAudioDevice != AudioDevice.BLUETOOTH)
 
         if (signalBluetoothManager!!.state.hasDevice()) {
