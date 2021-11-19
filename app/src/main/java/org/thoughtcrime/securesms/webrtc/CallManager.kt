@@ -36,7 +36,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         CallDataListener, CameraEventListener, DataChannel.Observer {
 
     enum class CallState {
-        STATE_IDLE, STATE_DIALING, STATE_ANSWERING, STATE_REMOTE_RINGING, STATE_LOCAL_RINGING, STATE_CONNECTED
+        STATE_IDLE, STATE_PRE_OFFER, STATE_DIALING, STATE_ANSWERING, STATE_REMOTE_RINGING, STATE_LOCAL_RINGING, STATE_CONNECTED
     }
 
     sealed class StateEvent {
@@ -101,7 +101,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     private val _audioDeviceEvents = MutableStateFlow(AudioDeviceUpdate(AudioDevice.NONE, setOf()))
     val audioDeviceEvents = _audioDeviceEvents.asSharedFlow()
 
-
     val currentConnectionState
         get() = (_connectionEvents.value as CallStateUpdate).state
 
@@ -111,6 +110,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     var pendingOffer: String? = null
     var pendingOfferTime: Long = -1
+    var preOfferCallData: PreOffer? = null
     var callId: UUID? = null
     var recipient: Recipient? = null
     set(value) {
@@ -163,8 +163,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
 
     }
 
-    fun isBusy(context: Context) = currentConnectionState != CallState.STATE_IDLE
-            || context.getSystemService(TelephonyManager::class.java).callState  != TelephonyManager.CALL_STATE_IDLE
+    fun isBusy(context: Context, callId: UUID) = callId != this.callId && (currentConnectionState != CallState.STATE_IDLE
+            || context.getSystemService(TelephonyManager::class.java).callState  != TelephonyManager.CALL_STATE_IDLE)
+
+    fun isPreOffer() = currentConnectionState == CallState.STATE_PRE_OFFER
 
     fun isIdle() = currentConnectionState == CallState.STATE_IDLE
 
@@ -347,6 +349,16 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         localCameraState = newCameraState
     }
 
+    fun onPreOffer(callId: UUID, recipient: Recipient) {
+        if (preOfferCallData != null) {
+            Log.d(TAG, "Received new pre-offer when we are already expecting one")
+        }
+        this.recipient = recipient
+        this.callId = callId
+        preOfferCallData = PreOffer(callId, recipient)
+        postConnectionEvent(CallState.STATE_PRE_OFFER)
+    }
+
     fun onNewOffer(offer: String, callId: UUID, recipient: Recipient): Promise<Unit, Exception> {
         if (callId != this.callId) return Promise.ofFail(NullPointerException("No callId"))
         if (recipient != this.recipient) return Promise.ofFail(NullPointerException("No recipient"))
@@ -361,7 +373,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     }
 
     fun onIncomingRing(offer: String, callId: UUID, recipient: Recipient, callTime: Long) {
-        if (currentConnectionState != CallState.STATE_IDLE) return
+        if (currentConnectionState !in arrayOf(CallState.STATE_IDLE, CallState.STATE_PRE_OFFER)) return
 
         this.callId = callId
         this.recipient = recipient

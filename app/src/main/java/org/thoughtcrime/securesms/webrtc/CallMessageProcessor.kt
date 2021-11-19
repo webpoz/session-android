@@ -77,6 +77,14 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
 
     private fun incomingPreOffer(callMessage: CallMessage) {
         // handle notification state
+        val recipientAddress = callMessage.sender ?: return
+        val callId = callMessage.callId ?: return
+        val incomingIntent = WebRtcCallService.preOffer(
+            context = context,
+            address = Address.fromSerialized(recipientAddress),
+            callId = callId,
+        )
+        ContextCompat.startForegroundService(context, incomingIntent)
     }
 
     private fun incomingCall(callMessage: CallMessage) {

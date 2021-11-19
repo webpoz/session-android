@@ -5,13 +5,9 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
-import android.graphics.BlendMode
-import android.graphics.PorterDuff
-import android.graphics.drawable.ColorDrawable
 import android.media.AudioManager
 import android.os.Bundle
 import android.view.MenuItem
-import android.view.View
 import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
@@ -26,7 +22,6 @@ import kotlinx.coroutines.launch
 import network.loki.messenger.R
 import org.session.libsession.avatars.ProfileContactPhoto
 import org.session.libsession.messaging.contacts.Contact
-import org.session.libsession.utilities.Address
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
 import org.thoughtcrime.securesms.dependencies.DatabaseComponent
 import org.thoughtcrime.securesms.mms.GlideApp
@@ -36,15 +31,14 @@ import org.thoughtcrime.securesms.util.AvatarPlaceholderGenerator
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallViewModel
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
-import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.*
-import org.webrtc.IceCandidate
 import java.util.*
 
 @AndroidEntryPoint
 class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     companion object {
+        const val ACTION_PRE_OFFER = "pre-offer"
         const val ACTION_ANSWER = "answer"
         const val ACTION_END = "end-call"
 
@@ -54,6 +48,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
     private val viewModel by viewModels<CallViewModel>()
     private val glide by lazy { GlideApp.with(this) }
     private var uiJob: Job? = null
+    private var wantsToAnswer = false
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
@@ -88,8 +83,11 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             .execute()
 
         if (intent.action == ACTION_ANSWER) {
-            val answerIntent = WebRtcCallService.acceptCallIntent(this)
-            ContextCompat.startForegroundService(this,answerIntent)
+            answerCall()
+        }
+
+        if (intent.action == ACTION_PRE_OFFER) {
+            wantsToAnswer = true
         }
 
         speakerPhoneButton.setOnClickListener {
@@ -141,6 +139,11 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     }
 
+    private fun answerCall() {
+        val answerIntent = WebRtcCallService.acceptCallIntent(this)
+        ContextCompat.startForegroundService(this,answerIntent)
+    }
+
     override fun onStart() {
         super.onStart()
 
@@ -160,6 +163,9 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                 viewModel.callState.collect { state ->
                     when (state) {
                         CALL_RINGING -> {
+                            if (wantsToAnswer) {
+                                answerCall()
+                            }
                         }
                         CALL_OUTGOING -> {
                         }

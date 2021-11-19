@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
-import android.os.Build
 import android.os.IBinder
 import android.os.ResultReceiver
 import android.telephony.PhoneStateListener
@@ -22,6 +21,7 @@ import org.thoughtcrime.securesms.calls.WebRtcCallActivity
 import org.thoughtcrime.securesms.util.CallNotificationBuilder
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_ESTABLISHED
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_CONNECTING
+import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_PRE_OFFER
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_RINGING
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_OUTGOING_RINGING
 import org.thoughtcrime.securesms.webrtc.*
@@ -58,6 +58,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         const val ACTION_CHECK_TIMEOUT = "CHECK_TIMEOUT"
         const val ACTION_IS_IN_CALL_QUERY = "IS_IN_CALL"
 
+        const val ACTION_PRE_OFFER = "PRE_OFFER"
         const val ACTION_RESPONSE_MESSAGE = "RESPONSE_MESSAGE"
         const val ACTION_ICE_MESSAGE = "ICE_MESSAGE"
         const val ACTION_CALL_CONNECTED = "CALL_CONNECTED"
@@ -112,6 +113,12 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                         .putExtra(EXTRA_RECIPIENT_ADDRESS, address)
                         .putExtra(EXTRA_CALL_ID, callId)
                         .putExtra(EXTRA_REMOTE_DESCRIPTION, sdp)
+
+        fun preOffer(context: Context, address: Address, callId: UUID) =
+            Intent(context, WebRtcCallService::class.java)
+                .setAction(ACTION_PRE_OFFER)
+                .putExtra(EXTRA_RECIPIENT_ADDRESS, address)
+                .putExtra(EXTRA_CALL_ID, callId)
 
         fun iceCandidates(context: Context, address: Address, iceCandidates: List<IceCandidate>, callId: UUID) =
                 Intent(context, WebRtcCallService::class.java)
@@ -176,7 +183,10 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         return callManager.callId == expectedCallId
     }
 
-    private fun isBusy() = callManager.isBusy(this)
+
+    private fun isPreOffer() = callManager.isPreOffer()
+
+    private fun isBusy(intent: Intent) = callManager.isBusy(this, getCallId(intent))
 
     private fun isIdle() = callManager.isIdle()
 
@@ -188,10 +198,11 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
             val action = intent.action
             Log.d("Loki", "Handling ${intent.action}")
             when {
-                action == ACTION_INCOMING_RING && isSameCall(intent) -> handleNewOffer(intent)
-                action == ACTION_INCOMING_RING && isBusy() -> handleBusyCall(intent)
+                action == ACTION_INCOMING_RING && isSameCall(intent) && !isPreOffer() -> handleNewOffer(intent)
+                action == ACTION_PRE_OFFER && isIdle() -> handlePreOffer(intent)
+                action == ACTION_INCOMING_RING && isBusy(intent) -> handleBusyCall(intent)
                 action == ACTION_REMOTE_BUSY -> handleBusyMessage(intent)
-                action == ACTION_INCOMING_RING && isIdle() -> handleIncomingRing(intent)
+                action == ACTION_INCOMING_RING && isPreOffer() -> handleIncomingRing(intent)
                 action == ACTION_OUTGOING_CALL && isIdle() -> handleOutgoingCall(intent)
                 action == ACTION_ANSWER_CALL -> handleAnswerCall(intent)
                 action == ACTION_DENY_CALL -> handleDenyCall(intent)
@@ -295,16 +306,28 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.onNewOffer(offer, callId, recipient)
     }
 
+    private fun handlePreOffer(intent: Intent) {
+        if (!callManager.isIdle()) {
+            Log.d(TAG, "Handling pre-offer from non-idle state")
+            return
+        }
+        val callId = getCallId(intent)
+        val recipient = getRemoteRecipient(intent)
+        setCallInProgressNotification(TYPE_INCOMING_PRE_OFFER, recipient)
+        callManager.onPreOffer(callId, recipient)
+        callManager.postViewModelState(CallViewModel.State.CALL_PRE_INIT)
+        callManager.initializeAudioForCall()
+        callManager.startIncomingRinger()
+    }
+
     private fun handleIncomingRing(intent: Intent) {
-        if (callManager.currentConnectionState != STATE_IDLE) throw IllegalStateException("Incoming ring on non-idle")
+        if (!callManager.isPreOffer() && !callManager.isIdle()) throw IllegalStateException("Incoming ring on non-idle")
 
         val callId = getCallId(intent)
         val recipient = getRemoteRecipient(intent)
         val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION) ?: return
         val timestamp = intent.getLongExtra(EXTRA_TIMESTAMP, -1)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            setCallInProgressNotification(TYPE_INCOMING_RINGING, recipient)
-        }
+        setCallInProgressNotification(TYPE_INCOMING_RINGING, recipient)
         callManager.clearPendingIceUpdates()
         callManager.onIncomingRing(offer, callId, recipient, timestamp)
         callManager.postConnectionEvent(STATE_LOCAL_RINGING)
@@ -404,7 +427,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     }
 
     private fun handleDenyCall(intent: Intent) {
-        if (callManager.currentConnectionState != STATE_LOCAL_RINGING) {
+        if (callManager.currentConnectionState != STATE_LOCAL_RINGING && !callManager.isPreOffer()) {
             Log.e(TAG,"Can only deny from ringing!")
             return
         }
@@ -523,7 +546,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         val callId = callManager.callId ?: return
         val callState = callManager.currentConnectionState
 
-        if (callId == getCallId(intent) && callState != STATE_CONNECTED) {
+        if (callId == getCallId(intent) && callState !in arrayOf(STATE_CONNECTED)) {
             Log.w(TAG, "Timing out call: $callId")
             handleLocalHangup(intent)
         }

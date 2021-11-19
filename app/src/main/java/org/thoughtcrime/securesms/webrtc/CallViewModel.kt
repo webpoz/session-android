@@ -1,12 +1,9 @@
 package org.thoughtcrime.securesms.webrtc
 
 import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
-import kotlinx.coroutines.flow.shareIn
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
 import org.webrtc.SurfaceViewRenderer
 import javax.inject.Inject
@@ -33,6 +30,7 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
     enum class State {
         CALL_PENDING,
 
+        CALL_PRE_INIT,
         CALL_INCOMING,
         CALL_OUTGOING,
         CALL_CONNECTED,

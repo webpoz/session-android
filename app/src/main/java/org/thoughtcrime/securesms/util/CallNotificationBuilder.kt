@@ -22,6 +22,7 @@ class CallNotificationBuilder {
         const val TYPE_OUTGOING_RINGING = 2
         const val TYPE_ESTABLISHED = 3
         const val TYPE_INCOMING_CONNECTING = 4
+        const val TYPE_INCOMING_PRE_OFFER = 5
 
         @JvmStatic
         fun getCallInProgressNotification(context: Context, type: Int, recipient: Recipient?): Notification {
@@ -45,6 +46,23 @@ class CallNotificationBuilder {
                 TYPE_INCOMING_CONNECTING -> {
                     builder.setContentText(context.getString(R.string.CallNotificationBuilder_connecting))
                     builder.priority = NotificationCompat.PRIORITY_LOW
+                }
+                TYPE_INCOMING_PRE_OFFER -> {
+                    builder.setContentText(context.getString(R.string.NotificationBarManager__incoming_signal_call))
+                        .setCategory(NotificationCompat.CATEGORY_CALL)
+                    builder.addAction(getServiceNotificationAction(
+                        context,
+                        WebRtcCallService.ACTION_DENY_CALL,
+                        R.drawable.ic_close_grey600_32dp,
+                        R.string.NotificationBarManager__deny_call
+                    ))
+                    builder.addAction(getActivityNotificationAction(
+                        context,
+                        WebRtcCallActivity.ACTION_PRE_OFFER,
+                        R.drawable.ic_phone_grey600_32dp,
+                        R.string.NotificationBarManager__answer_call
+                    ))
+                    builder.priority = NotificationCompat.PRIORITY_HIGH
                 }
                 TYPE_INCOMING_RINGING -> {
                     builder.setContentText(context.getString(R.string.NotificationBarManager__incoming_signal_call))
