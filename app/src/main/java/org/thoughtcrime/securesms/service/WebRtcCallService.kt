@@ -325,6 +325,13 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
         val callId = getCallId(intent)
         val recipient = getRemoteRecipient(intent)
+        val preOffer = callManager.preOfferCallData
+
+        if (callManager.isPreOffer() && (preOffer == null || preOffer.callId != callId || preOffer.recipient != recipient)) {
+            Log.d(TAG, "Incoming ring from non-matching pre-offer")
+            return
+        }
+
         val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION) ?: return
         val timestamp = intent.getLongExtra(EXTRA_TIMESTAMP, -1)
         setCallInProgressNotification(TYPE_INCOMING_RINGING, recipient)
