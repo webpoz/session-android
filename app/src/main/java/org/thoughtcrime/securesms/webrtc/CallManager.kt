@@ -9,10 +9,14 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import nl.komponents.kovenant.Promise
+import nl.komponents.kovenant.combine.and
 import nl.komponents.kovenant.functional.bind
+import org.session.libsession.database.StorageProtocol
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
+import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.Debouncer
+import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.protos.SignalServiceProtos
@@ -31,7 +35,7 @@ import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.Executors
 
-class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConnection.Observer,
+class CallManager(context: Context, audioManager: AudioManagerCompat, private val storage: StorageProtocol): PeerConnection.Observer,
         SignalAudioManager.EventListener,
         CallDataListener, CameraEventListener, DataChannel.Observer {
 
@@ -169,6 +173,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     fun isPreOffer() = currentConnectionState == CallState.STATE_PRE_OFFER
 
     fun isIdle() = currentConnectionState == CallState.STATE_IDLE
+
+    fun isCurrentUser(recipient: Recipient) = recipient.address.serialize() == storage.getUserPublicKey()
 
     fun initializeVideo(context: Context) {
         Util.runOnMainSync {
@@ -369,7 +375,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         val answer = connection.createAnswer(MediaConstraints().apply {
             mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
         })
-        return MessageSender.sendNonDurably(CallMessage.answer(answer.description, callId), recipient.address)
+        val answerMessage = CallMessage.answer(answer.description, callId)
+        return MessageSender.sendNonDurably(answerMessage, recipient.address)
     }
 
     fun onIncomingRing(offer: String, callId: UUID, recipient: Recipient, callTime: Long) {
@@ -406,8 +413,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
         connection.setRemoteDescription(SessionDescription(SessionDescription.Type.OFFER, offer))
         val answer = connection.createAnswer(MediaConstraints())
         connection.setLocalDescription(answer)
-
-        val answerMessage = MessageSender.sendNonDurably(CallMessage.answer(
+        val answerMessage = CallMessage.answer(answer.description, callId)
+        val userAddress = storage.getUserPublicKey() ?: return Promise.ofFail(NullPointerException("No user public key"))
+        MessageSender.sendNonDurably(answerMessage, Address.fromSerialized(userAddress))
+        val sendAnswerMessage = MessageSender.sendNonDurably(CallMessage.answer(
                 answer.description,
                 callId
         ), recipient.address)
@@ -416,7 +425,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
             val candidate = pendingIncomingIceUpdates.pop() ?: break
             connection.addIceCandidate(candidate)
         }
-        return answerMessage.success {
+        return sendAnswerMessage.success {
             pendingOffer = null
             pendingOfferTime = -1
         }
@@ -468,15 +477,19 @@ class CallManager(context: Context, audioManager: AudioManagerCompat): PeerConne
     fun handleDenyCall() {
         val callId = callId ?: return
         val recipient = recipient ?: return
+        val userAddress = storage.getUserPublicKey() ?: return
+        MessageSender.sendNonDurably(CallMessage.endCall(callId), Address.fromSerialized(userAddress))
         MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
     }
 
-    fun handleLocalHangup() {
+    fun handleLocalHangup(sendHangup: Boolean) {
         val recipient = recipient ?: return
         val callId = callId ?: return
 
         postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
-        MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
+        if (sendHangup) {
+            MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
+        }
     }
 
     fun handleRemoteHangup() {

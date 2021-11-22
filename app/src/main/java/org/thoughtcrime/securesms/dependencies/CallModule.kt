@@ -25,7 +25,7 @@ object CallModule {
 
     @Provides
     @Singleton
-    fun provideCallManager(@ApplicationContext context: Context, audioManagerCompat: AudioManagerCompat) =
-            CallManager(context, audioManagerCompat)
+    fun provideCallManager(@ApplicationContext context: Context, audioManagerCompat: AudioManagerCompat, storage: Storage) =
+            CallManager(context, audioManagerCompat, storage)
 
 }

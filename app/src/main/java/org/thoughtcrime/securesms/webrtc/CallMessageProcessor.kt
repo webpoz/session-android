@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.coroutineScope
+import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import org.session.libsession.messaging.messages.control.CallMessage
@@ -19,7 +20,7 @@ import org.webrtc.IceCandidate
 class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
 
     init {
-        lifecycle.coroutineScope.launch {
+        lifecycle.coroutineScope.launch(IO) {
             while (isActive) {
                 val nextMessage = WebRtcUtils.SIGNAL_QUEUE.receive()
                 Log.d("Loki", nextMessage.type?.name ?: "CALL MESSAGE RECEIVED")

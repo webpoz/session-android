@@ -1,6 +1,7 @@
 package org.session.libsession.messaging.messages.control
 
 import org.session.libsignal.protos.SignalServiceProtos
+import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.*
 import org.session.libsignal.utilities.Log
 import java.util.*
 
@@ -11,12 +12,12 @@ class CallMessage(): ControlMessage() {
     var sdpMids: List<String> = listOf()
     var callId: UUID? = null
 
-    override val isSelfSendValid: Boolean = type in arrayOf(SignalServiceProtos.CallMessage.Type.END_CALL,SignalServiceProtos.CallMessage.Type.ANSWER)
+    override val isSelfSendValid: Boolean get() = type in arrayOf(ANSWER, END_CALL)
 
     override val ttl: Long = 300000L // 30s
 
     override fun isValid(): Boolean = super.isValid() && type != null && callId != null
-            && (!sdps.isNullOrEmpty() || type in listOf(SignalServiceProtos.CallMessage.Type.END_CALL,SignalServiceProtos.CallMessage.Type.PRE_OFFER))
+            && (!sdps.isNullOrEmpty() || type in listOf(END_CALL, PRE_OFFER))
 
     constructor(type: SignalServiceProtos.CallMessage.Type,
                 sdps: List<String>,
@@ -33,28 +34,28 @@ class CallMessage(): ControlMessage() {
     companion object {
         const val TAG = "CallMessage"
 
-        fun answer(sdp: String, callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.ANSWER,
+        fun answer(sdp: String, callId: UUID) = CallMessage(ANSWER,
                 listOf(sdp),
                 listOf(),
                 listOf(),
                 callId
         )
 
-        fun preOffer(callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.PRE_OFFER,
+        fun preOffer(callId: UUID) = CallMessage(PRE_OFFER,
                 listOf(),
                 listOf(),
                 listOf(),
                 callId
         )
 
-        fun offer(sdp: String, callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.OFFER,
+        fun offer(sdp: String, callId: UUID) = CallMessage(OFFER,
                 listOf(sdp),
                 listOf(),
                 listOf(),
                 callId
         )
 
-        fun endCall(callId: UUID) = CallMessage(SignalServiceProtos.CallMessage.Type.END_CALL, emptyList(), emptyList(), emptyList(), callId)
+        fun endCall(callId: UUID) = CallMessage(END_CALL, emptyList(), emptyList(), emptyList(), callId)
 
         fun fromProto(proto: SignalServiceProtos.Content): CallMessage? {
             val callMessageProto = if (proto.hasCallMessage()) proto.callMessage else return null

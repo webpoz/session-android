@@ -51,7 +51,6 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         const val ACTION_SET_MUTE_AUDIO = "SET_MUTE_AUDIO"
         const val ACTION_SET_MUTE_VIDEO = "SET_MUTE_VIDEO"
         const val ACTION_FLIP_CAMERA = "FLIP_CAMERA"
-        const val ACTION_BLUETOOTH_CHANGE = "BLUETOOTH_CHANGE"
         const val ACTION_UPDATE_AUDIO = "UPDATE_AUDIO"
         const val ACTION_WIRED_HEADSET_CHANGE = "WIRED_HEADSET_CHANGE"
         const val ACTION_SCREEN_OFF = "SCREEN_OFF"
@@ -206,12 +205,11 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                 action == ACTION_OUTGOING_CALL && isIdle() -> handleOutgoingCall(intent)
                 action == ACTION_ANSWER_CALL -> handleAnswerCall(intent)
                 action == ACTION_DENY_CALL -> handleDenyCall(intent)
-                action == ACTION_LOCAL_HANGUP -> handleLocalHangup(intent)
+                action == ACTION_LOCAL_HANGUP -> handleLocalHangup(intent, true)
                 action == ACTION_REMOTE_HANGUP -> handleRemoteHangup(intent)
                 action == ACTION_SET_MUTE_AUDIO -> handleSetMuteAudio(intent)
                 action == ACTION_SET_MUTE_VIDEO -> handleSetMuteVideo(intent)
                 action == ACTION_FLIP_CAMERA -> handleSetCameraFlip(intent)
-                action == ACTION_BLUETOOTH_CHANGE -> handleBluetoothChange(intent)
                 action == ACTION_WIRED_HEADSET_CHANGE -> handleWiredHeadsetChanged(intent)
                 action == ACTION_SCREEN_OFF -> handleScreenOffChange(intent)
                 action == ACTION_RESPONSE_MESSAGE -> handleResponseMessage(intent)
@@ -444,8 +442,9 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         terminate()
     }
 
-    private fun handleLocalHangup(intent: Intent) {
-        callManager.handleLocalHangup()
+    private fun handleLocalHangup(intent: Intent, sendHangup: Boolean) {
+        // TODO: check current call ID and recipient == expected
+        callManager.handleLocalHangup(sendHangup)
         terminate()
     }
 
@@ -496,6 +495,10 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     private fun handleResponseMessage(intent: Intent) {
         try {
             val recipient = getRemoteRecipient(intent)
+            if (callManager.isCurrentUser(recipient) && callManager.currentConnectionState == STATE_LOCAL_RINGING) {
+                handleLocalHangup(intent, false)
+                return
+            }
             val callId = getCallId(intent)
             val description = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION)
             callManager.handleResponseMessage(recipient, callId, SessionDescription(SessionDescription.Type.ANSWER, description))
@@ -555,7 +558,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
         if (callId == getCallId(intent) && callState !in arrayOf(STATE_CONNECTED)) {
             Log.w(TAG, "Timing out call: $callId")
-            handleLocalHangup(intent)
+            handleLocalHangup(intent, true)
         }
     }
 
