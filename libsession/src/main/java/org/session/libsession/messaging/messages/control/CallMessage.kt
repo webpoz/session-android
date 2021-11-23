@@ -14,7 +14,7 @@ class CallMessage(): ControlMessage() {
 
     override val isSelfSendValid: Boolean get() = type in arrayOf(ANSWER, END_CALL)
 
-    override val ttl: Long = 300000L // 30s
+    override val ttl: Long = 300000L // 5m
 
     override fun isValid(): Boolean = super.isValid() && type != null && callId != null
             && (!sdps.isNullOrEmpty() || type in listOf(END_CALL, PRE_OFFER))
