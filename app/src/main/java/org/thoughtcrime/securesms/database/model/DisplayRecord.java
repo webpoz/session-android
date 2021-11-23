@@ -120,6 +120,6 @@ public abstract class DisplayRecord {
   public boolean isDeleted() { return  MmsSmsColumns.Types.isDeletedMessage(type); }
 
   public boolean isControlMessage() {
-    return isGroupUpdateMessage() || isExpirationTimerUpdate() || isDataExtractionNotification();
+    return isGroupUpdateMessage() || isExpirationTimerUpdate() || isDataExtractionNotification() || isCallLog();
   }
 }

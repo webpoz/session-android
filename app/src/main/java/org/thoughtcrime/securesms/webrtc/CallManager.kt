@@ -12,6 +12,7 @@ import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.combine.and
 import nl.komponents.kovenant.functional.bind
 import org.session.libsession.database.StorageProtocol
+import org.session.libsession.messaging.calls.CallMessageType
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Address
@@ -36,8 +37,7 @@ import java.util.*
 import java.util.concurrent.Executors
 
 class CallManager(context: Context, audioManager: AudioManagerCompat, private val storage: StorageProtocol): PeerConnection.Observer,
-        SignalAudioManager.EventListener,
-        CallDataListener, CameraEventListener, DataChannel.Observer {
+        SignalAudioManager.EventListener, CameraEventListener, DataChannel.Observer {
 
     enum class CallState {
         STATE_IDLE, STATE_PRE_OFFER, STATE_DIALING, STATE_ANSWERING, STATE_REMOTE_RINGING, STATE_LOCAL_RINGING, STATE_CONNECTED
@@ -161,10 +161,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
     fun postViewModelState(newState: CallViewModel.State) {
         _callStateEvents.value = newState
-    }
-
-    override fun newCallMessage(callMessage: SignalServiceProtos.CallMessage) {
-
     }
 
     fun isBusy(context: Context, callId: UUID) = callId != this.callId && (currentConnectionState != CallState.STATE_IDLE
@@ -355,7 +351,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         localCameraState = newCameraState
     }
 
-    fun onPreOffer(callId: UUID, recipient: Recipient) {
+    fun onPreOffer(callId: UUID, recipient: Recipient, sentTimestamp: Long) {
         if (preOfferCallData != null) {
             Log.d(TAG, "Received new pre-offer when we are already expecting one")
         }
@@ -363,6 +359,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         this.callId = callId
         preOfferCallData = PreOffer(callId, recipient)
         postConnectionEvent(CallState.STATE_PRE_OFFER)
+        insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_INCOMING, sentTimestamp)
     }
 
     fun onNewOffer(offer: String, callId: UUID, recipient: Recipient): Promise<Unit, Exception> {
@@ -482,14 +479,25 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
     }
 
-    fun handleLocalHangup(sendHangup: Boolean) {
+    fun handleLocalHangup(intentRecipient: Recipient, intentCallId: UUID) {
         val recipient = recipient ?: return
         val callId = callId ?: return
+        if (intentCallId != callId) {
+            Log.w(TAG,"Processing local hangup for non-active ring call ID")
+            return
+        }
+
+        val currentUserPublicKey  = storage.getUserPublicKey()
+        val sendHangup = intentRecipient == recipient && recipient.address.serialize() != currentUserPublicKey
 
         postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
         if (sendHangup) {
             MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
         }
+    }
+
+    fun insertCallMessage(threadPublicKey: String, callMessageType: CallMessageType, sentTimestamp: Long = System.currentTimeMillis()) {
+        storage.insertCallMessage(threadPublicKey, callMessageType, sentTimestamp)
     }
 
     fun handleRemoteHangup() {

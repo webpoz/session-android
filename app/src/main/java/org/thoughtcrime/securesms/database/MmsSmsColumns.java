@@ -204,7 +204,8 @@ public interface MmsSmsColumns {
     }
 
     public static boolean isCallLog(long type) {
-      return type == INCOMING_CALL_TYPE || type == OUTGOING_CALL_TYPE || type == MISSED_CALL_TYPE;
+      long baseType = type & BASE_TYPE_MASK;
+      return baseType == INCOMING_CALL_TYPE || baseType == OUTGOING_CALL_TYPE || baseType == MISSED_CALL_TYPE;
     }
 
     public static boolean isExpirationTimerUpdate(long type) {

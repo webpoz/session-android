@@ -12,6 +12,7 @@ import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dagger.hilt.android.AndroidEntryPoint
+import org.session.libsession.messaging.calls.CallMessageType
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.FutureTaskListener
 import org.session.libsession.utilities.Util
@@ -113,11 +114,12 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                         .putExtra(EXTRA_CALL_ID, callId)
                         .putExtra(EXTRA_REMOTE_DESCRIPTION, sdp)
 
-        fun preOffer(context: Context, address: Address, callId: UUID) =
-            Intent(context, WebRtcCallService::class.java)
-                .setAction(ACTION_PRE_OFFER)
-                .putExtra(EXTRA_RECIPIENT_ADDRESS, address)
-                .putExtra(EXTRA_CALL_ID, callId)
+        fun preOffer(context: Context, address: Address, callId: UUID, sentTimestamp: Long) =
+                Intent(context, WebRtcCallService::class.java)
+                    .setAction(ACTION_PRE_OFFER)
+                    .putExtra(EXTRA_RECIPIENT_ADDRESS, address)
+                    .putExtra(EXTRA_CALL_ID, callId)
+                    .putExtra(EXTRA_TIMESTAMP, sentTimestamp)
 
         fun iceCandidates(context: Context, address: Address, iceCandidates: List<IceCandidate>, callId: UUID) =
                 Intent(context, WebRtcCallService::class.java)
@@ -205,7 +207,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
                 action == ACTION_OUTGOING_CALL && isIdle() -> handleOutgoingCall(intent)
                 action == ACTION_ANSWER_CALL -> handleAnswerCall(intent)
                 action == ACTION_DENY_CALL -> handleDenyCall(intent)
-                action == ACTION_LOCAL_HANGUP -> handleLocalHangup(intent, true)
+                action == ACTION_LOCAL_HANGUP -> handleLocalHangup(intent)
                 action == ACTION_REMOTE_HANGUP -> handleRemoteHangup(intent)
                 action == ACTION_SET_MUTE_AUDIO -> handleSetMuteAudio(intent)
                 action == ACTION_SET_MUTE_VIDEO -> handleSetMuteVideo(intent)
@@ -311,8 +313,10 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         }
         val callId = getCallId(intent)
         val recipient = getRemoteRecipient(intent)
+        val sentTimestamp = intent.getLongExtra(EXTRA_TIMESTAMP, -1)
+        // TODO: check stale call info and don't proceed
         setCallInProgressNotification(TYPE_INCOMING_PRE_OFFER, recipient)
-        callManager.onPreOffer(callId, recipient)
+        callManager.onPreOffer(callId, recipient, sentTimestamp)
         callManager.postViewModelState(CallViewModel.State.CALL_PRE_INIT)
         callManager.initializeAudioForCall()
         callManager.startIncomingRinger()
@@ -346,7 +350,8 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         if (callManager.currentConnectionState != STATE_IDLE) throw IllegalStateException("Dialing from non-idle")
 
         callManager.postConnectionEvent(STATE_DIALING)
-        callManager.recipient = getRemoteRecipient(intent)
+        val recipient = getRemoteRecipient(intent)
+        callManager.recipient = recipient
         val callId = UUID.randomUUID()
         callManager.callId = callId
 
@@ -357,7 +362,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         callManager.initializeAudioForCall()
         callManager.startOutgoingRinger(OutgoingRinger.Type.RINGING)
         setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
-        // TODO: DatabaseComponent.get(this).insertOutgoingCall(callManager.recipient!!.address)
+        callManager.insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_OUTGOING)
         timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
 
         val expectedState = callManager.currentConnectionState
@@ -438,13 +443,13 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         }
 
         callManager.handleDenyCall()
-        // DatabaseComponent.get(this).smsDatabase().insertMissedCall(recipient)
         terminate()
     }
 
-    private fun handleLocalHangup(intent: Intent, sendHangup: Boolean) {
-        // TODO: check current call ID and recipient == expected
-        callManager.handleLocalHangup(sendHangup)
+    private fun handleLocalHangup(intent: Intent) {
+        val intentRecipient = getRemoteRecipient(intent)
+        val callId = getCallId(intent)
+        callManager.handleLocalHangup(intentRecipient, callId)
         terminate()
     }
 
@@ -496,7 +501,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         try {
             val recipient = getRemoteRecipient(intent)
             if (callManager.isCurrentUser(recipient) && callManager.currentConnectionState == STATE_LOCAL_RINGING) {
-                handleLocalHangup(intent, false)
+                handleLocalHangup(intent)
                 return
             }
             val callId = getCallId(intent)
@@ -558,7 +563,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
 
         if (callId == getCallId(intent) && callState !in arrayOf(STATE_CONNECTED)) {
             Log.w(TAG, "Timing out call: $callId")
-            handleLocalHangup(intent, true)
+            handleLocalHangup(intent)
         }
     }
 

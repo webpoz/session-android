@@ -161,7 +161,7 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
     public void onCreate() {
         DatabaseModule.init(this);
         super.onCreate();
-        callMessageProcessor = new CallMessageProcessor(this, ProcessLifecycleOwner.get().getLifecycle());
+        callMessageProcessor = new CallMessageProcessor(this, ProcessLifecycleOwner.get().getLifecycle(), storage);
         Log.i(TAG, "onCreate()");
         startKovenant();
         initializeSecurityProvider();

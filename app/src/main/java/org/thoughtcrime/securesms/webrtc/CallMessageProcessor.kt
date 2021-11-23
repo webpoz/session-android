@@ -7,6 +7,8 @@ import androidx.lifecycle.coroutineScope
 import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.session.libsession.database.StorageProtocol
+import org.session.libsession.messaging.calls.CallMessageType
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.utilities.Address
@@ -17,7 +19,7 @@ import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.webrtc.IceCandidate
 
 
-class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
+class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle, private val storage: StorageProtocol) {
 
     init {
         lifecycle.coroutineScope.launch(IO) {
@@ -26,7 +28,10 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
                 Log.d("Loki", nextMessage.type?.name ?: "CALL MESSAGE RECEIVED")
                 if (!TextSecurePreferences.isCallNotificationsEnabled(context)) {
                     Log.d("Loki","Dropping call message if call notifications disabled")
-                    // TODO: maybe insert a message here saying you missed a call due to permissions
+                    if (nextMessage.type != PRE_OFFER) continue
+                    val sentTimestamp = nextMessage.sentTimestamp ?: continue
+                    val sender = nextMessage.sender ?: continue
+                    insertMissedCall(sender, sentTimestamp)
                     continue
                 }
                 when (nextMessage.type) {
@@ -39,6 +44,12 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
                 }
             }
         }
+    }
+
+    private fun insertMissedCall(sender: String, sentTimestamp: Long) {
+        val currentUserPublicKey = storage.getUserPublicKey()
+        if (sender == currentUserPublicKey) return // don't insert a "missed" due to call notifications disabled if it's our own sender
+        storage.insertCallMessage(sender, CallMessageType.CALL_MISSED, sentTimestamp)
     }
 
     private fun incomingHangup(callMessage: CallMessage) {
@@ -81,9 +92,10 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
         val recipientAddress = callMessage.sender ?: return
         val callId = callMessage.callId ?: return
         val incomingIntent = WebRtcCallService.preOffer(
-            context = context,
-            address = Address.fromSerialized(recipientAddress),
-            callId = callId,
+                context = context,
+                address = Address.fromSerialized(recipientAddress),
+                callId = callId,
+                sentTimestamp = callMessage.sentTimestamp!!
         )
         ContextCompat.startForegroundService(context, incomingIntent)
     }
@@ -97,7 +109,7 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle) {
                 address = Address.fromSerialized(recipientAddress),
                 sdp = sdp,
                 callId = callId,
-                callTime = callMessage.sentTimestamp ?: -1L
+                callTime = callMessage.sentTimestamp!!
         )
         ContextCompat.startForegroundService(context, incomingIntent)
 

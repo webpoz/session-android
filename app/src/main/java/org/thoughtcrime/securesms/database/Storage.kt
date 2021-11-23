@@ -3,6 +3,7 @@ package org.thoughtcrime.securesms.database
 import android.content.Context
 import android.net.Uri
 import org.session.libsession.database.StorageProtocol
+import org.session.libsession.messaging.calls.CallMessageType
 import org.session.libsession.messaging.contacts.Contact
 import org.session.libsession.messaging.jobs.*
 import org.session.libsession.messaging.messages.control.ConfigurationMessage
@@ -616,5 +617,12 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
                 Optional.of(message))
 
         database.insertSecureDecryptedMessageInbox(mediaMessage, -1)
+    }
+
+    override fun insertCallMessage(senderPublicKey: String, callMessageType: CallMessageType, sentTimestamp: Long) {
+        val database = DatabaseComponent.get(context).smsDatabase()
+        val address = fromSerialized(senderPublicKey)
+        val callMessage = IncomingTextMessage.fromCallInfo(callMessageType, address, Optional.absent(), sentTimestamp)
+        database.insertCallMessage(callMessage)
     }
 }
