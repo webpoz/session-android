@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 @AndroidEntryPoint
-class WebRtcCallService: Service(), PeerConnection.Observer {
+class WebRtcCallService: Service(), CallManager.WebRtcListener {
 
     companion object {
 
@@ -192,6 +192,19 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     private fun isIdle() = callManager.isIdle()
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onHangup() {
+        serviceExecutor.execute {
+            callManager.handleRemoteHangup()
+
+            if (callManager.currentConnectionState in arrayOf(STATE_REMOTE_RINGING, STATE_ANSWERING, STATE_LOCAL_RINGING)) {
+                callManager.recipient?.let { recipient ->
+                    insertMissedCall(recipient, true)
+                }
+            }
+            terminate()
+        }
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent == null || intent.action == null) return START_NOT_STICKY
@@ -459,14 +472,7 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
             return
         }
 
-        callManager.handleRemoteHangup()
-
-        if (callManager.currentConnectionState in arrayOf(STATE_REMOTE_RINGING, STATE_ANSWERING, STATE_LOCAL_RINGING)) {
-            callManager.recipient?.let { recipient ->
-                insertMissedCall(recipient, true)
-            }
-        }
-        terminate()
+        onHangup()
     }
 
     private fun handleSetMuteAudio(intent: Intent) {

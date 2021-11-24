@@ -5,9 +5,7 @@ import android.telephony.TelephonyManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
+import kotlinx.serialization.json.*
 import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.functional.bind
 import org.session.libsession.database.StorageProtocol
@@ -56,6 +54,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
         val VIDEO_DISABLED_JSON by lazy { buildJsonObject { put("video", false) } }
         val VIDEO_ENABLED_JSON by lazy { buildJsonObject { put("video", true) } }
+        val HANGUP_JSON by lazy { buildJsonObject { put("hangup", true) } }
 
         private val TAG = Log.tag(CallManager::class.java)
         val CONNECTED_STATES = arrayOf(CallState.STATE_CONNECTED)
@@ -75,13 +74,13 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
     private val signalAudioManager: SignalAudioManager = SignalAudioManager(context, this, audioManager)
 
-    private val peerConnectionObservers = mutableSetOf<PeerConnection.Observer>()
+    private val peerConnectionObservers = mutableSetOf<WebRtcListener>()
 
-    fun registerListener(listener: PeerConnection.Observer) {
+    fun registerListener(listener: WebRtcListener) {
         peerConnectionObservers.add(listener)
     }
 
-    fun unregisterListener(listener: PeerConnection.Observer) {
+    fun unregisterListener(listener: WebRtcListener) {
         peerConnectionObservers.remove(listener)
     }
 
@@ -304,6 +303,12 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
         try {
             val byteArray = ByteArray(buffer.data.remaining()) { buffer.data[it] }
+            val json = Json.parseToJsonElement(byteArray.decodeToString()) as JsonObject
+            if (json.containsKey("video")) {
+                _remoteVideoEvents.value = VideoEnabled((json["video"] as JsonPrimitive).boolean)
+            } else if (json.containsKey("hangup")) {
+                peerConnectionObservers.forEach(WebRtcListener::onHangup)
+            }
             val videoEnabled = Json.decodeFromString(VideoEnabledMessage.serializer(), byteArray.decodeToString())
             _remoteVideoEvents.value = VideoEnabled(videoEnabled.video)
         } catch (e: Exception) {
@@ -487,6 +492,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
         postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
         if (sendHangup) {
+            dataChannel?.let { channel ->
+                val buffer = DataChannel.Buffer(ByteBuffer.wrap(HANGUP_JSON.toString().encodeToByteArray()), false)
+                channel.send(buffer)
+            }
             MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
         }
     }
@@ -642,5 +651,9 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
     @Serializable
     data class VideoEnabledMessage(val video: Boolean)
+
+    interface WebRtcListener: PeerConnection.Observer {
+        fun onHangup()
+    }
 
 }
