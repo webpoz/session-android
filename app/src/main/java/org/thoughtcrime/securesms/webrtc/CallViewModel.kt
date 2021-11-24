@@ -22,6 +22,11 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
     val videoEnabled: Boolean
         get() = _videoEnabled
 
+    private var _microphoneEnabled: Boolean = true
+
+    val microphoneEnabled: Boolean
+        get() = _microphoneEnabled
+
     private var _isSpeaker: Boolean = false
     val isSpeaker: Boolean
         get() = _isSpeaker
@@ -52,6 +57,7 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
 
     val localAudioEnabledState
         get() = callManager.audioEvents.map { it.isEnabled }
+            .onEach { _microphoneEnabled = it }
 
     val localVideoEnabledState
         get() = callManager.videoEvents

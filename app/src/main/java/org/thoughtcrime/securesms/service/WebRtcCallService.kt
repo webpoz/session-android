@@ -92,8 +92,9 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         fun acceptCallIntent(context: Context) = Intent(context, WebRtcCallService::class.java)
                 .setAction(ACTION_ANSWER_CALL)
 
-        fun speakerIntent(context: Context, enable: Boolean) = Intent(context, WebRtcCallService::class.java)
-                .setAction(ACTION_UPDATE_AUDIO)
+        fun microphoneIntent(context: Context, enabled: Boolean) = Intent(context, WebRtcCallService::class.java)
+            .setAction(ACTION_SET_MUTE_AUDIO)
+            .putExtra(EXTRA_MUTE, !enabled)
 
         fun createCall(context: Context, recipient: Recipient) = Intent(context, WebRtcCallService::class.java)
                 .setAction(ACTION_OUTGOING_CALL)

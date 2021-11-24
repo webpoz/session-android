@@ -90,6 +90,11 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             wantsToAnswer = true
         }
 
+        microphoneButton.setOnClickListener {
+            val audioEnabledIntent = WebRtcCallService.microphoneIntent(this, !viewModel.microphoneEnabled)
+            startService(audioEnabledIntent)
+        }
+
         speakerPhoneButton.setOnClickListener {
             val command = AudioManagerCommand.SetUserDevice( if (viewModel.isSpeaker) EARPIECE else SPEAKER_PHONE)
             WebRtcCallService.sendAudioManagerCommand(this, command)
@@ -197,6 +202,15 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                     } else {
                         glide.clear(remote_recipient)
                     }
+                }
+            }
+
+            launch {
+                viewModel.localAudioEnabledState.collect { isEnabled ->
+                    microphoneButton.setImageResource(
+                        if (isEnabled) R.drawable.ic_baseline_mic_off_24
+                        else R.drawable.ic_baseline_mic_24
+                    )
                 }
             }
 
