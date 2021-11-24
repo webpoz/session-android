@@ -101,7 +101,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         }
 
         declineCallButton.setOnClickListener {
-            val declineIntent = WebRtcCallService.hangupIntent(this)
+            val declineIntent = WebRtcCallService.denyCallIntent(this)
             startService(declineIntent)
         }
 

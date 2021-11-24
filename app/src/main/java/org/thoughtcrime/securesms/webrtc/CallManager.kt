@@ -9,7 +9,6 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import nl.komponents.kovenant.Promise
-import nl.komponents.kovenant.combine.and
 import nl.komponents.kovenant.functional.bind
 import org.session.libsession.database.StorageProtocol
 import org.session.libsession.messaging.calls.CallMessageType
@@ -17,10 +16,8 @@ import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.sending_receiving.MessageSender
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.Debouncer
-import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
-import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.*
@@ -359,7 +356,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         this.callId = callId
         preOfferCallData = PreOffer(callId, recipient)
         postConnectionEvent(CallState.STATE_PRE_OFFER)
-        insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_INCOMING, sentTimestamp)
     }
 
     fun onNewOffer(offer: String, callId: UUID, recipient: Recipient): Promise<Unit, Exception> {
@@ -417,6 +413,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
                 answer.description,
                 callId
         ), recipient.address)
+
+        insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_INCOMING, false)
 
         while (pendingIncomingIceUpdates.isNotEmpty()) {
             val candidate = pendingIncomingIceUpdates.pop() ?: break
@@ -477,18 +475,15 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         val userAddress = storage.getUserPublicKey() ?: return
         MessageSender.sendNonDurably(CallMessage.endCall(callId), Address.fromSerialized(userAddress))
         MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
+        insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_MISSED)
     }
 
-    fun handleLocalHangup(intentRecipient: Recipient, intentCallId: UUID) {
+    fun handleLocalHangup(intentRecipient: Recipient?) {
         val recipient = recipient ?: return
         val callId = callId ?: return
-        if (intentCallId != callId) {
-            Log.w(TAG,"Processing local hangup for non-active ring call ID")
-            return
-        }
 
         val currentUserPublicKey  = storage.getUserPublicKey()
-        val sendHangup = intentRecipient == recipient && recipient.address.serialize() != currentUserPublicKey
+        val sendHangup = intentRecipient == null || (intentRecipient == recipient && recipient.address.serialize() != currentUserPublicKey)
 
         postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
         if (sendHangup) {
@@ -496,7 +491,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         }
     }
 
-    fun insertCallMessage(threadPublicKey: String, callMessageType: CallMessageType, sentTimestamp: Long = System.currentTimeMillis()) {
+    fun insertCallMessage(threadPublicKey: String, callMessageType: CallMessageType, signal: Boolean = false, sentTimestamp: Long = System.currentTimeMillis()) {
         storage.insertCallMessage(threadPublicKey, callMessageType, sentTimestamp)
     }
 

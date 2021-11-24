@@ -1,9 +1,7 @@
 package org.thoughtcrime.securesms.conversation.v2.messages
 
 import android.content.Context
-import android.content.res.Resources
 import android.util.AttributeSet
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.widget.LinearLayout
@@ -34,6 +32,9 @@ class ControlMessageView : LinearLayout {
             iconImageView.visibility = View.VISIBLE
         } else if (message.isMediaSavedNotification) {
             iconImageView.setImageDrawable(ResourcesCompat.getDrawable(resources, R.drawable.ic_file_download_white_36dp, context.theme))
+            iconImageView.visibility = View.VISIBLE
+        } else if (message.isCallLog) {
+            iconImageView.setImageDrawable(ResourcesCompat.getDrawable(resources, R.drawable.ic_baseline_call_24, context.theme))
             iconImageView.visibility = View.VISIBLE
         }
         textView.text = message.getDisplayBody(context)

@@ -447,9 +447,8 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     }
 
     private fun handleLocalHangup(intent: Intent) {
-        val intentRecipient = getRemoteRecipient(intent)
-        val callId = getCallId(intent)
-        callManager.handleLocalHangup(intentRecipient, callId)
+        val intentRecipient = getOptionalRemoteRecipient(intent)
+        callManager.handleLocalHangup(intentRecipient)
         terminate()
     }
 
@@ -574,6 +573,13 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
         )
     }
 
+    private fun getOptionalRemoteRecipient(intent: Intent): Recipient? =
+        if (intent.hasExtra(EXTRA_RECIPIENT_ADDRESS)) {
+            getRemoteRecipient(intent)
+        } else {
+            null
+        }
+
     private fun getRemoteRecipient(intent: Intent): Recipient {
         val remoteAddress = intent.getParcelableExtra<Address>(EXTRA_RECIPIENT_ADDRESS)
                 ?: throw AssertionError("No recipient in intent!")
@@ -587,9 +593,11 @@ class WebRtcCallService: Service(), PeerConnection.Observer {
     }
 
     private fun insertMissedCall(recipient: Recipient, signal: Boolean) {
-        // TODO
-//        val messageAndThreadId = DatabaseComponent.get(this).smsDatabase().insertReceivedCall(recipient.address)
-//        MessageNotifier.updateNotification(this, messageAndThreadId.second, signal)
+        callManager.insertCallMessage(
+            threadPublicKey = recipient.address.serialize(),
+            callMessageType = CallMessageType.CALL_MISSED,
+            signal = signal
+        )
     }
 
     private fun isIncomingMessageExpired(intent: Intent) =
