@@ -11,6 +11,7 @@ import network.loki.messenger.R
 import org.session.libsession.utilities.recipients.Recipient
 import org.thoughtcrime.securesms.calls.WebRtcCallActivity
 import org.thoughtcrime.securesms.notifications.NotificationChannels
+import org.thoughtcrime.securesms.preferences.SettingsActivity
 import org.thoughtcrime.securesms.service.WebRtcCallService
 
 class CallNotificationBuilder {
@@ -23,6 +24,26 @@ class CallNotificationBuilder {
         const val TYPE_ESTABLISHED = 3
         const val TYPE_INCOMING_CONNECTING = 4
         const val TYPE_INCOMING_PRE_OFFER = 5
+
+        @JvmStatic
+        fun getFirstCallNotification(context: Context): Notification {
+            val contentIntent = Intent(context, SettingsActivity::class.java)
+
+            val pendingIntent = PendingIntent.getActivity(context, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+            val text = context.getString(R.string.CallNotificationBuilder_first_call_message)
+
+            val builder = NotificationCompat.Builder(context, NotificationChannels.CALLS)
+                .setSound(null)
+                .setSmallIcon(R.drawable.ic_baseline_call_24)
+                .setContentIntent(pendingIntent)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setContentTitle(context.getString(R.string.CallNotificationBuilder_first_call_title))
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+
+            return builder.build()
+        }
 
         @JvmStatic
         fun getCallInProgressNotification(context: Context, type: Int, recipient: Recipient?): Notification {

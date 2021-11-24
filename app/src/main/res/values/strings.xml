@@ -917,5 +917,7 @@
     <string name="preferences__allow_access_voice_video">Allow access to accept voice and video calls from other users</string>
     <string name="dialog_voice_video_title">Voice / video calls</string>
     <string name="dialog_voice_video_message">The current implementation of voice / video calls will expose your IP address to the Oxen Foundation servers and the calling / called user</string>
+    <string name="CallNotificationBuilder_first_call_title">Call Missed</string>
+    <string name="CallNotificationBuilder_first_call_message">You missed a call because you need to enable the \'Voice and video calls\' permission in the Privacy Settings.</string>
 
 </resources>

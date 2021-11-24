@@ -1,5 +1,6 @@
 package org.thoughtcrime.securesms.webrtc
 
+import android.app.NotificationManager
 import android.content.Context
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -16,6 +17,7 @@ import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.*
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.service.WebRtcCallService
+import org.thoughtcrime.securesms.util.CallNotificationBuilder
 import org.webrtc.IceCandidate
 
 
@@ -31,6 +33,11 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle, p
                     if (nextMessage.type != PRE_OFFER) continue
                     val sentTimestamp = nextMessage.sentTimestamp ?: continue
                     val sender = nextMessage.sender ?: continue
+                    if (TextSecurePreferences.setShownCallNotification(context)) {
+                        // first time call notification encountered
+                        val notification = CallNotificationBuilder.getFirstCallNotification(context)
+                        context.getSystemService(NotificationManager::class.java).notify(CallNotificationBuilder.WEBRTC_NOTIFICATION, notification)
+                    }
                     insertMissedCall(sender, sentTimestamp)
                     continue
                 }
