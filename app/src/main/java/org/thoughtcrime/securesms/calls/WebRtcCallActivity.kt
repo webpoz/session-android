@@ -15,6 +15,7 @@ import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.android.synthetic.main.activity_conversation_v2.*
 import kotlinx.android.synthetic.main.activity_webrtc.*
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
@@ -68,19 +69,9 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
         super.onCreate(savedInstanceState, ready)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setContentView(R.layout.activity_webrtc)
         volumeControlStream = AudioManager.STREAM_VOICE_CALL
-
-        initializeResources()
-
-        Permissions.with(this)
-            .request(Manifest.permission.RECORD_AUDIO)
-            .onAllGranted {
-                setupStreams()
-            }
-            .execute()
 
         if (intent.action == ACTION_ANSWER) {
             answerCall()
@@ -136,14 +127,6 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     }
 
-    private fun initializeResources() {
-
-    }
-
-    private fun setupStreams() {
-
-    }
-
     private fun answerCall() {
         val answerIntent = WebRtcCallService.acceptCallIntent(this)
         ContextCompat.startForegroundService(this,answerIntent)
@@ -157,10 +140,8 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             launch {
                 viewModel.audioDeviceState.collect { state ->
                     val speakerEnabled = state.selectedDevice == SPEAKER_PHONE
-                    speakerPhoneButton.setImageResource(
-                            if (speakerEnabled) R.drawable.ic_baseline_volume_up_24
-                            else R.drawable.ic_baseline_volume_mute_24
-                    )
+                    // change drawable background to enabled or not
+                    speakerPhoneButton.isSelected = speakerEnabled
                 }
             }
 
@@ -207,10 +188,8 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
             launch {
                 viewModel.localAudioEnabledState.collect { isEnabled ->
-                    microphoneButton.setImageResource(
-                        if (isEnabled) R.drawable.ic_baseline_mic_off_24
-                        else R.drawable.ic_baseline_mic_24
-                    )
+                    // change drawable background to enabled or not
+                    microphoneButton.isSelected = !isEnabled
                 }
             }
 
@@ -224,10 +203,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                         }
                     }
                     local_renderer.isVisible = isEnabled
-                    enableCameraButton.setImageResource(
-                            if (isEnabled) R.drawable.ic_baseline_videocam_off_24
-                            else R.drawable.ic_baseline_videocam_24
-                    )
+                    enableCameraButton.isSelected = isEnabled
                 }
             }
 

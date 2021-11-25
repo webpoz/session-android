@@ -136,6 +136,11 @@
         <!-- leave empty to allow overriding -->
     </style>
 
+    <style name="Theme.Session.CallActivity" parent="Theme.Session.ForceDark">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+
     <style name="Theme.Session.BottomSheet" parent="@style/Theme.AppCompat.DayNight.Dialog">
         <item name="colorControlNormal">?android:textColorPrimary</item>
         <item name="android:textColorPrimary">@color/text</item>
