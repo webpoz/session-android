@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.media.AudioManager
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import java.util.concurrent.TimeUnit
@@ -73,7 +74,7 @@ class SignalBluetoothManager(
 
         val bluetoothHeadsetFilter = IntentFilter().apply {
             addAction(BluetoothHeadset.ACTION_CONNECTION_STATE_CHANGED)
-            addAction(BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED)
+            addAction(AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED)
         }
 
         bluetoothReceiver = BluetoothHeadsetBroadcastReceiver()
@@ -134,7 +135,6 @@ class SignalBluetoothManager(
 
         state = State.CONNECTING
         androidAudioManager.startBluetoothSco()
-        androidAudioManager.isBluetoothScoOn = true
         scoConnectionAttempts++
         startTimer()
 
@@ -165,7 +165,7 @@ class SignalBluetoothManager(
             return
         }
 
-        if (bluetoothAdapter!!.getProfileConnectionState(BluetoothProfile.HEADSET) !in arrayOf(BluetoothProfile.STATE_CONNECTING, BluetoothProfile.STATE_CONNECTED)) {
+        if (bluetoothAdapter!!.getProfileConnectionState(BluetoothProfile.HEADSET) !in arrayOf(BluetoothProfile.STATE_CONNECTED)) {
             state = State.UNAVAILABLE
             Log.i(TAG, "No connected bluetooth headset")
         } else {
@@ -216,6 +216,7 @@ class SignalBluetoothManager(
 
     private fun onServiceConnected(proxy: BluetoothHeadset?) {
         bluetoothHeadset = proxy
+        androidAudioManager.isBluetoothScoOn = true
         updateAudioDeviceState()
     }
 
@@ -244,9 +245,9 @@ class SignalBluetoothManager(
     private fun onAudioStateChanged(audioState: Int, isInitialStateChange: Boolean) {
         Log.i(TAG, "onAudioStateChanged: state: $state audioState: ${audioState.toStateString()} initialSticky: $isInitialStateChange")
 
-        if (audioState == BluetoothHeadset.STATE_AUDIO_CONNECTED) {
+        if (audioState == AudioManager.SCO_AUDIO_STATE_CONNECTED) {
             cancelTimer()
-            if (state === State.CONNECTING) {
+            if (state == State.CONNECTING) {
                 Log.d(TAG, "Bluetooth audio SCO is now connected")
                 state = State.CONNECTED
                 scoConnectionAttempts = 0
@@ -254,9 +255,9 @@ class SignalBluetoothManager(
             } else {
                 Log.w(TAG, "Unexpected state ${audioState.toStateString()}")
             }
-        } else if (audioState == BluetoothHeadset.STATE_AUDIO_CONNECTING) {
+        } else if (audioState == AudioManager.SCO_AUDIO_STATE_CONNECTING) {
             Log.d(TAG, "Bluetooth audio SCO is now connecting...")
-        } else if (audioState == BluetoothHeadset.STATE_AUDIO_DISCONNECTED) {
+        } else if (audioState == AudioManager.SCO_AUDIO_STATE_DISCONNECTED) {
             Log.d(TAG, "Bluetooth audio SCO is now disconnected")
             if (isInitialStateChange) {
                 Log.d(TAG, "Ignore ${audioState.toStateString()} initial sticky broadcast.")
@@ -298,10 +299,17 @@ class SignalBluetoothManager(
                     }
                 }
             } else if (intent.action == BluetoothHeadset.ACTION_AUDIO_STATE_CHANGED) {
-                val connectionState: Int = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED)
+//                val connectionState: Int = intent.getIntExtra(BluetoothHeadset.EXTRA_STATE, BluetoothHeadset.STATE_AUDIO_DISCONNECTED)
+//                handler.post {
+//                    if (state != State.UNINITIALIZED) {
+//                        onAudioStateChanged(connectionState, isInitialStickyBroadcast)
+//                    }
+//                }
+            } else if (intent.action == AudioManager.ACTION_SCO_AUDIO_STATE_UPDATED) {
+                val scoState: Int = intent.getIntExtra(AudioManager.EXTRA_SCO_AUDIO_STATE, AudioManager.ERROR)
                 handler.post {
                     if (state != State.UNINITIALIZED) {
-                        onAudioStateChanged(connectionState, isInitialStickyBroadcast)
+                        onAudioStateChanged(scoState, isInitialStickyBroadcast)
                     }
                 }
             }
@@ -345,4 +353,12 @@ private fun Int.toStateString(): String {
         BluetoothAdapter.STATE_TURNING_ON -> "TURNING_ON"
         else -> "UNKNOWN"
     }
+}
+
+private fun Int.toScoString(): String = when (this) {
+    AudioManager.SCO_AUDIO_STATE_DISCONNECTED -> "DISCONNECTED"
+    AudioManager.SCO_AUDIO_STATE_CONNECTED -> "CONNECTED"
+    AudioManager.SCO_AUDIO_STATE_CONNECTING -> "CONNECTING"
+    AudioManager.SCO_AUDIO_STATE_ERROR -> "ERROR"
+    else -> "UNKNOWN"
 }

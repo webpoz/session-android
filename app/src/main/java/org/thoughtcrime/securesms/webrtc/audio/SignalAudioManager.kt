@@ -11,6 +11,7 @@ import android.os.HandlerThread
 import network.loki.messenger.R
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
+import org.thoughtcrime.securesms.webrtc.audio.SignalBluetoothManager.State as BState
 
 private val TAG = Log.tag(SignalAudioManager::class.java)
 
@@ -68,7 +69,6 @@ class SignalAudioManager(private val context: Context,
         }
         handler?.post {
             when (command) {
-                is AudioManagerCommand.Shutdown -> shutdown()
                 is AudioManagerCommand.UpdateAudioDeviceState -> updateAudioDeviceState()
                 is AudioManagerCommand.Start -> start()
                 is AudioManagerCommand.Stop -> stop(command.playDisconnect)
@@ -144,15 +144,23 @@ class SignalAudioManager(private val context: Context,
             return
         }
 
-        incomingRinger.stop()
-        outgoingRinger.stop()
+        handler?.post {
+            incomingRinger.stop()
+            outgoingRinger.stop()
+            stop(false)
+            if (commandAndControlThread != null) {
+                Log.i(TAG, "Shutting down command and control")
+                commandAndControlThread?.quitSafely()
+                commandAndControlThread = null
+            }
+        }
 
         if (playDisconnect) {
             val volume: Float = androidAudioManager.ringVolumeWithMinimum()
             soundPool.play(disconnectedSoundId, volume, volume, 0, 0, 1.0f)
         }
 
-        state = State.PREINITIALIZED
+        state = State.UNINITIALIZED
 
         wiredHeadsetReceiver?.let { receiver ->
             try {
@@ -173,19 +181,6 @@ class SignalAudioManager(private val context: Context,
         Log.d(TAG, "Abandoned audio focus for VOICE_CALL streams")
 
         Log.d(TAG, "Stopped")
-    }
-
-    private fun shutdown() {
-        handler?.post {
-            incomingRinger.stop()
-            outgoingRinger.stop()
-            stop(false)
-            if (commandAndControlThread != null) {
-                Log.i(TAG, "Shutting down command and control")
-                commandAndControlThread?.quitSafely()
-                commandAndControlThread = null
-            }
-        }
     }
 
     private fun updateAudioDeviceState() {
@@ -223,7 +218,7 @@ class SignalAudioManager(private val context: Context,
         var audioDeviceSetUpdated = audioDevices != newAudioDevices
         audioDevices = newAudioDevices
 
-        if (signalBluetoothManager!!.state == SignalBluetoothManager.State.UNAVAILABLE && userSelectedAudioDevice == AudioDevice.BLUETOOTH) {
+        if (signalBluetoothManager!!.state == BState.UNAVAILABLE && userSelectedAudioDevice == AudioDevice.BLUETOOTH) {
             userSelectedAudioDevice = AudioDevice.NONE
         }
 
@@ -236,13 +231,14 @@ class SignalAudioManager(private val context: Context,
             userSelectedAudioDevice = AudioDevice.NONE
         }
 
-        val needBluetoothAudioStart = signalBluetoothManager!!.state == SignalBluetoothManager.State.AVAILABLE && signalBluetoothManager!!.state != SignalBluetoothManager.State.CONNECTING
+        val btState = signalBluetoothManager!!.state
+        val needBluetoothAudioStart = btState == BState.AVAILABLE &&
                 (userSelectedAudioDevice == AudioDevice.NONE || userSelectedAudioDevice == AudioDevice.BLUETOOTH || autoSwitchToBluetooth)
 
-        val needBluetoothAudioStop = (signalBluetoothManager!!.state == SignalBluetoothManager.State.CONNECTED || signalBluetoothManager!!.state != SignalBluetoothManager.State.CONNECTING) &&
+        val needBluetoothAudioStop = (btState == BState.CONNECTED || btState == BState.CONNECTING) &&
                 (userSelectedAudioDevice != AudioDevice.NONE && userSelectedAudioDevice != AudioDevice.BLUETOOTH)
 
-        if (signalBluetoothManager!!.state.hasDevice()) {
+        if (btState.hasDevice()) {
             Log.i(TAG, "Need bluetooth audio: state: ${signalBluetoothManager!!.state} start: $needBluetoothAudioStart stop: $needBluetoothAudioStop")
         }
 
@@ -251,18 +247,19 @@ class SignalAudioManager(private val context: Context,
             signalBluetoothManager!!.updateDevice()
         }
 
-        if (!autoSwitchToBluetooth && signalBluetoothManager!!.state == SignalBluetoothManager.State.UNAVAILABLE) {
+        if (!autoSwitchToBluetooth && signalBluetoothManager!!.state == BState.UNAVAILABLE) {
             autoSwitchToBluetooth = true
         }
 
         if (needBluetoothAudioStart && !needBluetoothAudioStop) {
             if (!signalBluetoothManager!!.startScoAudio()) {
+                Log.e(TAG,"Failed to start sco audio")
                 audioDevices.remove(AudioDevice.BLUETOOTH)
                 audioDeviceSetUpdated = true
             }
         }
 
-        if (autoSwitchToBluetooth && signalBluetoothManager!!.state == SignalBluetoothManager.State.CONNECTED) {
+        if (autoSwitchToBluetooth && signalBluetoothManager!!.state == BState.CONNECTED) {
             userSelectedAudioDevice = AudioDevice.BLUETOOTH
             autoSwitchToBluetooth = false
         }
@@ -342,7 +339,6 @@ class SignalAudioManager(private val context: Context,
     private fun startIncomingRinger(vibrate: Boolean) {
         Log.i(TAG, "startIncomingRinger(): vibrate: $vibrate")
         androidAudioManager.mode = AudioManager.MODE_RINGTONE
-        setDefaultAudioDevice(AudioDevice.SPEAKER_PHONE, false)
 
         incomingRinger.start(vibrate)
     }

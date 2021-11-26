@@ -176,6 +176,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
     @Synchronized
     private fun terminate() {
         sendBroadcast(Intent(WebRtcCallActivity.ACTION_END))
+        lockManager.updatePhoneState(LockManager.PhoneState.IDLE)
         callManager.stop()
         stopForeground(true)
     }
@@ -377,7 +378,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         callManager.startOutgoingRinger(OutgoingRinger.Type.RINGING)
         setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
         callManager.insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_OUTGOING)
-        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 1, TimeUnit.MINUTES)
 
         val expectedState = callManager.currentConnectionState
         val expectedCallId = callManager.callId
@@ -425,7 +426,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
             return
         }
 
-        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 2, TimeUnit.MINUTES)
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 1, TimeUnit.MINUTES)
 
         callManager.initializeAudioForCall()
         callManager.initializeVideo(this)
@@ -488,11 +489,6 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
 
     private fun handleSetCameraFlip(intent: Intent) {
         callManager.handleSetCameraFlip()
-    }
-
-    private fun handleBluetoothChange(intent: Intent) {
-        val bluetoothAvailable = intent.getBooleanExtra(EXTRA_AVAILABLE, false)
-        callManager.postBluetoothAvailable(bluetoothAvailable)
     }
 
     private fun handleWiredHeadsetChanged(intent: Intent) {
@@ -611,6 +607,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
             System.currentTimeMillis() - intent.getLongExtra(EXTRA_TIMESTAMP, -1) > TimeUnit.MINUTES.toMillis(2)
 
     override fun onDestroy() {
+        Log.d(TAG,"onDestroy()")
         callManager.unregisterListener(this)
         callReceiver?.let { receiver ->
             unregisterReceiver(receiver)
@@ -621,7 +618,6 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         networkChangedReceiver = null
         callReceiver = null
         uncaughtExceptionHandlerManager?.unregister()
-        callManager.onDestroy()
         super.onDestroy()
         // shutdown audiomanager
         // unregister network receiver

@@ -155,8 +155,8 @@ dependencies {
     testImplementation 'org.robolectric:shadows-multidex:4.4'
 }
 
-def canonicalVersionCode = 236
-def canonicalVersionName = "1.12.0-ALPHA3"
+def canonicalVersionCode = 237
+def canonicalVersionName = "1.12.0-ALPHA4"
 
 def postFixSize = 10
 def abiPostFix = ['armeabi-v7a' : 1,
@@ -246,6 +246,7 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
+            debuggable true
             minifyEnabled false
         }
         debug {

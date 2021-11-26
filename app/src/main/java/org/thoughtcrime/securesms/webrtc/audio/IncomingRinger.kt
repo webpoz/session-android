@@ -17,6 +17,9 @@ class IncomingRinger(private val context: Context) {
     private val vibrator: Vibrator? = ServiceUtil.getVibrator(context)
     var mediaPlayer: MediaPlayer? = null
 
+    val isRinging: Boolean
+        get() = mediaPlayer?.isPlaying ?: false
+
     fun start(vibrate: Boolean) {
         val audioManager = ServiceUtil.getAudioManager(context)
         mediaPlayer?.release()
@@ -31,16 +34,14 @@ class IncomingRinger(private val context: Context) {
         }
 
         mediaPlayer?.let { player ->
-            if (ringerMode == AudioManager.RINGER_MODE_NORMAL) {
-                try {
-                    if (!player.isPlaying) {
-                        player.prepare()
-                        player.start()
-                        Log.i(TAG,"Playing ringtone")
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG,"Failed to start mediaPlayer", e)
+            try {
+                if (!player.isPlaying) {
+                    player.prepare()
+                    player.start()
+                    Log.i(TAG,"Playing ringtone")
                 }
+            } catch (e: Exception) {
+                Log.e(TAG,"Failed to start mediaPlayer", e)
             }
         } ?: run {
             Log.w(TAG,"Not ringing, mediaPlayer: ${mediaPlayer?.let{"available"}}, mode: $ringerMode")

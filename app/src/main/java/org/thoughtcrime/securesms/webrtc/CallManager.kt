@@ -309,8 +309,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             } else if (json.containsKey("hangup")) {
                 peerConnectionObservers.forEach(WebRtcListener::onHangup)
             }
-            val videoEnabled = Json.decodeFromString(VideoEnabledMessage.serializer(), byteArray.decodeToString())
-            _remoteVideoEvents.value = VideoEnabled(videoEnabled.video)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to deserialize data channel message", e)
         }
@@ -519,7 +517,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
     fun handleSetMuteVideo(muted: Boolean, lockManager: LockManager) {
         _videoEvents.value = VideoEnabled(!muted)
-        peerConnection?.setVideoEnabled(!muted)
+        val connection = peerConnection ?: return
+        connection.setVideoEnabled(!muted)
         dataChannel?.let { channel ->
             val toSend = if (muted) VIDEO_DISABLED_JSON else VIDEO_ENABLED_JSON
             val buffer = DataChannel.Buffer(ByteBuffer.wrap(toSend.toString().encodeToByteArray()), false)
@@ -527,7 +526,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         }
 
         if (currentConnectionState == CallState.STATE_CONNECTED) {
-            if (localCameraState.enabled) lockManager.updatePhoneState(LockManager.PhoneState.IN_VIDEO)
+            if (connection.isVideoEnabled()) lockManager.updatePhoneState(LockManager.PhoneState.IN_VIDEO)
             else lockManager.updatePhoneState(LockManager.PhoneState.IN_CALL)
         }
 
@@ -546,10 +545,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             connection.flipCamera()
             localCameraState = connection.getCameraState()
         }
-    }
-
-    fun postBluetoothAvailable(available: Boolean) {
-        // TODO: _bluetoothEnabled.value = available
     }
 
     fun handleWiredHeadsetChanged(present: Boolean) {
@@ -601,10 +596,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         }
     }
 
-    fun onDestroy() {
-        signalAudioManager.handleCommand(AudioManagerCommand.Shutdown)
-    }
-
     fun startIncomingRinger() {
         signalAudioManager.handleCommand(AudioManagerCommand.StartIncomingRinger(true))
     }
@@ -612,7 +603,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     fun startCommunication(lockManager: LockManager) {
         signalAudioManager.handleCommand(AudioManagerCommand.Start)
         val connection = peerConnection ?: return
-        if (localCameraState.enabled) lockManager.updatePhoneState(LockManager.PhoneState.IN_VIDEO)
+        if (connection.isVideoEnabled()) lockManager.updatePhoneState(LockManager.PhoneState.IN_VIDEO)
         else lockManager.updatePhoneState(LockManager.PhoneState.IN_CALL)
         connection.setCommunicationMode()
         setAudioEnabled(true)
@@ -648,9 +639,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             isReestablishing = false
         }
     }
-
-    @Serializable
-    data class VideoEnabledMessage(val video: Boolean)
 
     interface WebRtcListener: PeerConnection.Observer {
         fun onHangup()

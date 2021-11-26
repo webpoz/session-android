@@ -24,7 +24,7 @@ class PeerConnectionWrapper(context: Context,
     private val videoTrack: VideoTrack?
 
     val readyForIce
-    get() = peerConnection.localDescription != null && peerConnection.remoteDescription != null
+        get() = peerConnection.localDescription != null && peerConnection.remoteDescription != null
 
     init {
         val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org").setUsername("session").setPassword("session").createIceServer()
@@ -268,6 +268,8 @@ class PeerConnectionWrapper(context: Context,
             camera.enabled = isEnabled
         }
     }
+
+    fun isVideoEnabled() = camera.enabled
 
     fun flipCamera() {
         camera.flip()
