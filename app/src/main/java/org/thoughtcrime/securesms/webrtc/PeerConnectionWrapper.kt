@@ -27,8 +27,9 @@ class PeerConnectionWrapper(context: Context,
         get() = peerConnection.localDescription != null && peerConnection.remoteDescription != null
 
     init {
-        val turn = PeerConnection.IceServer.builder("turn:freyr.getsession.org").setUsername("session").setPassword("session").createIceServer()
-        val iceServers = listOf(turn)
+        val iceServers = listOf("freyr","fenrir","frigg","angus","hereford","holstein","brahman").map { sub ->
+            PeerConnection.IceServer.builder("turn:$sub.getsession.org").setUsername("session202111").setPassword("053c268164bc7bd7").createIceServer()
+        }
 
         val constraints = MediaConstraints().apply {
             optional.add(MediaConstraints.KeyValuePair("DtlsSrtpKeyAgreement", "true"))

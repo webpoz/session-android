@@ -356,8 +356,6 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         callManager.onIncomingRing(offer, callId, recipient, timestamp)
         callManager.postConnectionEvent(STATE_LOCAL_RINGING)
         callManager.postViewModelState(CallViewModel.State.CALL_RINGING)
-        callManager.initializeAudioForCall()
-        callManager.startIncomingRinger()
         registerPowerButtonReceiver()
     }
 

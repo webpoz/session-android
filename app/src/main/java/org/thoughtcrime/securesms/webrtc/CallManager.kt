@@ -382,6 +382,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         this.recipient = recipient
         this.pendingOffer = offer
         this.pendingOfferTime = callTime
+        initializeAudioForCall()
         startIncomingRinger()
     }
 
