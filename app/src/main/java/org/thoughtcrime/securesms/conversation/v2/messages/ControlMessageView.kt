@@ -39,9 +39,9 @@ class ControlMessageView : LinearLayout {
             iconImageView.visibility = View.VISIBLE
         } else if (message.isCallLog) {
             val drawable = when {
-                message.isIncomingCall -> R.drawable.ic_baseline_call_received_24
-                message.isOutgoingCall -> R.drawable.ic_baseline_call_made_24
-                else -> R.drawable.ic_baseline_call_missed_24
+                message.isIncomingCall -> R.drawable.ic_incoming_call
+                message.isOutgoingCall -> R.drawable.ic_outgoing_call
+                else -> R.drawable.ic_missed_call
             }
             iconImageView.setImageDrawable(ResourcesCompat.getDrawable(resources, drawable, context.theme))
             iconImageView.visibility = View.VISIBLE
