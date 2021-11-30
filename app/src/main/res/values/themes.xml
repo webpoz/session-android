@@ -137,8 +137,7 @@
     </style>
 
     <style name="Theme.Session.CallActivity" parent="Theme.Session.ForceDark">
-        <item name="windowActionBar">false</item>
-        <item name="windowNoTitle">true</item>
+        <!-- in case we want to add customisation like no title -->
     </style>
 
     <style name="Theme.Session.BottomSheet" parent="@style/Theme.AppCompat.DayNight.Dialog">

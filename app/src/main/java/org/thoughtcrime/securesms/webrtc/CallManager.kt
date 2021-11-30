@@ -27,6 +27,7 @@ import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
 import org.webrtc.*
+import org.webrtc.PeerConnection.IceConnectionState
 import java.nio.ByteBuffer
 import java.util.*
 import java.util.concurrent.Executors
@@ -104,8 +105,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     val currentConnectionState
         get() = (_connectionEvents.value as CallStateUpdate).state
 
-    private val networkExecutor = Executors.newSingleThreadExecutor()
-
     private var eglBase: EglBase? = null
 
     var pendingOffer: String? = null
@@ -117,6 +116,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         field = value
         _recipientEvents.value = RecipientUpdate(value)
     }
+    var callStartTime: Long = -1
     var isReestablishing: Boolean = false
 
     private var peerConnection: PeerConnectionWrapper? = null
@@ -209,8 +209,11 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         peerConnectionObservers.forEach { listener -> listener.onSignalingChange(newState) }
     }
 
-    override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState) {
+    override fun onIceConnectionChange(newState: IceConnectionState) {
         peerConnectionObservers.forEach { listener -> listener.onIceConnectionChange(newState) }
+        if (newState == IceConnectionState.CONNECTED) {
+            callStartTime = System.currentTimeMillis()
+        }
     }
 
     override fun onIceConnectionReceivingChange(receiving: Boolean) {
@@ -340,6 +343,9 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         localCameraState = CameraState.UNKNOWN
         recipient = null
         callId = null
+        pendingOfferTime = -1
+        pendingOffer = null
+        callStartTime = -1
         _audioEvents.value = AudioEnabled(false)
         _videoEvents.value = VideoEnabled(false)
         _remoteVideoEvents.value = VideoEnabled(false)

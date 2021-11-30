@@ -18,7 +18,9 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.android.synthetic.main.activity_conversation_v2.*
 import kotlinx.android.synthetic.main.activity_webrtc.*
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import network.loki.messenger.R
 import org.session.libsession.avatars.ProfileContactPhoto
@@ -33,6 +35,7 @@ import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallViewModel
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.*
+import java.time.Duration
 import java.util.*
 
 @AndroidEntryPoint
@@ -44,6 +47,8 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         const val ACTION_END = "end-call"
 
         const val BUSY_SIGNAL_DELAY_FINISH = 5500L
+
+        val CALL_DURATION_FORMAT = 
     }
 
     private val viewModel by viewModels<CallViewModel>()
@@ -183,6 +188,20 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                     } else {
                         glide.clear(remote_recipient)
                     }
+                }
+            }
+
+            launch {
+                while (isActive) {
+                    val startTime = viewModel.callStartTime
+                    if (startTime == -1L) {
+                        callTime.isVisible = false
+                    } else {
+                        callTime.isVisible = true
+                        callTime.text = Duration.Duration.ofMillis(startTime)
+                    }
+
+                    delay(5_000) // update the call duration less frequently
                 }
             }
 

@@ -11,6 +11,23 @@ import javax.inject.Inject
 @HiltViewModel
 class CallViewModel @Inject constructor(private val callManager: CallManager): ViewModel() {
 
+    enum class State {
+        CALL_PENDING,
+
+        CALL_PRE_INIT,
+        CALL_INCOMING,
+        CALL_OUTGOING,
+        CALL_CONNECTED,
+        CALL_RINGING,
+        CALL_BUSY,
+        CALL_DISCONNECTED,
+
+        NETWORK_FAILURE,
+        RECIPIENT_UNAVAILABLE,
+        NO_SUCH_USER,
+        UNTRUSTED_IDENTITY,
+    }
+
     val localRenderer: SurfaceViewRenderer?
     get() = callManager.localRenderer
 
@@ -30,24 +47,6 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
     private var _isSpeaker: Boolean = false
     val isSpeaker: Boolean
         get() = _isSpeaker
-
-
-    enum class State {
-        CALL_PENDING,
-
-        CALL_PRE_INIT,
-        CALL_INCOMING,
-        CALL_OUTGOING,
-        CALL_CONNECTED,
-        CALL_RINGING,
-        CALL_BUSY,
-        CALL_DISCONNECTED,
-
-        NETWORK_FAILURE,
-        RECIPIENT_UNAVAILABLE,
-        NO_SUCH_USER,
-        UNTRUSTED_IDENTITY,
-    }
 
     val audioDeviceState
         get() = callManager.audioDeviceEvents
@@ -72,5 +71,8 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
 
     val recipient
         get() = callManager.recipientEvents
+
+    val callStartTime: Long
+        get() = callManager.callStartTime
 
 }
