@@ -43,13 +43,14 @@
         tools:visibility="visible" />
 
     <TextView
-        android:textSize="@dimen/text_size"
+        android:id="@+id/callTime"
+        android:textSize="@dimen/medium_font_size"
         android:textColor="@color/text"
         tools:text="00:05:20"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintBottom_toTopOf="@+id/controlGroupBarrier"
-        android:layout_marginBottom="@dimen/medium_spacing"
+        android:layout_marginBottom="@dimen/very_large_spacing"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"/>
 

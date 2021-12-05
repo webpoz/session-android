@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import network.loki.messenger.R
+import org.apache.commons.lang3.time.DurationFormatUtils
 import org.session.libsession.avatars.ProfileContactPhoto
 import org.session.libsession.messaging.contacts.Contact
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
@@ -35,6 +36,7 @@ import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallViewModel
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.*
+import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.*
 
@@ -48,7 +50,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
         const val BUSY_SIGNAL_DELAY_FINISH = 5500L
 
-        val CALL_DURATION_FORMAT = 
+        private const val CALL_DURATION_FORMAT = "HH:mm:ss"
     }
 
     private val viewModel by viewModels<CallViewModel>()
@@ -198,10 +200,10 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                         callTime.isVisible = false
                     } else {
                         callTime.isVisible = true
-                        callTime.text = Duration.Duration.ofMillis(startTime)
+                        callTime.text = DurationFormatUtils.formatDuration(System.currentTimeMillis() - startTime, CALL_DURATION_FORMAT)
                     }
 
-                    delay(5_000) // update the call duration less frequently
+                    delay(1_000)
                 }
             }
 
