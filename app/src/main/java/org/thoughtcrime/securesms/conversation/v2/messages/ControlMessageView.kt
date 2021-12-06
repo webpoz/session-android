@@ -27,7 +27,8 @@ class ControlMessageView : LinearLayout {
     // endregion
 
     // region Updating
-    fun bind(message: MessageRecord) {
+    fun bind(message: MessageRecord, previous: MessageRecord?) {
+        dateBreakTextView.showDateBreak(message, previous)
         iconImageView.visibility = View.GONE
         val tintColor = if (message.isMissedCall) R.color.destructive else R.color.text
         iconImageView.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(context,tintColor))
