@@ -34,13 +34,14 @@ class CallNotificationBuilder {
             val text = context.getString(R.string.CallNotificationBuilder_first_call_message)
 
             val builder = NotificationCompat.Builder(context, NotificationChannels.CALLS)
-                .setSound(null)
-                .setSmallIcon(R.drawable.ic_baseline_call_24)
-                .setContentIntent(pendingIntent)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setContentTitle(context.getString(R.string.CallNotificationBuilder_first_call_title))
-                .setContentText(text)
-                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                    .setSound(null)
+                    .setSmallIcon(R.drawable.ic_baseline_call_24)
+                    .setContentIntent(pendingIntent)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setContentTitle(context.getString(R.string.CallNotificationBuilder_first_call_title))
+                    .setContentText(text)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                    .setAutoCancel(true)
 
             return builder.build()
         }
@@ -53,11 +54,11 @@ class CallNotificationBuilder {
             val pendingIntent = PendingIntent.getActivity(context, 0, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
             val builder = NotificationCompat.Builder(context, NotificationChannels.CALLS)
-                .setSound(null)
-                .setSmallIcon(R.drawable.ic_baseline_call_24)
-                .setContentIntent(pendingIntent)
-                .setOngoing(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setSound(null)
+                    .setSmallIcon(R.drawable.ic_baseline_call_24)
+                    .setContentIntent(pendingIntent)
+                    .setOngoing(true)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
 
             recipient?.name?.let { name ->
                 builder.setContentTitle(name)
@@ -68,23 +69,7 @@ class CallNotificationBuilder {
                     builder.setContentText(context.getString(R.string.CallNotificationBuilder_connecting))
                     builder.priority = NotificationCompat.PRIORITY_LOW
                 }
-                TYPE_INCOMING_PRE_OFFER -> {
-                    builder.setContentText(context.getString(R.string.NotificationBarManager__incoming_signal_call))
-                        .setCategory(NotificationCompat.CATEGORY_CALL)
-                    builder.addAction(getServiceNotificationAction(
-                        context,
-                        WebRtcCallService.ACTION_DENY_CALL,
-                        R.drawable.ic_close_grey600_32dp,
-                        R.string.NotificationBarManager__deny_call
-                    ))
-                    builder.addAction(getActivityNotificationAction(
-                        context,
-                        WebRtcCallActivity.ACTION_PRE_OFFER,
-                        R.drawable.ic_phone_grey600_32dp,
-                        R.string.NotificationBarManager__answer_call
-                    ))
-                    builder.priority = NotificationCompat.PRIORITY_HIGH
-                }
+                TYPE_INCOMING_PRE_OFFER,
                 TYPE_INCOMING_RINGING -> {
                     builder.setContentText(context.getString(R.string.NotificationBarManager__incoming_signal_call))
                             .setCategory(NotificationCompat.CATEGORY_CALL)
@@ -94,9 +79,12 @@ class CallNotificationBuilder {
                             R.drawable.ic_close_grey600_32dp,
                             R.string.NotificationBarManager__deny_call
                     ))
+                    builder.setFullScreenIntent(getFullScreenPendingIntent(
+                            context
+                    ), true)
                     builder.addAction(getActivityNotificationAction(
                             context,
-                            WebRtcCallActivity.ACTION_ANSWER,
+                            if (type == TYPE_INCOMING_PRE_OFFER) WebRtcCallActivity.ACTION_PRE_OFFER else WebRtcCallActivity.ACTION_ANSWER,
                             R.drawable.ic_phone_grey600_32dp,
                             R.string.NotificationBarManager__answer_call
                     ))
@@ -125,7 +113,6 @@ class CallNotificationBuilder {
             return builder.build()
         }
 
-        @JvmStatic
         private fun getServiceNotificationAction(context: Context, action: String, iconResId: Int, titleResId: Int): NotificationCompat.Action {
             val intent = Intent(context, WebRtcCallService::class.java)
                     .setAction(action)
@@ -135,7 +122,12 @@ class CallNotificationBuilder {
             return NotificationCompat.Action(iconResId, context.getString(titleResId), pendingIntent)
         }
 
-        @JvmStatic
+        private fun getFullScreenPendingIntent(context: Context): PendingIntent {
+            val intent = Intent(context, WebRtcCallActivity::class.java)
+
+            return PendingIntent.getActivity(context, 1, intent, PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        }
+
         private fun getActivityNotificationAction(context: Context, action: String,
                                                   @DrawableRes iconResId: Int, @StringRes titleResId: Int): NotificationCompat.Action {
             val intent = Intent(context, WebRtcCallActivity::class.java)
