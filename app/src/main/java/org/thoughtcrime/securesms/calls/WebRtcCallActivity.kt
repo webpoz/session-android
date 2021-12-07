@@ -12,17 +12,15 @@ import android.view.MenuItem
 import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
+import androidx.core.view.contains
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.android.synthetic.main.activity_conversation_v2.*
 import kotlinx.android.synthetic.main.activity_webrtc.*
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
+import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 import network.loki.messenger.R
 import org.apache.commons.lang3.time.DurationFormatUtils
 import org.session.libsession.avatars.ProfileContactPhoto
@@ -37,8 +35,6 @@ import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallViewModel
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.*
-import java.text.SimpleDateFormat
-import java.time.Duration
 import java.util.*
 
 @AndroidEntryPoint
@@ -152,7 +148,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
     override fun onStart() {
         super.onStart()
 
-        uiJob = lifecycleScope.launch {
+        uiJob = lifecycleScope.launchWhenResumed {
 
             launch {
                 viewModel.audioDeviceState.collect { state ->
@@ -260,5 +256,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
     override fun onStop() {
         super.onStop()
         uiJob?.cancel()
+        remote_renderer.removeAllViews()
+        local_renderer.removeAllViews()
     }
 }
