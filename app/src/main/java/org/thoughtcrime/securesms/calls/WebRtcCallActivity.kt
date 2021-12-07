@@ -177,21 +177,22 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                     }
                     controlGroup.isVisible = state in listOf(CALL_CONNECTED, CALL_OUTGOING, CALL_INCOMING)
                     remote_loading_view.isVisible = state !in listOf(CALL_CONNECTED, CALL_RINGING)
-                    incomingControlGroup.isVisible = state == CALL_RINGING
+                    incomingControlGroup.isVisible = state in listOf(CALL_RINGING, CALL_PRE_INIT)
                 }
             }
 
             launch {
                 viewModel.recipient.collect { latestRecipient ->
                     if (latestRecipient.recipient != null) {
+                        val publicKey = latestRecipient.recipient.address.serialize()
+                        val displayName = getUserDisplayName(publicKey)
+                        supportActionBar?.title = displayName
                         val signalProfilePicture = latestRecipient.recipient.contactPhoto
                         val avatar = (signalProfilePicture as? ProfileContactPhoto)?.avatarObject
                         if (signalProfilePicture != null && avatar != "0" && avatar != "") {
                             glide.clear(remote_recipient)
                             glide.load(signalProfilePicture).diskCacheStrategy(DiskCacheStrategy.AUTOMATIC).circleCrop().into(remote_recipient)
                         } else {
-                            val publicKey = latestRecipient.recipient.address.serialize()
-                            val displayName = getUserDisplayName(publicKey)
                             val sizeInPX = resources.getDimensionPixelSize(R.dimen.extra_large_profile_picture_size)
                             glide.clear(remote_recipient)
                             glide.load(AvatarPlaceholderGenerator.generate(this@WebRtcCallActivity, sizeInPX, publicKey, displayName))

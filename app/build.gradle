@@ -232,20 +232,8 @@ android {
         }
     }
 
-    signingConfigs {
-        release {
-            def props = new Properties()
-            rootProject.file("signing.properties").withInputStream { props.load(it) }
-            storeFile file(props["KEYSTORE_FILE"])
-            storePassword props["KEYSTORE_PASS"]
-            keyAlias props["KEYSTORE_ALIAS"]
-            keyPassword props["KEYSTORE_ALIAS_PASS"]
-        }
-    }
-
     buildTypes {
         release {
-            signingConfig signingConfigs.release
             minifyEnabled false
         }
         debug {

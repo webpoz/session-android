@@ -188,12 +188,19 @@ class PeerConnectionWrapper(context: Context,
         }, mediaConstraints)
 
         try {
-            return future.get()
+            return correctSessionDescription(future.get())
         } catch (e: InterruptedException) {
             throw AssertionError()
         } catch (e: ExecutionException) {
             throw PeerConnectionException(e)
         }
+    }
+
+    private fun correctSessionDescription(sessionDescription: SessionDescription): SessionDescription {
+        val updatedSdp = sessionDescription.description.replace("(a=fmtp:111 ((?!cbr=).)*)\r?\n".toRegex(), "$1;cbr=1\r\n")
+                .replace(".+urn:ietf:params:rtp-hdrext:ssrc-audio-level.*\r?\n".toRegex(), "")
+
+        return SessionDescription(sessionDescription.type, updatedSdp)
     }
 
     fun createOffer(mediaConstraints: MediaConstraints): SessionDescription {
@@ -218,7 +225,7 @@ class PeerConnectionWrapper(context: Context,
         }, mediaConstraints)
 
         try {
-            return future.get()
+            return correctSessionDescription(future.get())
         } catch (e: InterruptedException) {
             throw AssertionError()
         } catch (e: ExecutionException) {
