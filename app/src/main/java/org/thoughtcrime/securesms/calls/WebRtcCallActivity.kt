@@ -109,6 +109,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         }
 
         acceptCallButton.setOnClickListener {
+            wantsToAnswer = true
             val answerIntent = WebRtcCallService.acceptCallIntent(this)
             ContextCompat.startForegroundService(this,answerIntent)
         }
@@ -175,9 +176,9 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                         CALL_CONNECTED -> {
                         }
                     }
-                    controlGroup.isVisible = state in listOf(CALL_CONNECTED, CALL_OUTGOING, CALL_INCOMING)
-                    remote_loading_view.isVisible = state !in listOf(CALL_CONNECTED, CALL_RINGING)
-                    incomingControlGroup.isVisible = state in listOf(CALL_RINGING, CALL_PRE_INIT)
+                    controlGroup.isVisible = state in listOf(CALL_CONNECTED, CALL_OUTGOING, CALL_INCOMING) || (state == CALL_PRE_INIT && wantsToAnswer)
+                    remote_loading_view.isVisible = state !in listOf(CALL_CONNECTED, CALL_RINGING, CALL_PRE_INIT)
+                    incomingControlGroup.isVisible = state in listOf(CALL_RINGING, CALL_PRE_INIT) && !wantsToAnswer
                 }
             }
 

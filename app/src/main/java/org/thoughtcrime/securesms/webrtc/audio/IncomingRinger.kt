@@ -34,14 +34,16 @@ class IncomingRinger(private val context: Context) {
         }
 
         mediaPlayer?.let { player ->
-            try {
-                if (!player.isPlaying) {
-                    player.prepare()
-                    player.start()
-                    Log.i(TAG,"Playing ringtone")
+            if (ringerMode == AudioManager.RINGER_MODE_NORMAL) {
+                try {
+                    if (!player.isPlaying) {
+                        player.prepare()
+                        player.start()
+                        Log.i(TAG,"Playing ringtone")
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG,"Failed to start mediaPlayer", e)
                 }
-            } catch (e: Exception) {
-                Log.e(TAG,"Failed to start mediaPlayer", e)
             }
         } ?: run {
             Log.w(TAG,"Not ringing, mediaPlayer: ${mediaPlayer?.let{"available"}}, mode: $ringerMode")
