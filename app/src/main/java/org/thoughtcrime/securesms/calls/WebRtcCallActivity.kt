@@ -8,8 +8,11 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.view.Gravity
 import android.view.MenuItem
+import android.view.ViewGroup
 import android.view.WindowManager
+import android.widget.FrameLayout
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.core.view.contains
@@ -35,6 +38,7 @@ import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallViewModel
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.*
+import org.webrtc.RendererCommon
 import java.util.*
 
 @AndroidEntryPoint
@@ -228,6 +232,11 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                         viewModel.localRenderer?.let { surfaceView ->
                             surfaceView.setZOrderOnTop(true)
                             local_renderer.addView(surfaceView)
+                            val params = surfaceView.layoutParams as FrameLayout.LayoutParams
+                            params.width = FrameLayout.LayoutParams.WRAP_CONTENT
+                            params.height = FrameLayout.LayoutParams.WRAP_CONTENT
+                            params.gravity = Gravity.CENTER
+                            surfaceView.layoutParams = params
                         }
                     }
                     local_renderer.isVisible = isEnabled
@@ -239,7 +248,14 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                 viewModel.remoteVideoEnabledState.collect { isEnabled ->
                     remote_renderer.removeAllViews()
                     if (isEnabled) {
-                        viewModel.remoteRenderer?.let { remote_renderer.addView(it) }
+                        viewModel.remoteRenderer?.let { surfaceView ->
+                            remote_renderer.addView(surfaceView)
+                            val params = surfaceView.layoutParams as FrameLayout.LayoutParams
+                            params.width = ViewGroup.LayoutParams.WRAP_CONTENT
+                            params.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                            params.gravity = Gravity.CENTER
+                            surfaceView.layoutParams = params
+                        }
                     }
                     remote_renderer.isVisible = isEnabled
                     remote_recipient.isVisible = !isEnabled

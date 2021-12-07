@@ -175,6 +175,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             localRenderer = SurfaceViewRenderer(context)
             remoteRenderer = SurfaceViewRenderer(context)
 
+            localRenderer?.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
+            remoteRenderer?.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
             localRenderer?.init(base.eglBaseContext, null)
             remoteRenderer?.init(base.eglBaseContext, null)
 
@@ -184,7 +186,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             peerConnectionFactory = PeerConnectionFactory.builder()
                     .setOptions(object: PeerConnectionFactory.Options() {
                         init {
-//                            networkIgnoreMask = 1 shl 4
+                            networkIgnoreMask = 1 shl 4
                         }
                     })
                     .setVideoEncoderFactory(encoderFactory)
