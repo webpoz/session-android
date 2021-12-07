@@ -46,6 +46,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     companion object {
         const val ACTION_PRE_OFFER = "pre-offer"
+        const val ACTION_FULL_SCREEN_INTENT = "fullscreen-intent"
         const val ACTION_ANSWER = "answer"
         const val ACTION_END = "end-call"
 
@@ -93,9 +94,11 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         if (intent.action == ACTION_ANSWER) {
             answerCall()
         }
-
         if (intent.action == ACTION_PRE_OFFER) {
             wantsToAnswer = true
+        }
+        if (intent.action == ACTION_FULL_SCREEN_INTENT) {
+            supportActionBar?.setDisplayHomeAsUpEnabled(false)
         }
 
         microphoneButton.setOnClickListener {

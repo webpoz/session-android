@@ -59,7 +59,7 @@ class CallNotificationBuilder {
                     .setSmallIcon(R.drawable.ic_baseline_call_24)
                     .setContentIntent(pendingIntent)
                     .setOngoing(true)
-                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setPriority(NotificationCompat.PRIORITY_MIN)
 
             recipient?.name?.let { name ->
                 builder.setContentTitle(name)
@@ -68,7 +68,6 @@ class CallNotificationBuilder {
             when (type) {
                 TYPE_INCOMING_CONNECTING -> {
                     builder.setContentText(context.getString(R.string.CallNotificationBuilder_connecting))
-                    builder.priority = NotificationCompat.PRIORITY_LOW
                 }
                 TYPE_INCOMING_PRE_OFFER,
                 TYPE_INCOMING_RINGING -> {
@@ -125,6 +124,7 @@ class CallNotificationBuilder {
 
         private fun getFullScreenPendingIntent(context: Context): PendingIntent {
             val intent = Intent(context, WebRtcCallActivity::class.java)
+                    .setAction(WebRtcCallActivity.ACTION_FULL_SCREEN_INTENT)
 
             return PendingIntent.getActivity(context, 1, intent, PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }

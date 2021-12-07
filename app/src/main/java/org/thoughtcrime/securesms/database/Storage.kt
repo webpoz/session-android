@@ -625,4 +625,13 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
         val callMessage = IncomingTextMessage.fromCallInfo(callMessageType, address, Optional.absent(), sentTimestamp)
         database.insertCallMessage(callMessage)
     }
+
+    override fun conversationHasOutgoing(userPublicKey: String): Boolean {
+        val database = DatabaseComponent.get(context).threadDatabase()
+        val threadId = database.getThreadIdIfExistsFor(userPublicKey)
+
+        if (threadId == -1L) return false
+
+        return database.getLastSeenAndHasSent(threadId).second() ?: false
+    }
 }
