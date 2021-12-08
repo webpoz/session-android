@@ -8,16 +8,14 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
-import android.view.Gravity
-import android.view.MenuItem
-import android.view.ViewGroup
-import android.view.WindowManager
+import android.view.*
 import android.widget.FrameLayout
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.core.view.contains
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.android.synthetic.main.activity_conversation_v2.*
@@ -59,6 +57,11 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
     private val glide by lazy { GlideApp.with(this) }
     private var uiJob: Job? = null
     private var wantsToAnswer = false
+        set(value) {
+            field = value
+            WebRtcCallService.broadcastWantsToAnswer(this, value)
+        }
+    private var hangupReceiver: BroadcastReceiver? = null
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
@@ -112,7 +115,10 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         }
 
         acceptCallButton.setOnClickListener {
-            wantsToAnswer = true
+            if (viewModel.currentCallState == CALL_PRE_INIT) {
+                wantsToAnswer = true
+                updateControls()
+            }
             val answerIntent = WebRtcCallService.acceptCallIntent(this)
             ContextCompat.startForegroundService(this,answerIntent)
         }
@@ -122,11 +128,13 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             startService(declineIntent)
         }
 
-        registerReceiver(object: BroadcastReceiver() {
+        hangupReceiver = object: BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 finish()
             }
-        },IntentFilter(ACTION_END))
+        }
+
+        LocalBroadcastManager.getInstance(this).registerReceiver(hangupReceiver!!,IntentFilter(ACTION_END))
 
         enableCameraButton.setOnClickListener {
             Permissions.with(this)
@@ -148,15 +156,36 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        hangupReceiver?.let { receiver ->
+            LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
+        }
+    }
+
     private fun answerCall() {
         val answerIntent = WebRtcCallService.acceptCallIntent(this)
         ContextCompat.startForegroundService(this,answerIntent)
     }
 
+    private fun updateControls(state: CallViewModel.State? = null) {
+        if (state == null) {
+            if (wantsToAnswer) {
+                controlGroup.isVisible = true
+                remote_loading_view.isVisible = true
+                incomingControlGroup.isVisible = false
+            }
+        } else {
+            controlGroup.isVisible = state in listOf(CALL_CONNECTED, CALL_OUTGOING, CALL_INCOMING) || (state == CALL_PRE_INIT && wantsToAnswer)
+            remote_loading_view.isVisible = state !in listOf(CALL_CONNECTED, CALL_RINGING, CALL_PRE_INIT) || wantsToAnswer
+            incomingControlGroup.isVisible = state in listOf(CALL_RINGING, CALL_PRE_INIT) && !wantsToAnswer
+        }
+    }
+
     override fun onStart() {
         super.onStart()
 
-        uiJob = lifecycleScope.launchWhenResumed {
+        uiJob = lifecycleScope.launch {
 
             launch {
                 viewModel.audioDeviceState.collect { state ->
@@ -177,11 +206,10 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                         CALL_OUTGOING -> {
                         }
                         CALL_CONNECTED -> {
+                            wantsToAnswer = false
                         }
                     }
-                    controlGroup.isVisible = state in listOf(CALL_CONNECTED, CALL_OUTGOING, CALL_INCOMING) || (state == CALL_PRE_INIT && wantsToAnswer)
-                    remote_loading_view.isVisible = state !in listOf(CALL_CONNECTED, CALL_RINGING, CALL_PRE_INIT)
-                    incomingControlGroup.isVisible = state in listOf(CALL_RINGING, CALL_PRE_INIT) && !wantsToAnswer
+                    updateControls(state)
                 }
             }
 
@@ -193,11 +221,14 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                         supportActionBar?.title = displayName
                         val signalProfilePicture = latestRecipient.recipient.contactPhoto
                         val avatar = (signalProfilePicture as? ProfileContactPhoto)?.avatarObject
+                        val sizeInPX = resources.getDimensionPixelSize(R.dimen.extra_large_profile_picture_size)
                         if (signalProfilePicture != null && avatar != "0" && avatar != "") {
                             glide.clear(remote_recipient)
-                            glide.load(signalProfilePicture).diskCacheStrategy(DiskCacheStrategy.AUTOMATIC).circleCrop().into(remote_recipient)
+                            glide.load(signalProfilePicture).diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                                    .circleCrop()
+                                    .error(AvatarPlaceholderGenerator.generate(this@WebRtcCallActivity, sizeInPX, publicKey, displayName))
+                                    .into(remote_recipient)
                         } else {
-                            val sizeInPX = resources.getDimensionPixelSize(R.dimen.extra_large_profile_picture_size)
                             glide.clear(remote_recipient)
                             glide.load(AvatarPlaceholderGenerator.generate(this@WebRtcCallActivity, sizeInPX, publicKey, displayName))
                                     .diskCacheStrategy(DiskCacheStrategy.ALL).circleCrop().into(remote_recipient)

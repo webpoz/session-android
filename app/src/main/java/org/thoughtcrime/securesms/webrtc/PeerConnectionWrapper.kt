@@ -47,13 +47,13 @@ class PeerConnectionWrapper(context: Context,
         }
 
         peerConnection = factory.createPeerConnection(configuration, constraints, observer)!!
-        peerConnection.setAudioPlayout(false)
-        peerConnection.setAudioRecording(false)
+        peerConnection.setAudioPlayout(true)
+        peerConnection.setAudioRecording(true)
 
         val mediaStream = factory.createLocalMediaStream("ARDAMS")
         audioSource = factory.createAudioSource(audioConstraints)
         audioTrack = factory.createAudioTrack("ARDAMSa0", audioSource)
-        audioTrack.setEnabled(false)
+        audioTrack.setEnabled(true)
         mediaStream.addTrack(audioTrack)
 
         camera = Camera(context, cameraEventListener)

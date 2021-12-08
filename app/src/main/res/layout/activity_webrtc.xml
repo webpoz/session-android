@@ -25,6 +25,7 @@
         app:layout_constraintEnd_toEndOf="@id/remote_parent"
         app:layout_constraintTop_toTopOf="@id/remote_parent"
         app:layout_constraintBottom_toBottomOf="@id/remote_parent"
+        app:layout_constraintVertical_bias="0.4"
         android:layout_width="@dimen/extra_large_profile_picture_size"
         android:layout_height="@dimen/extra_large_profile_picture_size"/>
 
@@ -58,6 +59,7 @@
     <TextView
         android:id="@+id/callTime"
         android:textSize="@dimen/medium_font_size"
+        android:theme="@style/Theme.Session.CallActivity"
         android:textColor="@color/text"
         tools:text="@tools:sample/date/hhmmss"
         app:layout_constraintStart_toStartOf="parent"

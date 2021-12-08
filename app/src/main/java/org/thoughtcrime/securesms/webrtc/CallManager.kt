@@ -105,6 +105,9 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     val currentConnectionState
         get() = (_connectionEvents.value as CallStateUpdate).state
 
+    val currentCallState
+        get() = _callStateEvents.value
+
     private var eglBase: EglBase? = null
 
     var pendingOffer: String? = null
@@ -418,6 +421,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         connection.setRemoteDescription(SessionDescription(SessionDescription.Type.OFFER, offer))
         val answer = connection.createAnswer(MediaConstraints())
         connection.setLocalDescription(answer)
+        setAudioEnabled(true)
         val answerMessage = CallMessage.answer(answer.description, callId)
         val userAddress = storage.getUserPublicKey() ?: return Promise.ofFail(NullPointerException("No user public key"))
         MessageSender.sendNonDurably(answerMessage, Address.fromSerialized(userAddress))

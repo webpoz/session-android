@@ -104,7 +104,7 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle, p
                 context = context,
                 address = Address.fromSerialized(recipientAddress),
                 callId = callId,
-                sentTimestamp = callMessage.sentTimestamp!!
+                callTime = callMessage.sentTimestamp!!
         )
         ContextCompat.startForegroundService(context, incomingIntent)
     }
