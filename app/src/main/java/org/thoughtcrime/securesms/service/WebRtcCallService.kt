@@ -294,10 +294,8 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
 
     private fun handleBusyCall(intent: Intent) {
         val recipient = getRemoteRecipient(intent)
-        val callId = getCallId(intent)
         val callState = callManager.currentConnectionState
 
-        callManager.handleBusyCall(callId, recipient)
         insertMissedCall(recipient, false)
 
         if (callState == STATE_IDLE) {

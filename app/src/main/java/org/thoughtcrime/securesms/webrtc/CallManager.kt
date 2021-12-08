@@ -627,10 +627,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         }
     }
 
-    fun handleBusyCall(callId: UUID, recipient: Recipient): Promise<Unit, Exception> {
-        return MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
-    }
-
     fun handleAudioCommand(audioCommand: AudioManagerCommand) {
         signalAudioManager.handleCommand(audioCommand)
     }
