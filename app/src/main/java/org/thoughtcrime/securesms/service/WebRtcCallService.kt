@@ -81,6 +81,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         const val EXTRA_RESULT_RECEIVER = "result_receiver"
 
         const val INVALID_NOTIFICATION_ID = -1
+        private const val TIMEOUT_SECONDS = 30L
 
         fun cameraEnabled(context: Context, enabled: Boolean) = Intent(context, WebRtcCallService::class.java)
                 .setAction(ACTION_SET_MUTE_VIDEO)
@@ -376,7 +377,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         callManager.startOutgoingRinger(OutgoingRinger.Type.RINGING)
         setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
         callManager.insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_OUTGOING)
-        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 1, TimeUnit.MINUTES)
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
         val expectedState = callManager.currentConnectionState
         val expectedCallId = callManager.callId
@@ -424,7 +425,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
             return
         }
 
-        timeoutExecutor.schedule(TimeoutRunnable(callId, this), 1, TimeUnit.MINUTES)
+        timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
         callManager.initializeAudioForCall()
         callManager.initializeVideo(this)
