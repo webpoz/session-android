@@ -99,6 +99,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         }
         if (intent.action == ACTION_PRE_OFFER) {
             wantsToAnswer = true
+            answerCall() // this will do nothing, except update notification state
         }
         if (intent.action == ACTION_FULL_SCREEN_INTENT) {
             supportActionBar?.setDisplayHomeAsUpEnabled(false)
@@ -119,8 +120,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                 wantsToAnswer = true
                 updateControls()
             }
-            val answerIntent = WebRtcCallService.acceptCallIntent(this)
-            ContextCompat.startForegroundService(this,answerIntent)
+            answerCall()
         }
 
         declineCallButton.setOnClickListener {
