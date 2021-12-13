@@ -63,7 +63,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
                 CallState.STATE_DIALING,
                 CallState.STATE_ANSWERING,
                 CallState.STATE_LOCAL_RINGING,
-                CallState.STATE_REMOTE_RINGING
+                CallState.STATE_REMOTE_RINGING,
+                CallState.STATE_PRE_OFFER,
         )
         val OUTGOING_STATES = arrayOf(
                 CallState.STATE_DIALING,
@@ -107,6 +108,8 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
     val currentCallState
         get() = _callStateEvents.value
+
+    var iceState = IceConnectionState.CLOSED
 
     private var eglBase: EglBase? = null
 
@@ -215,6 +218,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     }
 
     override fun onIceConnectionChange(newState: IceConnectionState) {
+        iceState = newState
         peerConnectionObservers.forEach { listener -> listener.onIceConnectionChange(newState) }
         if (newState == IceConnectionState.CONNECTED) {
             callStartTime = System.currentTimeMillis()
@@ -421,7 +425,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         connection.setRemoteDescription(SessionDescription(SessionDescription.Type.OFFER, offer))
         val answer = connection.createAnswer(MediaConstraints())
         connection.setLocalDescription(answer)
-        setAudioEnabled(true)
         val answerMessage = CallMessage.answer(answer.description, callId)
         val userAddress = storage.getUserPublicKey() ?: return Promise.ofFail(NullPointerException("No user public key"))
         MessageSender.sendNonDurably(answerMessage, Address.fromSerialized(userAddress))

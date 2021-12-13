@@ -349,12 +349,19 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         val callId = getCallId(intent)
         val recipient = getRemoteRecipient(intent)
         val sentTimestamp = intent.getLongExtra(EXTRA_TIMESTAMP, -1)
-        // TODO: check stale call info and don't proceed
+
+        if (isIncomingMessageExpired(intent)) {
+            insertMissedCall(recipient, true)
+            terminate()
+            return
+        }
+
         setCallInProgressNotification(TYPE_INCOMING_PRE_OFFER, recipient)
         callManager.onPreOffer(callId, recipient, sentTimestamp)
         callManager.postViewModelState(CallViewModel.State.CALL_PRE_INIT)
         callManager.initializeAudioForCall()
         callManager.startIncomingRinger()
+        callManager.setAudioEnabled(true)
     }
 
     private fun handleIncomingRing(intent: Intent) {
@@ -401,6 +408,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
         callManager.insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_OUTGOING)
         timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        callManager.setAudioEnabled(true)
 
         val expectedState = callManager.currentConnectionState
         val expectedCallId = callManager.callId
@@ -470,6 +478,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
                 }
             }
             lockManager.updatePhoneState(LockManager.PhoneState.PROCESSING)
+            callManager.setAudioEnabled(true)
         } catch (e: Exception) {
             Log.e(TAG,e)
             terminate()
@@ -588,7 +597,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         val callId = callManager.callId ?: return
         val callState = callManager.currentConnectionState
 
-        if (callId == getCallId(intent) && callState !in arrayOf(STATE_CONNECTED)) { // TODO: add check for ice state connecting
+        if (callId == getCallId(intent) && (callState !in arrayOf(STATE_CONNECTED) || callManager.iceState == CHECKING)) {
             Log.w(TAG, "Timing out call: $callId")
             handleLocalHangup(intent)
         }
@@ -629,7 +638,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
     }
 
     private fun isIncomingMessageExpired(intent: Intent) =
-            System.currentTimeMillis() - intent.getLongExtra(EXTRA_TIMESTAMP, -1) > TimeUnit.MINUTES.toMillis(2)
+            System.currentTimeMillis() - intent.getLongExtra(EXTRA_TIMESTAMP, -1) > TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS)
 
     override fun onDestroy() {
         Log.d(TAG,"onDestroy()")

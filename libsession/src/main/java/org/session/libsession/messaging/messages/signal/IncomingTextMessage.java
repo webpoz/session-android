@@ -54,8 +54,13 @@ public class IncomingTextMessage implements Parcelable {
 
   public IncomingTextMessage(Address sender, int senderDeviceId, long sentTimestampMillis,
                              String encodedBody, Optional<SignalServiceGroup> group,
-                             long expiresInMillis, boolean unidentified, int callType)
-  {
+                             long expiresInMillis, boolean unidentified, int callType) {
+    this(sender, senderDeviceId, sentTimestampMillis, encodedBody, group, expiresInMillis, unidentified, callType, true);
+  }
+
+  public IncomingTextMessage(Address sender, int senderDeviceId, long sentTimestampMillis,
+                             String encodedBody, Optional<SignalServiceGroup> group,
+                             long expiresInMillis, boolean unidentified, int callType, boolean isPush) {
     this.message              = encodedBody;
     this.sender               = sender;
     this.senderDeviceId       = senderDeviceId;
@@ -64,7 +69,7 @@ public class IncomingTextMessage implements Parcelable {
     this.replyPathPresent     = true;
     this.pseudoSubject        = "";
     this.sentTimestampMillis  = sentTimestampMillis;
-    this.push                 = true;
+    this.push                 = isPush;
     this.subscriptionId       = -1;
     this.expiresInMillis      = expiresInMillis;
     this.unidentified         = unidentified;
@@ -137,7 +142,7 @@ public class IncomingTextMessage implements Parcelable {
                                                  Address sender,
                                                  Optional<SignalServiceGroup> group,
                                                  long sentTimestamp) {
-    return new IncomingTextMessage(sender, 1, sentTimestamp, null, group, 0, false, callMessageType.ordinal());
+    return new IncomingTextMessage(sender, 1, sentTimestamp, null, group, 0, false, callMessageType.ordinal(), false);
   }
 
   public int getSubscriptionId() {

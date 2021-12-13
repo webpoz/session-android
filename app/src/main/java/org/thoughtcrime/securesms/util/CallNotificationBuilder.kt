@@ -61,6 +61,7 @@ class CallNotificationBuilder {
                     .setOngoing(true)
                     .setPriority(NotificationCompat.PRIORITY_MIN)
 
+
             recipient?.name?.let { name ->
                 builder.setContentTitle(name)
             }
@@ -68,6 +69,7 @@ class CallNotificationBuilder {
             when (type) {
                 TYPE_INCOMING_CONNECTING -> {
                     builder.setContentText(context.getString(R.string.CallNotificationBuilder_connecting))
+                            .setNotificationSilent()
                 }
                 TYPE_INCOMING_PRE_OFFER,
                 TYPE_INCOMING_RINGING -> {
@@ -97,7 +99,7 @@ class CallNotificationBuilder {
                             WebRtcCallService.ACTION_LOCAL_HANGUP,
                             R.drawable.ic_call_end_grey600_32dp,
                             R.string.NotificationBarManager__cancel_call
-                    ))
+                    )).setNotificationSilent()
                 }
                 else -> {
                     builder.setContentText(context.getString(R.string.NotificationBarManager_call_in_progress))
@@ -106,7 +108,7 @@ class CallNotificationBuilder {
                             WebRtcCallService.ACTION_LOCAL_HANGUP,
                             R.drawable.ic_call_end_grey600_32dp,
                             R.string.NotificationBarManager__end_call
-                    ))
+                    )).setNotificationSilent().setUsesChronometer(true)
                 }
             }
 
