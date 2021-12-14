@@ -267,11 +267,6 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                         viewModel.localRenderer?.let { surfaceView ->
                             surfaceView.setZOrderOnTop(true)
                             local_renderer.addView(surfaceView)
-                            val params = surfaceView.layoutParams as FrameLayout.LayoutParams
-                            params.width = FrameLayout.LayoutParams.WRAP_CONTENT
-                            params.height = FrameLayout.LayoutParams.WRAP_CONTENT
-                            params.gravity = Gravity.CENTER
-                            surfaceView.layoutParams = params
                         }
                     }
                     local_renderer.isVisible = isEnabled
@@ -285,11 +280,6 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                     if (isEnabled) {
                         viewModel.remoteRenderer?.let { surfaceView ->
                             remote_renderer.addView(surfaceView)
-                            val params = surfaceView.layoutParams as FrameLayout.LayoutParams
-                            params.width = ViewGroup.LayoutParams.WRAP_CONTENT
-                            params.height = ViewGroup.LayoutParams.WRAP_CONTENT
-                            params.gravity = Gravity.CENTER
-                            surfaceView.layoutParams = params
                         }
                     }
                     remote_renderer.isVisible = isEnabled

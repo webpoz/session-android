@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
+import android.net.ConnectivityManager
 import android.os.IBinder
 import android.os.ResultReceiver
 import android.telephony.PhoneStateListener
@@ -25,6 +26,7 @@ import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_IN
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_PRE_OFFER
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_RINGING
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_OUTGOING_RINGING
+import org.thoughtcrime.securesms.util.ContextProvider
 import org.thoughtcrime.securesms.webrtc.*
 import org.thoughtcrime.securesms.webrtc.CallManager.CallState.*
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
@@ -263,7 +265,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         networkChangedReceiver = NetworkChangeReceiver { available ->
             networkChange(available)
         }
-        LocalBroadcastManager.getInstance(this).registerReceiver(networkChangedReceiver!!, IntentFilter("pathsBuilt"))
+        networkChangedReceiver!!.register(this)
     }
 
     private fun registerUncaughtExceptionHandler() {
@@ -647,7 +649,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
             unregisterReceiver(receiver)
         }
         networkChangedReceiver?.let { receiver ->
-            LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
+            receiver.unregister(this)
         }
         wantsToAnswerReceiver?.let { receiver ->
             LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
@@ -660,7 +662,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
     }
 
     fun networkChange(networkAvailable: Boolean) {
-        if (!callManager.isReestablishing && callManager.currentConnectionState in arrayOf(STATE_CONNECTED)) {
+        if (networkAvailable && !callManager.isReestablishing && callManager.currentConnectionState in arrayOf(STATE_CONNECTED)) {
             callManager.networkReestablished()
         }
     }

@@ -181,8 +181,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             localRenderer = SurfaceViewRenderer(context)
             remoteRenderer = SurfaceViewRenderer(context)
 
-            localRenderer?.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
-            remoteRenderer?.setScalingType(RendererCommon.ScalingType.SCALE_ASPECT_FIT)
             localRenderer?.init(base.eglBaseContext, null)
             remoteRenderer?.init(base.eglBaseContext, null)
 
@@ -641,6 +639,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
         if (isReestablishing) return
         isReestablishing = true
+        Log.d("Loki", "start re-establish")
 
         val offer = connection.createOffer(MediaConstraints().apply {
             mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))

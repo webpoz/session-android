@@ -166,35 +166,36 @@
         app:layout_constraintHorizontal_bias="0.9"
         />
 
-    <TextView
-        android:textAllCaps="true"
-        android:theme="@style/Theme.Session.ForceDark"
-        style="@style/Widget.Session.Button.Common.ProminentOutline.Accent"
-        android:text="@string/accept_call"
-        android:layout_marginBottom="@dimen/large_spacing"
+    <ImageView
+        android:background="@drawable/circle_tintable"
+        android:src="@drawable/ic_baseline_call_24"
+        android:padding="@dimen/medium_spacing"
+        android:foregroundTint="@color/call_action_foreground"
+        android:backgroundTint="@color/accent"
+        android:layout_width="@dimen/large_button_height"
+        android:layout_height="@dimen/large_button_height"
+        android:layout_marginBottom="@dimen/very_large_spacing"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintHorizontal_bias="0.85"
-        android:padding="@dimen/medium_spacing"
+        app:layout_constraintHorizontal_bias="0.75"
         android:gravity="center"
-        android:id="@+id/acceptCallButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+        android:id="@+id/acceptCallButton"/>
 
-    <TextView
-        android:textAllCaps="true"
-        style="@style/Widget.Session.Button.Common.UnimportantDestructive"
-        android:text="@string/decline_call"
-        android:layout_marginBottom="@dimen/large_spacing"
+    <ImageView
+        android:background="@drawable/circle_tintable"
+        android:src="@drawable/ic_baseline_call_end_24"
+        android:padding="@dimen/medium_spacing"
+        android:foregroundTint="@color/call_action_foreground"
+        android:backgroundTint="@color/destructive"
+        android:layout_width="@dimen/large_button_height"
+        android:layout_height="@dimen/large_button_height"
+        android:layout_marginBottom="@dimen/very_large_spacing"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintHorizontal_bias="0.15"
-        android:padding="@dimen/medium_spacing"
-        android:id="@+id/declineCallButton"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"/>
+        app:layout_constraintHorizontal_bias="0.25"
+        android:id="@+id/declineCallButton"/>
 
     <androidx.constraintlayout.widget.Group
         android:id="@+id/controlGroup"
