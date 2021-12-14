@@ -48,7 +48,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/WebRtcCallActivity_Session_Call"
-        android:textColor="@color/text"
+        android:textColor="?android:textColorPrimary"
         android:textSize="11sp"
         app:layout_constraintBottom_toTopOf="@+id/controlGroupBarrier"
         android:layout_marginBottom="@dimen/small_spacing"
@@ -59,8 +59,7 @@
     <TextView
         android:id="@+id/callTime"
         android:textSize="@dimen/medium_font_size"
-        android:theme="@style/Theme.Session.CallActivity"
-        android:textColor="@color/text"
+        android:textColor="?android:textColorPrimary"
         tools:text="@tools:sample/date/hhmmss"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
