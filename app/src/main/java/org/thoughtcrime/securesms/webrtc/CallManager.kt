@@ -52,7 +52,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     }
 
     companion object {
-
         val VIDEO_DISABLED_JSON by lazy { buildJsonObject { put("video", false) } }
         val VIDEO_ENABLED_JSON by lazy { buildJsonObject { put("video", true) } }
         val HANGUP_JSON by lazy { buildJsonObject { put("hangup", true) } }
