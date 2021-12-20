@@ -72,6 +72,7 @@ class ProfilePictureView : RelativeLayout {
     }
 
     fun update() {
+        if (!this::glide.isInitialized) return
         val publicKey = publicKey ?: return
         val additionalPublicKey = additionalPublicKey
         if (additionalPublicKey != null) {
