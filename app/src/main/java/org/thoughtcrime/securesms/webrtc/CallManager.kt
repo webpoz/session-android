@@ -181,6 +181,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             remoteRenderer = SurfaceViewRenderer(context)
 
             localRenderer?.init(base.eglBaseContext, null)
+            localRenderer?.setMirror(true)
             remoteRenderer?.init(base.eglBaseContext, null)
 
             val encoderFactory = DefaultVideoEncoderFactory(base.eglBaseContext, true, true)

@@ -29,7 +29,7 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle, p
                 val nextMessage = WebRtcUtils.SIGNAL_QUEUE.receive()
                 Log.d("Loki", nextMessage.type?.name ?: "CALL MESSAGE RECEIVED")
                 val sender = nextMessage.sender ?: continue
-                if (!storage.conversationHasOutgoing(sender)) continue
+                if (!storage.conversationHasOutgoing(sender) && storage.getUserPublicKey() != sender) continue
 
                 if (!TextSecurePreferences.isCallNotificationsEnabled(context)) {
                     Log.d("Loki","Dropping call message if call notifications disabled")

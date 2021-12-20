@@ -201,6 +201,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                         CALL_RINGING -> {
                             if (wantsToAnswer) {
                                 answerCall()
+                                wantsToAnswer = false
                             }
                         }
                         CALL_OUTGOING -> {
