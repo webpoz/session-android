@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Session</string>
+    <string name="app_name">Session</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
     <string name="delete">Delete</string>
@@ -905,6 +905,9 @@
     <string name="dialog_share_logs_explanation">Would you like to export your application logs to be able to share for troubleshooting?</string>
     <string name="conversation_pin">Pin</string>
     <string name="conversation_unpin">Unpin</string>
+    <string name="mark_all_as_read">Mark all as read</string>
+    <string name="global_search_contacts_groups">Contacts and Groups</string>
+    <string name="global_search_messages">Messages</string>
     <string name="CallNotificationBuilder_connecting">Connecting…</string>
     <string name="NotificationBarManager__incoming_signal_call">Incoming call</string>
     <string name="NotificationBarManager__deny_call">Deny call</string>

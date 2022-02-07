@@ -9,11 +9,13 @@ import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
 import androidx.core.content.res.ResourcesCompat
 import androidx.recyclerview.widget.RecyclerView
-import kotlinx.android.synthetic.main.view_control_message.view.*
 import network.loki.messenger.R
+import network.loki.messenger.databinding.ViewControlMessageBinding
 import org.thoughtcrime.securesms.database.model.MessageRecord
 
 class ControlMessageView : LinearLayout {
+
+    private lateinit var binding: ViewControlMessageBinding
 
     // region Lifecycle
     constructor(context: Context) : super(context) { initialize() }
@@ -21,33 +23,37 @@ class ControlMessageView : LinearLayout {
     constructor(context: Context, attrs: AttributeSet, defStyleAttr: Int) : super(context, attrs, defStyleAttr) { initialize() }
 
     private fun initialize() {
-        LayoutInflater.from(context).inflate(R.layout.view_control_message, this)
+        binding = ViewControlMessageBinding.inflate(LayoutInflater.from(context), this, true)
         layoutParams = RecyclerView.LayoutParams(RecyclerView.LayoutParams.MATCH_PARENT, RecyclerView.LayoutParams.WRAP_CONTENT)
     }
     // endregion
 
     // region Updating
     fun bind(message: MessageRecord, previous: MessageRecord?) {
-        dateBreakTextView.showDateBreak(message, previous)
-        iconImageView.visibility = View.GONE
+        binding.dateBreakTextView.showDateBreak(message, previous)
+        binding.iconImageView.visibility = View.GONE
         val tintColor = if (message.isMissedCall) R.color.destructive else R.color.text
-        iconImageView.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(context,tintColor))
+        binding.iconImageView.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(context,tintColor))
         if (message.isExpirationTimerUpdate) {
-            iconImageView.setImageDrawable(ResourcesCompat.getDrawable(resources, R.drawable.ic_timer, context.theme))
-            iconImageView.visibility = View.VISIBLE
+            binding.iconImageView.setImageDrawable(
+                ResourcesCompat.getDrawable(resources, R.drawable.ic_timer, context.theme)
+            )
+            binding.iconImageView.visibility = View.VISIBLE
         } else if (message.isMediaSavedNotification) {
-            iconImageView.setImageDrawable(ResourcesCompat.getDrawable(resources, R.drawable.ic_file_download_white_36dp, context.theme))
-            iconImageView.visibility = View.VISIBLE
+            binding.iconImageView.setImageDrawable(
+                ResourcesCompat.getDrawable(resources, R.drawable.ic_file_download_white_36dp, context.theme)
+            )
+            binding.iconImageView.visibility = View.VISIBLE
         } else if (message.isCallLog) {
             val drawable = when {
                 message.isIncomingCall -> R.drawable.ic_incoming_call
                 message.isOutgoingCall -> R.drawable.ic_outgoing_call
                 else -> R.drawable.ic_missed_call
             }
-            iconImageView.setImageDrawable(ResourcesCompat.getDrawable(resources, drawable, context.theme))
-            iconImageView.visibility = View.VISIBLE
+            binding.iconImageView.setImageDrawable(ResourcesCompat.getDrawable(resources, drawable, context.theme))
+            binding.iconImageView.visibility = View.VISIBLE
         }
-        textView.text = message.getDisplayBody(context)
+        binding.textView.text = message.getDisplayBody(context)
     }
 
     fun recycle() {

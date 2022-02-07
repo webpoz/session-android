@@ -47,7 +47,7 @@ class BatchMessageReceiveJob(
 
     fun executeAsync(): Promise<Unit, Exception> {
         return task {
-            messages.forEach { messageParameters ->
+            messages.iterator().forEach { messageParameters ->
                 val (data, serverHash, openGroupMessageServerID) = messageParameters
                 try {
                     val (message, proto) = MessageReceiver.parse(data, openGroupMessageServerID)
