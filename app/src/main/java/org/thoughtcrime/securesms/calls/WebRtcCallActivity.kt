@@ -9,20 +9,19 @@ import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
 import android.view.*
-import android.widget.FrameLayout
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
-import androidx.core.view.contains
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.android.synthetic.main.activity_conversation_v2.*
-import kotlinx.android.synthetic.main.activity_webrtc.*
-import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import network.loki.messenger.R
+import network.loki.messenger.databinding.ActivityWebrtcBinding
 import org.apache.commons.lang3.time.DurationFormatUtils
 import org.session.libsession.avatars.ProfileContactPhoto
 import org.session.libsession.messaging.contacts.Contact
@@ -36,11 +35,10 @@ import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallViewModel
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.*
-import org.webrtc.RendererCommon
 import java.util.*
 
 @AndroidEntryPoint
-class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
+class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
 
     companion object {
         const val ACTION_PRE_OFFER = "pre-offer"
@@ -55,6 +53,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     private val viewModel by viewModels<CallViewModel>()
     private val glide by lazy { GlideApp.with(this) }
+    private lateinit var binding: ActivityWebrtcBinding
     private var uiJob: Job? = null
     private var wantsToAnswer = false
         set(value) {
@@ -75,23 +74,24 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
         super.onNewIntent(intent)
         if (intent?.action == ACTION_ANSWER) {
             val answerIntent = WebRtcCallService.acceptCallIntent(this)
-            ContextCompat.startForegroundService(this,answerIntent)
+            ContextCompat.startForegroundService(this, answerIntent)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
         super.onCreate(savedInstanceState, ready)
-        setContentView(R.layout.activity_webrtc)
+        binding = ActivityWebrtcBinding.inflate(layoutInflater)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
         }
         window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
-                        or WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
-                        or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
-                        or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-                        or WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON)
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED
+                    or WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD
+                    or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                    or WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
+                    or WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON
+        )
         volumeControlStream = AudioManager.STREAM_VOICE_CALL
 
         if (intent.action == ACTION_ANSWER) {
@@ -105,17 +105,19 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             supportActionBar?.setDisplayHomeAsUpEnabled(false)
         }
 
-        microphoneButton.setOnClickListener {
-            val audioEnabledIntent = WebRtcCallService.microphoneIntent(this, !viewModel.microphoneEnabled)
+        binding.microphoneButton.setOnClickListener {
+            val audioEnabledIntent =
+                WebRtcCallService.microphoneIntent(this, !viewModel.microphoneEnabled)
             startService(audioEnabledIntent)
         }
 
-        speakerPhoneButton.setOnClickListener {
-            val command = AudioManagerCommand.SetUserDevice( if (viewModel.isSpeaker) EARPIECE else SPEAKER_PHONE)
+        binding.speakerPhoneButton.setOnClickListener {
+            val command =
+                AudioManagerCommand.SetUserDevice(if (viewModel.isSpeaker) EARPIECE else SPEAKER_PHONE)
             WebRtcCallService.sendAudioManagerCommand(this, command)
         }
 
-        acceptCallButton.setOnClickListener {
+        binding.acceptCallButton.setOnClickListener {
             if (viewModel.currentCallState == CALL_PRE_INIT) {
                 wantsToAnswer = true
                 updateControls()
@@ -123,34 +125,35 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             answerCall()
         }
 
-        declineCallButton.setOnClickListener {
+        binding.declineCallButton.setOnClickListener {
             val declineIntent = WebRtcCallService.denyCallIntent(this)
             startService(declineIntent)
         }
 
-        hangupReceiver = object: BroadcastReceiver() {
+        hangupReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 finish()
             }
         }
 
-        LocalBroadcastManager.getInstance(this).registerReceiver(hangupReceiver!!,IntentFilter(ACTION_END))
+        LocalBroadcastManager.getInstance(this)
+            .registerReceiver(hangupReceiver!!, IntentFilter(ACTION_END))
 
-        enableCameraButton.setOnClickListener {
+        binding.enableCameraButton.setOnClickListener {
             Permissions.with(this)
-                    .request(Manifest.permission.CAMERA)
-                    .onAllGranted {
-                        val intent = WebRtcCallService.cameraEnabled(this, !viewModel.videoEnabled)
-                        startService(intent)
-                    }
-                    .execute()
+                .request(Manifest.permission.CAMERA)
+                .onAllGranted {
+                    val intent = WebRtcCallService.cameraEnabled(this, !viewModel.videoEnabled)
+                    startService(intent)
+                }
+                .execute()
         }
 
-        switchCameraButton.setOnClickListener {
+        binding.switchCameraButton.setOnClickListener {
             startService(WebRtcCallService.flipCamera(this))
         }
 
-        endCallButton.setOnClickListener {
+        binding.endCallButton.setOnClickListener {
             startService(WebRtcCallService.hangupIntent(this))
         }
 
@@ -165,20 +168,29 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
 
     private fun answerCall() {
         val answerIntent = WebRtcCallService.acceptCallIntent(this)
-        ContextCompat.startForegroundService(this,answerIntent)
+        ContextCompat.startForegroundService(this, answerIntent)
     }
 
     private fun updateControls(state: CallViewModel.State? = null) {
-        if (state == null) {
-            if (wantsToAnswer) {
-                controlGroup.isVisible = true
-                remote_loading_view.isVisible = true
-                incomingControlGroup.isVisible = false
+        with (binding) {
+            if (state == null) {
+                if (wantsToAnswer) {
+                    controlGroup.isVisible = true
+                    remoteLoadingView.isVisible = true
+                    incomingControlGroup.isVisible = false
+                }
+            } else {
+
+                controlGroup.isVisible = state in listOf(
+                    CALL_CONNECTED,
+                    CALL_OUTGOING,
+                    CALL_INCOMING
+                ) || (state == CALL_PRE_INIT && wantsToAnswer)
+                remoteLoadingView.isVisible =
+                    state !in listOf(CALL_CONNECTED, CALL_RINGING, CALL_PRE_INIT) || wantsToAnswer
+                incomingControlGroup.isVisible =
+                    state in listOf(CALL_RINGING, CALL_PRE_INIT) && !wantsToAnswer
             }
-        } else {
-            controlGroup.isVisible = state in listOf(CALL_CONNECTED, CALL_OUTGOING, CALL_INCOMING) || (state == CALL_PRE_INIT && wantsToAnswer)
-            remote_loading_view.isVisible = state !in listOf(CALL_CONNECTED, CALL_RINGING, CALL_PRE_INIT) || wantsToAnswer
-            incomingControlGroup.isVisible = state in listOf(CALL_RINGING, CALL_PRE_INIT) && !wantsToAnswer
         }
     }
 
@@ -191,7 +203,7 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                 viewModel.audioDeviceState.collect { state ->
                     val speakerEnabled = state.selectedDevice == SPEAKER_PHONE
                     // change drawable background to enabled or not
-                    speakerPhoneButton.isSelected = speakerEnabled
+                    binding.speakerPhoneButton.isSelected = speakerEnabled
                 }
             }
 
@@ -222,20 +234,37 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                         supportActionBar?.title = displayName
                         val signalProfilePicture = latestRecipient.recipient.contactPhoto
                         val avatar = (signalProfilePicture as? ProfileContactPhoto)?.avatarObject
-                        val sizeInPX = resources.getDimensionPixelSize(R.dimen.extra_large_profile_picture_size)
+                        val sizeInPX =
+                            resources.getDimensionPixelSize(R.dimen.extra_large_profile_picture_size)
                         if (signalProfilePicture != null && avatar != "0" && avatar != "") {
-                            glide.clear(remote_recipient)
-                            glide.load(signalProfilePicture).diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
-                                    .circleCrop()
-                                    .error(AvatarPlaceholderGenerator.generate(this@WebRtcCallActivity, sizeInPX, publicKey, displayName))
-                                    .into(remote_recipient)
+                            glide.clear(binding.remoteRecipient)
+                            glide.load(signalProfilePicture)
+                                .diskCacheStrategy(DiskCacheStrategy.AUTOMATIC)
+                                .circleCrop()
+                                .error(
+                                    AvatarPlaceholderGenerator.generate(
+                                        this@WebRtcCallActivity,
+                                        sizeInPX,
+                                        publicKey,
+                                        displayName
+                                    )
+                                )
+                                .into(binding.remoteRecipient)
                         } else {
-                            glide.clear(remote_recipient)
-                            glide.load(AvatarPlaceholderGenerator.generate(this@WebRtcCallActivity, sizeInPX, publicKey, displayName))
-                                    .diskCacheStrategy(DiskCacheStrategy.ALL).circleCrop().into(remote_recipient)
+                            glide.clear(binding.remoteRecipient)
+                            glide.load(
+                                AvatarPlaceholderGenerator.generate(
+                                    this@WebRtcCallActivity,
+                                    sizeInPX,
+                                    publicKey,
+                                    displayName
+                                )
+                            )
+                                .diskCacheStrategy(DiskCacheStrategy.ALL).circleCrop()
+                                .into(binding.remoteRecipient)
                         }
                     } else {
-                        glide.clear(remote_recipient)
+                        glide.clear(binding.remoteRecipient)
                     }
                 }
             }
@@ -244,10 +273,13 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
                 while (isActive) {
                     val startTime = viewModel.callStartTime
                     if (startTime == -1L) {
-                        callTime.isVisible = false
+                        binding.callTime.isVisible = false
                     } else {
-                        callTime.isVisible = true
-                        callTime.text = DurationFormatUtils.formatDuration(System.currentTimeMillis() - startTime, CALL_DURATION_FORMAT)
+                        binding.callTime.isVisible = true
+                        binding.callTime.text = DurationFormatUtils.formatDuration(
+                            System.currentTimeMillis() - startTime,
+                            CALL_DURATION_FORMAT
+                        )
                     }
 
                     delay(1_000)
@@ -257,48 +289,49 @@ class WebRtcCallActivity: PassphraseRequiredActionBarActivity() {
             launch {
                 viewModel.localAudioEnabledState.collect { isEnabled ->
                     // change drawable background to enabled or not
-                    microphoneButton.isSelected = !isEnabled
+                    binding.microphoneButton.isSelected = !isEnabled
                 }
             }
 
             launch {
                 viewModel.localVideoEnabledState.collect { isEnabled ->
-                    local_renderer.removeAllViews()
+                    binding.localRenderer.removeAllViews()
                     if (isEnabled) {
                         viewModel.localRenderer?.let { surfaceView ->
                             surfaceView.setZOrderOnTop(true)
-                            local_renderer.addView(surfaceView)
+                            binding.localRenderer.addView(surfaceView)
                         }
                     }
-                    local_renderer.isVisible = isEnabled
-                    enableCameraButton.isSelected = isEnabled
+                    binding.localRenderer.isVisible = isEnabled
+                    binding.enableCameraButton.isSelected = isEnabled
                 }
             }
 
             launch {
                 viewModel.remoteVideoEnabledState.collect { isEnabled ->
-                    remote_renderer.removeAllViews()
+                    binding.remoteRenderer.removeAllViews()
                     if (isEnabled) {
                         viewModel.remoteRenderer?.let { surfaceView ->
-                            remote_renderer.addView(surfaceView)
+                            binding.remoteRenderer.addView(surfaceView)
                         }
                     }
-                    remote_renderer.isVisible = isEnabled
-                    remote_recipient.isVisible = !isEnabled
+                    binding.remoteRenderer.isVisible = isEnabled
+                    binding.remoteRecipient.isVisible = !isEnabled
                 }
             }
         }
     }
 
     private fun getUserDisplayName(publicKey: String): String {
-        val contact = DatabaseComponent.get(this).sessionContactDatabase().getContactWithSessionID(publicKey)
+        val contact =
+            DatabaseComponent.get(this).sessionContactDatabase().getContactWithSessionID(publicKey)
         return contact?.displayName(Contact.ContactContext.REGULAR) ?: publicKey
     }
 
     override fun onStop() {
         super.onStop()
         uiJob?.cancel()
-        remote_renderer.removeAllViews()
-        local_renderer.removeAllViews()
+        binding.remoteRenderer.removeAllViews()
+        binding.localRenderer.removeAllViews()
     }
 }

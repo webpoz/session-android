@@ -12,6 +12,9 @@ import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import org.session.libsession.R
+import org.session.libsession.utilities.TextSecurePreferences.Companion.CALL_NOTIFICATIONS_ENABLED
+import org.session.libsession.utilities.TextSecurePreferences.Companion.SHOWN_CALL_NOTIFICATION
+import org.session.libsession.utilities.TextSecurePreferences.Companion.SHOWN_CALL_WARNING
 import org.session.libsignal.utilities.Log
 import java.io.IOException
 import java.util.Arrays
@@ -151,6 +154,9 @@ interface TextSecurePreferences {
     fun setLastOpenDate()
     fun hasSeenLinkPreviewSuggestionDialog(): Boolean
     fun setHasSeenLinkPreviewSuggestionDialog()
+    fun setShownCallWarning(): Boolean
+    fun setShownCallNotification(): Boolean
+    fun isCallNotificationsEnabled(): Boolean
     fun clearAll()
 
     companion object {
@@ -228,8 +234,8 @@ interface TextSecurePreferences {
         const val LAST_PROFILE_UPDATE_TIME = "pref_last_profile_update_time"
         const val LAST_OPEN_DATE = "pref_last_open_date"
         const val CALL_NOTIFICATIONS_ENABLED = "pref_call_notifications_enabled"
-        private const val SHOWN_CALL_WARNING = "pref_shown_call_warning" // call warning is user-facing warning of enabling calls
-        private const val SHOWN_CALL_NOTIFICATION = "pref_shown_call_notification" // call notification is a promp to check privacy settings
+        const val SHOWN_CALL_WARNING = "pref_shown_call_warning" // call warning is user-facing warning of enabling calls
+        const val SHOWN_CALL_NOTIFICATION = "pref_shown_call_notification" // call notification is a promp to check privacy settings
 
         @JvmStatic
         fun getLastConfigurationSyncTime(context: Context): Long {
@@ -874,6 +880,17 @@ interface TextSecurePreferences {
         }
 
         @JvmStatic
+        fun setShownCallWarning(context: Context): Boolean {
+            val previousValue = getBooleanPreference(context, SHOWN_CALL_WARNING, false)
+            if (previousValue) {
+                return false
+            }
+            val setValue = true
+            setBooleanPreference(context, SHOWN_CALL_WARNING, setValue)
+            return previousValue != setValue
+        }
+
+        @JvmStatic
         fun clearAll(context: Context) {
             getDefaultSharedPreferences(context).edit().clear().commit()
         }
@@ -1429,21 +1446,15 @@ class AppTextSecurePreferences @Inject constructor(
         setBooleanPreference("has_seen_link_preview_suggestion_dialog", true)
     }
 
-    override fun clearAll() {
-        getDefaultSharedPreferences(context).edit().clear().commit()
+    override fun isCallNotificationsEnabled(): Boolean {
+        return getBooleanPreference(CALL_NOTIFICATIONS_ENABLED, false)
     }
 
-    @JvmStatic
-    fun isCallNotificationsEnabled(context: Context): Boolean {
-        return getBooleanPreference(context, CALL_NOTIFICATIONS_ENABLED, false)
-    }
-
-    @JvmStatic
-    fun setShownCallNotification(context: Context): Boolean {
-        val previousValue = getBooleanPreference(context, SHOWN_CALL_NOTIFICATION, false)
+    override fun setShownCallNotification(): Boolean {
+        val previousValue = getBooleanPreference(SHOWN_CALL_NOTIFICATION, false)
         if (previousValue) return false
         val setValue = true
-        setBooleanPreference(context, SHOWN_CALL_NOTIFICATION, setValue)
+        setBooleanPreference(SHOWN_CALL_NOTIFICATION, setValue)
         return previousValue != setValue
     }
 
@@ -1452,15 +1463,18 @@ class AppTextSecurePreferences @Inject constructor(
      * Set the SHOWN_CALL_WARNING preference to `true`
      * Return `true` if the value did update (it was previously unset)
      */
-    @JvmStatic
-    fun setShownCallWarning(context: Context) : Boolean {
-        val previousValue = getBooleanPreference(context, SHOWN_CALL_WARNING, false)
+    override fun setShownCallWarning() : Boolean {
+        val previousValue = getBooleanPreference(SHOWN_CALL_WARNING, false)
         if (previousValue) {
             return false
         }
         val setValue = true
-        setBooleanPreference(context, SHOWN_CALL_WARNING, setValue)
+        setBooleanPreference(SHOWN_CALL_WARNING, setValue)
         return previousValue != setValue
+    }
+
+    override fun clearAll() {
+        getDefaultSharedPreferences(context).edit().clear().commit()
     }
 
 }

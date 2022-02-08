@@ -21,7 +21,7 @@ import org.thoughtcrime.securesms.util.CallNotificationBuilder
 import org.webrtc.IceCandidate
 
 
-class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle, private val storage: StorageProtocol) {
+class CallMessageProcessor(private val context: Context, private val textSecurePreferences: TextSecurePreferences, lifecycle: Lifecycle, private val storage: StorageProtocol) {
 
     init {
         lifecycle.coroutineScope.launch(IO) {
@@ -31,11 +31,11 @@ class CallMessageProcessor(private val context: Context, lifecycle: Lifecycle, p
                 val sender = nextMessage.sender ?: continue
                 if (!storage.conversationHasOutgoing(sender) && storage.getUserPublicKey() != sender) continue
 
-                if (!TextSecurePreferences.isCallNotificationsEnabled(context)) {
+                if (!textSecurePreferences.isCallNotificationsEnabled()) {
                     Log.d("Loki","Dropping call message if call notifications disabled")
                     if (nextMessage.type != PRE_OFFER) continue
                     val sentTimestamp = nextMessage.sentTimestamp ?: continue
-                    if (TextSecurePreferences.setShownCallNotification(context)) {
+                    if (textSecurePreferences.setShownCallNotification()) {
                         // first time call notification encountered
                         val notification = CallNotificationBuilder.getFirstCallNotification(context)
                         context.getSystemService(NotificationManager::class.java).notify(CallNotificationBuilder.WEBRTC_NOTIFICATION, notification)

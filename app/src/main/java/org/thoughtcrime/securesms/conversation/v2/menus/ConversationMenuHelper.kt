@@ -53,7 +53,7 @@ import java.io.IOException
 
 object ConversationMenuHelper {
     
-    fun onPrepareOptionsMenu(menu: Menu, inflater: MenuInflater, thread: Recipient, threadId: Long, context: Context, onOptionsItemSelected: (MenuItem) -> Unit) {
+    fun onPrepareOptionsMenu(menu: Menu, inflater: MenuInflater, thread: Recipient, threadId: Long, isCallsEnabled: Boolean, context: Context, onOptionsItemSelected: (MenuItem) -> Unit) {
         // Prepare
         menu.clear()
         val isOpenGroup = thread.isOpenGroupRecipient
@@ -102,7 +102,7 @@ object ConversationMenuHelper {
             inflater.inflate(R.menu.menu_conversation_notification_settings, menu)
         }
 
-        if (!thread.isGroupRecipient && TextSecurePreferences.isCallNotificationsEnabled(context)) {
+        if (!thread.isGroupRecipient && isCallsEnabled) {
             inflater.inflate(R.menu.menu_conversation_call, menu)
         }
 

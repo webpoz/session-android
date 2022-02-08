@@ -60,7 +60,7 @@ private fun MessageReceiver.handleReadReceipt(message: ReadReceipt) {
 
 private fun MessageReceiver.handleCallMessage(message: CallMessage) {
     // TODO: refactor this out to persistence, just to help debug the flow and send/receive in synchronous testing
-    WebRtcUtils.SIGNAL_QUEUE.offer(message)
+    WebRtcUtils.SIGNAL_QUEUE.trySend(message)
 }
 
 private fun MessageReceiver.handleTypingIndicator(message: TypingIndicator) {

@@ -21,6 +21,9 @@ import org.thoughtcrime.securesms.service.KeyCachingService;
 
 import java.util.concurrent.TimeUnit;
 
+import javax.inject.Inject;
+
+import dagger.hilt.android.AndroidEntryPoint;
 import kotlin.jvm.functions.Function1;
 import mobi.upod.timedurationpicker.TimeDurationPickerDialog;
 import network.loki.messenger.R;
