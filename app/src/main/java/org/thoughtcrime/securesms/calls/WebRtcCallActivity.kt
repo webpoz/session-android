@@ -25,6 +25,7 @@ import network.loki.messenger.databinding.ActivityWebrtcBinding
 import org.apache.commons.lang3.time.DurationFormatUtils
 import org.session.libsession.avatars.ProfileContactPhoto
 import org.session.libsession.messaging.contacts.Contact
+import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
 import org.thoughtcrime.securesms.dependencies.DatabaseComponent
 import org.thoughtcrime.securesms.mms.GlideApp
@@ -181,7 +182,6 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
                     incomingControlGroup.isVisible = false
                 }
             } else {
-
                 controlGroup.isVisible = state in listOf(
                     CALL_CONNECTED,
                     CALL_OUTGOING,
@@ -210,6 +210,7 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
 
             launch {
                 viewModel.callState.collect { state ->
+                    Log.d("Loki", "Consuming view model state $state")
                     when (state) {
                         CALL_RINGING -> {
                             if (wantsToAnswer) {
@@ -309,6 +310,13 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
             }
 
             launch {
+                viewModel.cameraRotations.collect { (localRotation, remoteRotation) ->
+                    val screenRotation = getDeviceRotation()
+                    Log.d("Loki", "local rotation: $localRotation, remote rotation: $remoteRotation, screen rotation: $screenRotation")
+                }
+            }
+
+            launch {
                 viewModel.remoteVideoEnabledState.collect { isEnabled ->
                     binding.remoteRenderer.removeAllViews()
                     if (isEnabled) {
@@ -320,6 +328,21 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
                     binding.remoteRecipient.isVisible = !isEnabled
                 }
             }
+        }
+    }
+
+    private fun getDeviceRotation(): Int {
+        val rotation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            display?.rotation
+        } else {
+            windowManager.defaultDisplay.rotation
+        }
+        return when (rotation) {
+            Surface.ROTATION_0 -> 0
+            Surface.ROTATION_180 -> 180
+            Surface.ROTATION_270 -> 270
+            Surface.ROTATION_90 -> 90
+            else -> throw NullPointerException("Unrecognized rotation $rotation")
         }
     }
 

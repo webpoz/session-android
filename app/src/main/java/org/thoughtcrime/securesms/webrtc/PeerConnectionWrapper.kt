@@ -6,7 +6,9 @@ import org.thoughtcrime.securesms.webrtc.video.Camera
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
 import org.webrtc.*
+import java.security.SecureRandom
 import java.util.concurrent.ExecutionException
+import kotlin.random.asKotlinRandom
 
 class PeerConnectionWrapper(context: Context,
                             factory: PeerConnectionFactory,
@@ -27,8 +29,12 @@ class PeerConnectionWrapper(context: Context,
         get() = peerConnection.localDescription != null && peerConnection.remoteDescription != null
 
     init {
-        val iceServers = listOf("freyr","fenrir","frigg","angus","hereford","holstein","brahman").map { sub ->
-            PeerConnection.IceServer.builder("turn:$sub.getsession.org").setUsername("session202111").setPassword("053c268164bc7bd7").createIceServer()
+        val random = SecureRandom().asKotlinRandom()
+        val iceServers = listOf("freyr","fenrir","frigg","angus","hereford","holstein", "brahman").shuffled(random).take(2).map { sub ->
+            PeerConnection.IceServer.builder("turn:$sub.getsession.org")
+                .setUsername("session202111")
+                .setPassword("053c268164bc7bd7")
+                .createIceServer()
         }
 
         val constraints = MediaConstraints().apply {

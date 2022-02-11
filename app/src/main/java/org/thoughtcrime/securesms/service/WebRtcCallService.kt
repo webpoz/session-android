@@ -85,7 +85,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         const val EXTRA_WANTS_TO_ANSWER = "wants_to_answer"
 
         const val INVALID_NOTIFICATION_ID = -1
-        private const val TIMEOUT_SECONDS = 30L
+        private const val TIMEOUT_SECONDS = 60L
 
         fun cameraEnabled(context: Context, enabled: Boolean) = Intent(context, WebRtcCallService::class.java)
                 .setAction(ACTION_SET_MUTE_VIDEO)
@@ -485,7 +485,6 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
             Log.e(TAG,e)
             terminate()
         }
-        // DatabaseComponent.get(this).smsDatabase().insertReceivedCall(recipient)
     }
 
     private fun handleDenyCall(intent: Intent) {

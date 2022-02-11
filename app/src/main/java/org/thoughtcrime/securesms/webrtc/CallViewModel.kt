@@ -66,6 +66,9 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
     val remoteVideoEnabledState
         get() = callManager.remoteVideoEvents.map { it.isEnabled }
 
+    val cameraRotations
+        get() = callManager.cameraRotations
+
     val currentCallState
         get() = callManager.currentCallState
 
