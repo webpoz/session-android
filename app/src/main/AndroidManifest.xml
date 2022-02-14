@@ -298,6 +298,7 @@
             android:theme="@style/Theme.Session.DayNight.NoActionBar" />
         <activity android:name="org.thoughtcrime.securesms.calls.WebRtcCallActivity"
             android:launchMode="singleTop"
+            android:screenOrientation="portrait"
             android:showForAllUsers="true"
             android:parentActivityName="org.thoughtcrime.securesms.home.HomeActivity"
             android:theme="@style/Theme.Session.CallActivity">

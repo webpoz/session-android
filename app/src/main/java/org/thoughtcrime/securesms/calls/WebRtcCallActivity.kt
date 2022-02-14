@@ -8,7 +8,10 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
-import android.view.*
+import android.view.MenuItem
+import android.view.OrientationEventListener
+import android.view.Surface
+import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
@@ -34,9 +37,13 @@ import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.thoughtcrime.securesms.util.AvatarPlaceholderGenerator
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallViewModel
-import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
-import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.*
-import java.util.*
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_CONNECTED
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_INCOMING
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_OUTGOING
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_PRE_INIT
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_RINGING
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.EARPIECE
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.SPEAKER_PHONE
 
 @AndroidEntryPoint
 class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
@@ -63,6 +70,14 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
         }
     private var hangupReceiver: BroadcastReceiver? = null
 
+    private val rotationListener by lazy {
+        object : OrientationEventListener(this) {
+            override fun onOrientationChanged(orientation: Int) {
+                viewModel.setDeviceRotation(orientation)
+            }
+        }
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
             finish()
@@ -81,6 +96,7 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
         super.onCreate(savedInstanceState, ready)
+        rotationListener.enable()
         binding = ActivityWebrtcBinding.inflate(layoutInflater)
         setContentView(binding.root)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -166,6 +182,7 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
         hangupReceiver?.let { receiver ->
             LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
         }
+        rotationListener.disable()
     }
 
     private fun answerCall() {
@@ -174,7 +191,7 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
     }
 
     private fun updateControls(state: CallViewModel.State? = null) {
-        with (binding) {
+        with(binding) {
             if (state == null) {
                 if (wantsToAnswer) {
                     controlGroup.isVisible = true
@@ -306,13 +323,6 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
                     }
                     binding.localRenderer.isVisible = isEnabled
                     binding.enableCameraButton.isSelected = isEnabled
-                }
-            }
-
-            launch {
-                viewModel.cameraRotations.collect { (localRotation, remoteRotation) ->
-                    val screenRotation = getDeviceRotation()
-                    Log.d("Loki", "local rotation: $localRotation, remote rotation: $remoteRotation, screen rotation: $screenRotation")
                 }
             }
 

@@ -28,6 +28,7 @@ import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
 import org.webrtc.*
 import org.webrtc.PeerConnection.IceConnectionState
+import org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL
 import org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT
 import java.nio.ByteBuffer
 import java.util.*
@@ -99,9 +100,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     private val _recipientEvents = MutableStateFlow(RecipientUpdate.UNKNOWN)
     val recipientEvents = _recipientEvents.asSharedFlow()
     private var localCameraState: CameraState = CameraState.UNKNOWN
-
-    private val _cameraRotations = MutableStateFlow(0 to 0)
-    val cameraRotations = _cameraRotations.asSharedFlow()
 
     private val _audioDeviceEvents = MutableStateFlow(AudioDeviceUpdate(AudioDevice.NONE, setOf()))
     val audioDeviceEvents = _audioDeviceEvents.asSharedFlow()
@@ -182,35 +180,25 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         Util.runOnMainSync {
             val base = EglBase.create()
             eglBase = base
-            _cameraRotations.value = 0 to 0
             localRenderer = SurfaceViewRenderer(context).apply {
                 setEnableHardwareScaler(true)
             }
 
             remoteRenderer = SurfaceViewRenderer(context).apply {
                 setEnableHardwareScaler(true)
-                setScalingType(SCALE_ASPECT_FIT, SCALE_ASPECT_FIT)
             }
 
-            localRenderer?.init(base.eglBaseContext, object : RendererCommon.RendererEvents {
-                override fun onFirstFrameRendered() {
-                    localCameraState
-                }
-
-                override fun onFrameResolutionChanged(p0: Int, p1: Int, rotation: Int) {
-                    _cameraRotations.value = _cameraRotations.value.copy(first = rotation)
-                }
-            })
+            localRenderer?.init(base.eglBaseContext, null)
             localRenderer?.setMirror(localCameraState.activeDirection == CameraState.Direction.FRONT)
-            remoteRenderer?.init(base.eglBaseContext, object : RendererCommon.RendererEvents {
+            remoteRenderer?.init(base.eglBaseContext, object: RendererCommon.RendererEvents {
                 override fun onFirstFrameRendered() {
-                    localCameraState
                 }
 
-                override fun onFrameResolutionChanged(p0: Int, p1: Int, rotation: Int) {
-                    _cameraRotations.value = _cameraRotations.value.copy(second = rotation)
+                override fun onFrameResolutionChanged(p0: Int, p1: Int, p2: Int) {
+                    Log.d("Loki", "remote rotation: $p2")
                 }
             })
+            remoteRenderer?.setScalingType(SCALE_ASPECT_FIT)
 
             val encoderFactory = DefaultVideoEncoderFactory(base.eglBaseContext, true, true)
             val decoderFactory = DefaultVideoDecoderFactory(base.eglBaseContext)
@@ -589,6 +577,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             localCameraState = connection.getCameraState()
             localRenderer?.setMirror(localCameraState.activeDirection == CameraState.Direction.FRONT)
         }
+    }
+
+    fun setDeviceRotation(newRotation: Int) {
+        peerConnection?.setDeviceRotation(newRotation)
     }
 
     fun handleWiredHeadsetChanged(present: Boolean) {

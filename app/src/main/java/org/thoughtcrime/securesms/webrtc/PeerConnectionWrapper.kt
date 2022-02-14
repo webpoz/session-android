@@ -5,6 +5,7 @@ import org.session.libsignal.utilities.SettableFuture
 import org.thoughtcrime.securesms.webrtc.video.Camera
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
+import org.thoughtcrime.securesms.webrtc.video.RotationVideoSink
 import org.webrtc.*
 import java.security.SecureRandom
 import java.util.concurrent.ExecutionException
@@ -24,6 +25,7 @@ class PeerConnectionWrapper(context: Context,
     private val camera: Camera
     private val videoSource: VideoSource?
     private val videoTrack: VideoTrack?
+    private val rotationVideoSink = RotationVideoSink()
 
     val readyForIce
         get() = peerConnection.localDescription != null && peerConnection.remoteDescription != null
@@ -66,13 +68,12 @@ class PeerConnectionWrapper(context: Context,
         if (camera.capturer != null) {
             videoSource = factory.createVideoSource(false)
             videoTrack = factory.createVideoTrack("ARDAMSv0", videoSource)
-
+            rotationVideoSink.setObserver(videoSource.capturerObserver)
             camera.capturer.initialize(
                     SurfaceTextureHelper.create("WebRTC-SurfaceTextureHelper", eglBase.eglBaseContext),
                             context,
-                            videoSource.capturerObserver
+                            rotationVideoSink
             )
-
             videoTrack.addSink(localRenderer)
             videoTrack.setEnabled(false)
             mediaStream.addTrack(videoTrack)
@@ -274,6 +275,10 @@ class PeerConnectionWrapper(context: Context,
 
     fun setAudioEnabled(isEnabled: Boolean) {
         audioTrack.setEnabled(isEnabled)
+    }
+
+    fun setDeviceRotation(rotation: Int) {
+        rotationVideoSink.rotation = rotation
     }
 
     fun setVideoEnabled(isEnabled: Boolean) {
