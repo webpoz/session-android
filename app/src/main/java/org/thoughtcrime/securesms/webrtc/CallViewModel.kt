@@ -66,9 +66,11 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
     val remoteVideoEnabledState
         get() = callManager.remoteVideoEvents.map { it.isEnabled }
 
-    fun setDeviceRotation(newRotation: Int) {
-        callManager.setDeviceRotation(newRotation)
-    }
+    var deviceRotation: Int = 0
+        set(value) {
+            field = value
+            callManager.setDeviceRotation(value)
+        }
 
     val currentCallState
         get() = callManager.currentCallState

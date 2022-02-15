@@ -44,6 +44,8 @@ import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_PRE_INIT
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_RINGING
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.EARPIECE
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.SPEAKER_PHONE
+import org.thoughtcrime.securesms.webrtc.data.quadrantRotation
+import org.thoughtcrime.securesms.webrtc.video.RotationVideoProcessor
 
 @AndroidEntryPoint
 class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
@@ -73,7 +75,7 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
     private val rotationListener by lazy {
         object : OrientationEventListener(this) {
             override fun onOrientationChanged(orientation: Int) {
-                viewModel.setDeviceRotation(orientation)
+                viewModel.deviceRotation = orientation
             }
         }
     }

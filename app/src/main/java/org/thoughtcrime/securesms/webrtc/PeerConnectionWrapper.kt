@@ -1,10 +1,12 @@
 package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
+import org.session.libsignal.utilities.Log
 import org.session.libsignal.utilities.SettableFuture
 import org.thoughtcrime.securesms.webrtc.video.Camera
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
+import org.thoughtcrime.securesms.webrtc.video.RotationVideoProcessor
 import org.thoughtcrime.securesms.webrtc.video.RotationVideoSink
 import org.webrtc.*
 import java.security.SecureRandom
@@ -74,7 +76,7 @@ class PeerConnectionWrapper(context: Context,
                             context,
                             rotationVideoSink
             )
-            videoTrack.addSink(localRenderer)
+            rotationVideoSink.setSink(localRenderer)
             videoTrack.setEnabled(false)
             mediaStream.addTrack(videoTrack)
         } else {
@@ -278,6 +280,7 @@ class PeerConnectionWrapper(context: Context,
     }
 
     fun setDeviceRotation(rotation: Int) {
+        Log.d("Loki", "rotation: $rotation")
         rotationVideoSink.rotation = rotation
     }
 

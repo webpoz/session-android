@@ -2,6 +2,8 @@ package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
 import android.telephony.TelephonyManager
+import android.view.ViewGroup
+import android.view.ViewGroup.LayoutParams.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.serialization.Serializable
@@ -182,10 +184,12 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             eglBase = base
             localRenderer = SurfaceViewRenderer(context).apply {
                 setEnableHardwareScaler(true)
+                setScalingType(SCALE_ASPECT_FIT)
             }
 
             remoteRenderer = SurfaceViewRenderer(context).apply {
                 setEnableHardwareScaler(true)
+                setScalingType(SCALE_ASPECT_FIT)
             }
 
             localRenderer?.init(base.eglBaseContext, null)
@@ -198,7 +202,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
                     Log.d("Loki", "remote rotation: $p2")
                 }
             })
-            remoteRenderer?.setScalingType(SCALE_ASPECT_FIT)
 
             val encoderFactory = DefaultVideoEncoderFactory(base.eglBaseContext, true, true)
             val decoderFactory = DefaultVideoDecoderFactory(base.eglBaseContext)

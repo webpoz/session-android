@@ -1,17 +1,20 @@
 package org.thoughtcrime.securesms.webrtc.video
 
-import org.session.libsignal.utilities.Log
+import org.thoughtcrime.securesms.webrtc.data.quadrantRotation
 import org.webrtc.CapturerObserver
 import org.webrtc.VideoFrame
+import org.webrtc.VideoProcessor
+import org.webrtc.VideoSink
 import java.lang.ref.SoftReference
 import java.util.concurrent.atomic.AtomicBoolean
 
-class RotationVideoSink: CapturerObserver {
+class RotationVideoSink: CapturerObserver, VideoProcessor {
 
     var rotation: Int = 0
 
     private val capturing = AtomicBoolean(false)
     private var capturerObserver = SoftReference<CapturerObserver>(null)
+    private var sink = SoftReference<VideoSink>(null)
 
     override fun onCapturerStarted(ignored: Boolean) {
         capturing.set(true)
@@ -26,15 +29,19 @@ class RotationVideoSink: CapturerObserver {
         val observer = capturerObserver.get()
         if (videoFrame == null || observer == null || !capturing.get()) return
 
-        val quadrantRotation = when (rotation % 360) {
-            in 0 until 90 -> 90
-            in 90 until 180 -> 180
-            in 180 until 270 -> 270
-            else -> 0
-        }
+        val quadrantRotation = rotation.quadrantRotation()
+
+        val localRotation = 90
 
         val newFrame = VideoFrame(videoFrame.buffer, quadrantRotation, videoFrame.timestampNs)
+        val localFrame = VideoFrame(videoFrame.buffer, localRotation, videoFrame.timestampNs)
+
         observer.onFrameCaptured(newFrame)
+        sink.get()?.onFrame(localFrame)
+    }
+
+    override fun setSink(sink: VideoSink?) {
+        this.sink = SoftReference(sink)
     }
 
     fun setObserver(videoSink: CapturerObserver?) {
