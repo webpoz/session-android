@@ -2,11 +2,8 @@ package org.thoughtcrime.securesms.webrtc
 
 import android.content.Context
 import android.telephony.TelephonyManager
-import android.view.ViewGroup
-import android.view.ViewGroup.LayoutParams.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.*
 import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.functional.bind
@@ -28,13 +25,14 @@ import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice
 import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
+import org.thoughtcrime.securesms.webrtc.video.RemoteRotationVideoProxySink
 import org.webrtc.*
 import org.webrtc.PeerConnection.IceConnectionState
+import org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_BALANCED
 import org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL
 import org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT
 import java.nio.ByteBuffer
 import java.util.*
-import java.util.concurrent.Executors
 
 class CallManager(context: Context, audioManager: AudioManagerCompat, private val storage: StorageProtocol): PeerConnection.Observer,
         SignalAudioManager.EventListener, CameraEventListener, DataChannel.Observer {
@@ -137,6 +135,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     private val outgoingIceDebouncer = Debouncer(200L)
 
     var localRenderer: SurfaceViewRenderer? = null
+    var remoteRotationSink: RemoteRotationVideoProxySink? = null
     var remoteRenderer: SurfaceViewRenderer? = null
     private var peerConnectionFactory: PeerConnectionFactory? = null
 
@@ -184,24 +183,18 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             eglBase = base
             localRenderer = SurfaceViewRenderer(context).apply {
                 setEnableHardwareScaler(true)
-                setScalingType(SCALE_ASPECT_FIT)
             }
 
             remoteRenderer = SurfaceViewRenderer(context).apply {
                 setEnableHardwareScaler(true)
-                setScalingType(SCALE_ASPECT_FIT)
             }
+            remoteRotationSink = RemoteRotationVideoProxySink()
+
 
             localRenderer?.init(base.eglBaseContext, null)
             localRenderer?.setMirror(localCameraState.activeDirection == CameraState.Direction.FRONT)
-            remoteRenderer?.init(base.eglBaseContext, object: RendererCommon.RendererEvents {
-                override fun onFirstFrameRendered() {
-                }
-
-                override fun onFrameResolutionChanged(p0: Int, p1: Int, p2: Int) {
-                    Log.d("Loki", "remote rotation: $p2")
-                }
-            })
+            remoteRenderer?.init(base.eglBaseContext, null)
+            remoteRotationSink!!.setSink(remoteRenderer!!)
 
             val encoderFactory = DefaultVideoEncoderFactory(base.eglBaseContext, true, true)
             val decoderFactory = DefaultVideoDecoderFactory(base.eglBaseContext)
@@ -299,7 +292,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         if (stream.videoTracks != null && stream.videoTracks.size == 1) {
             val videoTrack = stream.videoTracks.first()
             videoTrack.setEnabled(true)
-            videoTrack.addSink(remoteRenderer)
+            videoTrack.addSink(remoteRotationSink)
         }
     }
 
@@ -359,6 +352,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         peerConnection = null
 
         localRenderer?.release()
+        remoteRotationSink?.release()
         remoteRenderer?.release()
         eglBase?.release()
 
@@ -584,6 +578,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
     fun setDeviceRotation(newRotation: Int) {
         peerConnection?.setDeviceRotation(newRotation)
+        remoteRotationSink?.rotation = newRotation
     }
 
     fun handleWiredHeadsetChanged(present: Boolean) {

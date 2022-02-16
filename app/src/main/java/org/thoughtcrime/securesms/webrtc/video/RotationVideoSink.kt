@@ -1,5 +1,6 @@
 package org.thoughtcrime.securesms.webrtc.video
 
+import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.data.quadrantRotation
 import org.webrtc.CapturerObserver
 import org.webrtc.VideoFrame
@@ -11,6 +12,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class RotationVideoSink: CapturerObserver, VideoProcessor {
 
     var rotation: Int = 0
+    var mirrored = false
 
     private val capturing = AtomicBoolean(false)
     private var capturerObserver = SoftReference<CapturerObserver>(null)
@@ -31,10 +33,8 @@ class RotationVideoSink: CapturerObserver, VideoProcessor {
 
         val quadrantRotation = rotation.quadrantRotation()
 
-        val localRotation = 90
-
-        val newFrame = VideoFrame(videoFrame.buffer, quadrantRotation, videoFrame.timestampNs)
-        val localFrame = VideoFrame(videoFrame.buffer, localRotation, videoFrame.timestampNs)
+        val newFrame = VideoFrame(videoFrame.buffer, (videoFrame.rotation + quadrantRotation * if (mirrored && quadrantRotation in listOf(90,270)) -1 else 1) % 360, videoFrame.timestampNs)
+        val localFrame = VideoFrame(videoFrame.buffer, videoFrame.rotation * if (mirrored && quadrantRotation in listOf(90,270)) -1 else 1, videoFrame.timestampNs)
 
         observer.onFrameCaptured(newFrame)
         sink.get()?.onFrame(localFrame)

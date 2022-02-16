@@ -44,8 +44,6 @@ import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_PRE_INIT
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_RINGING
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.EARPIECE
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.SPEAKER_PHONE
-import org.thoughtcrime.securesms.webrtc.data.quadrantRotation
-import org.thoughtcrime.securesms.webrtc.video.RotationVideoProcessor
 
 @AndroidEntryPoint
 class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {

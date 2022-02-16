@@ -6,7 +6,6 @@ import org.session.libsignal.utilities.SettableFuture
 import org.thoughtcrime.securesms.webrtc.video.Camera
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
-import org.thoughtcrime.securesms.webrtc.video.RotationVideoProcessor
 import org.thoughtcrime.securesms.webrtc.video.RotationVideoSink
 import org.webrtc.*
 import java.security.SecureRandom
@@ -17,9 +16,9 @@ class PeerConnectionWrapper(context: Context,
                             factory: PeerConnectionFactory,
                             observer: PeerConnection.Observer,
                             localRenderer: VideoSink,
-                            cameraEventListener: CameraEventListener,
+                            private val cameraEventListener: CameraEventListener,
                             eglBase: EglBase,
-                            relay: Boolean = false) {
+                            relay: Boolean = false): CameraEventListener {
 
     private val peerConnection: PeerConnection
     private val audioTrack: AudioTrack
@@ -66,7 +65,7 @@ class PeerConnectionWrapper(context: Context,
         audioTrack.setEnabled(true)
         mediaStream.addTrack(audioTrack)
 
-        camera = Camera(context, cameraEventListener)
+        camera = Camera(context, this)
         if (camera.capturer != null) {
             videoSource = factory.createVideoSource(false)
             videoTrack = factory.createVideoTrack("ARDAMSv0", videoSource)
@@ -76,6 +75,7 @@ class PeerConnectionWrapper(context: Context,
                             context,
                             rotationVideoSink
             )
+            rotationVideoSink.mirrored = camera.activeDirection == CameraState.Direction.FRONT
             rotationVideoSink.setSink(localRenderer)
             videoTrack.setEnabled(false)
             mediaStream.addTrack(videoTrack)
@@ -297,4 +297,9 @@ class PeerConnectionWrapper(context: Context,
         camera.flip()
     }
 
+    override fun onCameraSwitchCompleted(newCameraState: CameraState) {
+        // mirror rotation offset
+        rotationVideoSink.mirrored = newCameraState.activeDirection == CameraState.Direction.FRONT
+        cameraEventListener.onCameraSwitchCompleted(newCameraState)
+    }
 }
