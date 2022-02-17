@@ -10,7 +10,6 @@ import android.os.Build
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.OrientationEventListener
-import android.view.Surface
 import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
@@ -44,6 +43,7 @@ import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_PRE_INIT
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_RINGING
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.EARPIECE
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.SPEAKER_PHONE
+import org.thoughtcrime.securesms.webrtc.data.quadrantRotation
 
 @AndroidEntryPoint
 class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
@@ -73,7 +73,10 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
     private val rotationListener by lazy {
         object : OrientationEventListener(this) {
             override fun onOrientationChanged(orientation: Int) {
-                viewModel.deviceRotation = orientation
+                if ((orientation + 15) % 90 < 30) {
+                    viewModel.deviceRotation = orientation
+                    updateControlsRotation(orientation.quadrantRotation() * -1)
+                }
             }
         }
     }
@@ -188,6 +191,18 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
     private fun answerCall() {
         val answerIntent = WebRtcCallService.acceptCallIntent(this)
         ContextCompat.startForegroundService(this, answerIntent)
+    }
+
+    private fun updateControlsRotation(newRotation: Int) {
+        with (binding) {
+            val rotation = newRotation.toFloat()
+            remoteRecipient.rotation = rotation
+            speakerPhoneButton.rotation = rotation
+            microphoneButton.rotation = rotation
+            enableCameraButton.rotation = rotation
+            switchCameraButton.rotation = rotation
+            endCallButton.rotation = rotation
+        }
     }
 
     private fun updateControls(state: CallViewModel.State? = null) {
@@ -338,21 +353,6 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
                     binding.remoteRecipient.isVisible = !isEnabled
                 }
             }
-        }
-    }
-
-    private fun getDeviceRotation(): Int {
-        val rotation = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            display?.rotation
-        } else {
-            windowManager.defaultDisplay.rotation
-        }
-        return when (rotation) {
-            Surface.ROTATION_0 -> 0
-            Surface.ROTATION_180 -> 180
-            Surface.ROTATION_270 -> 270
-            Surface.ROTATION_90 -> 90
-            else -> throw NullPointerException("Unrecognized rotation $rotation")
         }
     }
 

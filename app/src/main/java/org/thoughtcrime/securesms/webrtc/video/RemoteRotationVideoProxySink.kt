@@ -16,9 +16,10 @@ class RemoteRotationVideoProxySink: VideoSink {
         val thisFrame = frame ?: return
 
         val quadrantRotation = rotation.quadrantRotation()
+        val modifiedRotation = thisFrame.rotation - quadrantRotation
 
-        val newFrame = VideoFrame(thisFrame.buffer, (thisFrame.rotation - quadrantRotation) % 360, thisFrame.timestampNs)
-
+        val newFrame = VideoFrame(thisFrame.buffer, modifiedRotation, thisFrame.timestampNs)
+        Log.d("Loki", "sending frame: w=${newFrame.buffer.width}, h=${newFrame.buffer.height}, rw=${newFrame.rotatedWidth}, rh=${newFrame.rotatedHeight}, rot=${newFrame.rotation}")
         thisSink.onFrame(newFrame)
     }
 

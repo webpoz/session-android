@@ -4,7 +4,12 @@ import android.content.Context
 import android.telephony.TelephonyManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.functional.bind
 import org.session.libsession.database.StorageProtocol
@@ -17,7 +22,11 @@ import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES
 import org.session.libsignal.utilities.Log
-import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.*
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.AudioDeviceUpdate
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.AudioEnabled
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.CallStateUpdate
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.RecipientUpdate
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.VideoEnabled
 import org.thoughtcrime.securesms.webrtc.audio.AudioManagerCompat
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
@@ -26,13 +35,22 @@ import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
 import org.thoughtcrime.securesms.webrtc.video.RemoteRotationVideoProxySink
-import org.webrtc.*
+import org.webrtc.DataChannel
+import org.webrtc.DefaultVideoDecoderFactory
+import org.webrtc.DefaultVideoEncoderFactory
+import org.webrtc.EglBase
+import org.webrtc.IceCandidate
+import org.webrtc.MediaConstraints
+import org.webrtc.MediaStream
+import org.webrtc.PeerConnection
 import org.webrtc.PeerConnection.IceConnectionState
-import org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_BALANCED
-import org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FILL
-import org.webrtc.RendererCommon.ScalingType.SCALE_ASPECT_FIT
+import org.webrtc.PeerConnectionFactory
+import org.webrtc.RtpReceiver
+import org.webrtc.SessionDescription
+import org.webrtc.SurfaceViewRenderer
 import java.nio.ByteBuffer
-import java.util.*
+import java.util.ArrayDeque
+import java.util.UUID
 
 class CallManager(context: Context, audioManager: AudioManagerCompat, private val storage: StorageProtocol): PeerConnection.Observer,
         SignalAudioManager.EventListener, CameraEventListener, DataChannel.Observer {
@@ -182,11 +200,11 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             val base = EglBase.create()
             eglBase = base
             localRenderer = SurfaceViewRenderer(context).apply {
-                setEnableHardwareScaler(true)
+//                setScalingType(SCALE_ASPECT_FIT)
             }
 
             remoteRenderer = SurfaceViewRenderer(context).apply {
-                setEnableHardwareScaler(true)
+//                setScalingType(SCALE_ASPECT_FIT)
             }
             remoteRotationSink = RemoteRotationVideoProxySink()
 
@@ -484,8 +502,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         this.dataChannel = dataChannel
         val offer = connection.createOffer(MediaConstraints())
         connection.setLocalDescription(offer)
-
-        Log.i(TAG, "Sending offer: ${offer.description}")
 
         return MessageSender.sendNonDurably(CallMessage.preOffer(
                 callId
