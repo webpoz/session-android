@@ -31,6 +31,7 @@ import org.thoughtcrime.securesms.webrtc.audio.AudioManagerCompat
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice
+import org.thoughtcrime.securesms.webrtc.data.StateProcessor
 import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
@@ -51,13 +52,10 @@ import org.webrtc.SurfaceViewRenderer
 import java.nio.ByteBuffer
 import java.util.ArrayDeque
 import java.util.UUID
+import org.thoughtcrime.securesms.webrtc.data.State as CallState
 
 class CallManager(context: Context, audioManager: AudioManagerCompat, private val storage: StorageProtocol): PeerConnection.Observer,
         SignalAudioManager.EventListener, CameraEventListener, DataChannel.Observer {
-
-    enum class CallState {
-        STATE_IDLE, STATE_PRE_OFFER, STATE_DIALING, STATE_ANSWERING, STATE_REMOTE_RINGING, STATE_LOCAL_RINGING, STATE_CONNECTED
-    }
 
     sealed class StateEvent {
         data class AudioEnabled(val isEnabled: Boolean): StateEvent()
@@ -77,19 +75,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         val HANGUP_JSON by lazy { buildJsonObject { put("hangup", true) } }
 
         private val TAG = Log.tag(CallManager::class.java)
-        val CONNECTED_STATES = arrayOf(CallState.STATE_CONNECTED)
-        val PENDING_CONNECTION_STATES = arrayOf(
-                CallState.STATE_DIALING,
-                CallState.STATE_ANSWERING,
-                CallState.STATE_LOCAL_RINGING,
-                CallState.STATE_REMOTE_RINGING,
-                CallState.STATE_PRE_OFFER,
-        )
-        val OUTGOING_STATES = arrayOf(
-                CallState.STATE_DIALING,
-                CallState.STATE_REMOTE_RINGING,
-                CallState.STATE_CONNECTED
-        )
         private const val DATA_CHANNEL_NAME = "signaling"
     }
 
@@ -111,8 +96,9 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     val videoEvents = _videoEvents.asSharedFlow()
     private val _remoteVideoEvents = MutableStateFlow(VideoEnabled(false))
     val remoteVideoEvents = _remoteVideoEvents.asSharedFlow()
-    private val _connectionEvents = MutableStateFlow<StateEvent>(CallStateUpdate(CallState.STATE_IDLE))
-    val connectionEvents = _connectionEvents.asSharedFlow()
+
+    private val stateProcessor = StateProcessor(CallState.Idle)
+
     private val _callStateEvents = MutableStateFlow(CallViewModel.State.CALL_PENDING)
     val callStateEvents = _callStateEvents.asSharedFlow()
     private val _recipientEvents = MutableStateFlow(RecipientUpdate.UNKNOWN)
@@ -123,7 +109,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     val audioDeviceEvents = _audioDeviceEvents.asSharedFlow()
 
     val currentConnectionState
-        get() = (_connectionEvents.value as CallStateUpdate).state
+        get() = stateProcessor.currentState
 
     val currentCallState
         get() = _callStateEvents.value
@@ -186,12 +172,12 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         _callStateEvents.value = newState
     }
 
-    fun isBusy(context: Context, callId: UUID) = callId != this.callId && (currentConnectionState != CallState.STATE_IDLE
+    fun isBusy(context: Context, callId: UUID) = callId != this.callId && (currentConnectionState != CallState.Idle
             || context.getSystemService(TelephonyManager::class.java).callState  != TelephonyManager.CALL_STATE_IDLE)
 
-    fun isPreOffer() = currentConnectionState == CallState.STATE_PRE_OFFER
+    fun isPreOffer() = currentConnectionState == CallState.RemotePreOffer
 
-    fun isIdle() = currentConnectionState == CallState.STATE_IDLE
+    fun isIdle() = currentConnectionState == CallState.Idle
 
     fun isCurrentUser(recipient: Recipient) = recipient.address.serialize() == storage.getUserPublicKey()
 
@@ -235,7 +221,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     }
 
     fun setAudioEnabled(isEnabled: Boolean) {
-        currentConnectionState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
+        currentConnectionState.withState(*PENDING_CONNECTION_STATES)) {
             peerConnection?.setAudioEnabled(isEnabled)
             _audioEvents.value = AudioEnabled(true)
         }
@@ -407,6 +393,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     }
 
     fun onNewOffer(offer: String, callId: UUID, recipient: Recipient): Promise<Unit, Exception> {
+        // TODO transition to ice reestablished
         if (callId != this.callId) return Promise.ofFail(NullPointerException("No callId"))
         if (recipient != this.recipient) return Promise.ofFail(NullPointerException("No recipient"))
 

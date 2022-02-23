@@ -6,17 +6,16 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.media.AudioManager
-import android.net.ConnectivityManager
 import android.os.IBinder
 import android.os.ResultReceiver
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
+import androidx.core.os.bundleOf
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dagger.hilt.android.AndroidEntryPoint
 import org.session.libsession.messaging.calls.CallMessageType
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.FutureTaskListener
-import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.calls.WebRtcCallActivity
@@ -26,9 +25,7 @@ import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_IN
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_PRE_OFFER
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_INCOMING_RINGING
 import org.thoughtcrime.securesms.util.CallNotificationBuilder.Companion.TYPE_OUTGOING_RINGING
-import org.thoughtcrime.securesms.util.ContextProvider
 import org.thoughtcrime.securesms.webrtc.*
-import org.thoughtcrime.securesms.webrtc.CallManager.CallState.*
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import org.webrtc.*
@@ -38,6 +35,7 @@ import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
+import org.thoughtcrime.securesms.webrtc.data.State as CallState
 
 @AndroidEntryPoint
 class WebRtcCallService: Service(), CallManager.WebRtcListener {
@@ -64,10 +62,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         const val ACTION_PRE_OFFER = "PRE_OFFER"
         const val ACTION_RESPONSE_MESSAGE = "RESPONSE_MESSAGE"
         const val ACTION_ICE_MESSAGE = "ICE_MESSAGE"
-        const val ACTION_CALL_CONNECTED = "CALL_CONNECTED"
         const val ACTION_REMOTE_HANGUP = "REMOTE_HANGUP"
-        const val ACTION_REMOTE_BUSY = "REMOTE_BUSY"
-        const val ACTION_REMOTE_VIDEO_MUTE = "REMOTE_VIDEO_MUTE"
         const val ACTION_ICE_CONNECTED = "ICE_CONNECTED"
 
         const val EXTRA_RECIPIENT_ADDRESS = "RECIPIENT_ID"
@@ -85,7 +80,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         const val EXTRA_WANTS_TO_ANSWER = "wants_to_answer"
 
         const val INVALID_NOTIFICATION_ID = -1
-        private const val TIMEOUT_SECONDS = 60L
+        private const val TIMEOUT_SECONDS = 30L
 
         fun cameraEnabled(context: Context, enabled: Boolean) = Intent(context, WebRtcCallService::class.java)
                 .setAction(ACTION_SET_MUTE_VIDEO)
@@ -211,7 +206,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         serviceExecutor.execute {
             callManager.handleRemoteHangup()
 
-            if (callManager.currentConnectionState in arrayOf(STATE_REMOTE_RINGING, STATE_ANSWERING, STATE_LOCAL_RINGING)) {
+            if (callManager.currentConnectionState in CallState.CAN_DECLINE_STATES) {
                 callManager.recipient?.let { recipient ->
                     insertMissedCall(recipient, true)
                 }
@@ -229,7 +224,6 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
                 action == ACTION_INCOMING_RING && isSameCall(intent) && !isPreOffer() -> handleNewOffer(intent)
                 action == ACTION_PRE_OFFER && isIdle() -> handlePreOffer(intent)
                 action == ACTION_INCOMING_RING && isBusy(intent) -> handleBusyCall(intent)
-                action == ACTION_REMOTE_BUSY -> handleBusyMessage(intent)
                 action == ACTION_INCOMING_RING && isPreOffer() -> handleIncomingRing(intent)
                 action == ACTION_OUTGOING_CALL && isIdle() -> handleOutgoingCall(intent)
                 action == ACTION_ANSWER_CALL -> handleAnswerCall(intent)
@@ -258,7 +252,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         wantsToAnswer = false
         registerIncomingPstnCallReceiver()
         registerWiredHeadsetStateReceiver()
-        registerWantsToAnswerReceiver()
+        registerWantsToAnswerReceiver() // TODO unregister
         getSystemService(TelephonyManager::class.java)
                 .listen(hangupOnCallAnswered, PhoneStateListener.LISTEN_CALL_STATE)
         registerUncaughtExceptionHandler()
@@ -300,43 +294,21 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
 
         insertMissedCall(recipient, false)
 
-        if (callState == STATE_IDLE) {
+        if (callState == CallState.Idle) {
             stopForeground(true)
         }
     }
 
     private fun handleUpdateAudio(intent: Intent) {
         val audioCommand = intent.getParcelableExtra<AudioManagerCommand>(EXTRA_AUDIO_COMMAND)!!
-        if (callManager.currentConnectionState !in arrayOf(STATE_DIALING, STATE_CONNECTED, STATE_LOCAL_RINGING)) {
+        if (callManager.currentConnectionState !in arrayOf(CallState.Connected, *CallState.PENDING_CONNECTION_STATES)) {
             Log.w(TAG, "handling audio command not in call")
             return
         }
         callManager.handleAudioCommand(audioCommand)
     }
 
-    private fun handleBusyMessage(intent: Intent) {
-        val recipient = getRemoteRecipient(intent)
-        val callId = getCallId(intent)
-        if (callManager.currentConnectionState != STATE_DIALING || callManager.callId != callId || callManager.recipient != recipient) {
-            Log.w(TAG,"Got busy message for inactive session...")
-            return
-        }
-        callManager.postViewModelState(CallViewModel.State.CALL_BUSY)
-        callManager.startOutgoingRinger(OutgoingRinger.Type.BUSY)
-        Util.runOnMainDelayed({
-            startService(
-                    Intent(this, WebRtcCallService::class.java)
-                            .setAction(ACTION_LOCAL_HANGUP)
-            )
-        }, WebRtcCallActivity.BUSY_SIGNAL_DELAY_FINISH)
-    }
-
     private fun handleNewOffer(intent: Intent) {
-        if (callManager.currentConnectionState !in arrayOf(STATE_CONNECTED, STATE_DIALING, STATE_ANSWERING)) {
-            Log.w(TAG,"trying to handle new offer from non-connecting state")
-            return
-        }
-
         val offer = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION) ?: return
         val callId = getCallId(intent)
         val recipient = getRemoteRecipient(intent)
@@ -488,7 +460,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
     }
 
     private fun handleDenyCall(intent: Intent) {
-        if (callManager.currentConnectionState != STATE_LOCAL_RINGING && !callManager.isPreOffer()) {
+        if (callManager.currentConnectionState !in CallState.CAN_DECLINE_STATES) {
             Log.e(TAG,"Can only deny from ringing!")
             return
         }
@@ -558,7 +530,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
             Log.w(TAG,"sdp info not of equal length")
             return
         }
-        val iceCandidates = (0 until sdpMids.size).map { index ->
+        val iceCandidates = sdpMids.indices.map { index ->
             IceCandidate(
                     sdpMids[index],
                     sdpLineIndexes[index],
@@ -570,7 +542,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
 
     private fun handleIceConnected(intent: Intent) {
         val recipient = callManager.recipient ?: return
-        if (callManager.currentConnectionState in arrayOf(STATE_ANSWERING, STATE_DIALING)) {
+        if (callManager.currentConnectionState in arrayOf(STATE_ANSWERING)) {
             callManager.postConnectionEvent(STATE_CONNECTED)
             callManager.postViewModelState(CallViewModel.State.CALL_CONNECTED)
         } else {
@@ -583,7 +555,10 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
     }
 
     private fun handleIsInCallQuery(intent: Intent) {
-
+        val listener = intent.getParcelableExtra<ResultReceiver>(EXTRA_RESULT_RECEIVER) ?: return
+        val currentState = callManager.currentConnectionState
+        val isInCall = if (currentState in CONNECTED_STATES || currentState in PENDING_CONNECTION_STATES) 1 else 0
+        listener.send(isInCall, bundleOf())
     }
 
     private fun registerPowerButtonReceiver() {
