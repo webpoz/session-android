@@ -51,6 +51,7 @@ import org.webrtc.SessionDescription
 import java.util.UUID
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import org.thoughtcrime.securesms.webrtc.data.State as CallState
@@ -101,7 +102,8 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
 
         const val INVALID_NOTIFICATION_ID = -1
         private const val TIMEOUT_SECONDS = 90L
-        private const val MAX_TIMEOUTS = 3
+        private const val RECONNECT_SECONDS = 5L
+        private const val MAX_RECONNECTS = 5
 
         fun cameraEnabled(context: Context, enabled: Boolean) = Intent(context, WebRtcCallService::class.java)
                 .setAction(ACTION_SET_MUTE_VIDEO)
@@ -188,6 +190,9 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
     private var wantsToAnswer = false
     private var currentTimeouts = 0
     private var isNetworkAvailable = true
+    private var scheduledTimeout: ScheduledFuture<*>? = null
+    private var scheduledReconnectTimeout: ScheduledFuture<*>? = null
+    private var scheduledReconnect: ScheduledFuture<*>? = null
 
     private val lockManager by lazy { LockManager(this) }
     private val serviceExecutor = Executors.newSingleThreadExecutor()
@@ -407,7 +412,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
             callManager.startOutgoingRinger(OutgoingRinger.Type.RINGING)
             setCallInProgressNotification(TYPE_OUTGOING_RINGING, callManager.recipient)
             callManager.insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_OUTGOING)
-            timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            scheduledTimeout = timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
             callManager.setAudioEnabled(true)
 
             val expectedState = callManager.currentConnectionState
@@ -463,7 +468,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
             callManager.silenceIncomingRinger()
             callManager.postViewModelState(CallViewModel.State.CALL_INCOMING)
 
-            timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            scheduledTimeout = timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
 
             callManager.initializeAudioForCall()
             callManager.initializeVideo(this)
@@ -598,8 +603,13 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         val callId = callManager.callId ?: return
         val numTimeouts = ++currentTimeouts
 
-        if (callId == getCallId(intent) && isNetworkAvailable && numTimeouts <= 5) {
+        if (callId == getCallId(intent) && isNetworkAvailable && numTimeouts <= MAX_RECONNECTS) {
+            Log.d("Loki", "Trying to re-connect")
             callManager.networkReestablished()
+            scheduledTimeout = timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+        } else {
+            Log.d("Loki", "Network isn't available, timeouts == $numTimeouts out of $MAX_RECONNECTS")
+            scheduledReconnect = timeoutExecutor.schedule(CheckReconnectedRunnable(callId, this), RECONNECT_SECONDS, TimeUnit.SECONDS)
         }
     }
 
@@ -783,17 +793,22 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
 
     override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
         if (newState == CONNECTED) {
+            scheduledTimeout?.cancel(false)
+            scheduledReconnect?.cancel(false)
+            scheduledReconnectTimeout?.cancel(false)
+            scheduledTimeout = null
+            scheduledReconnect = null
+            scheduledReconnectTimeout = null
             val intent = Intent(this, WebRtcCallService::class.java)
                     .setAction(ACTION_ICE_CONNECTED)
             startService(intent)
-        } else if (newState == FAILED) {
-            val intent = hangupIntent(this)
-            startService(intent)
-        } else if (newState == DISCONNECTED) {
+        } else if (newState in arrayOf(FAILED, DISCONNECTED) && scheduledReconnectTimeout == null) {
             callManager.callId?.let { callId ->
-                callManager.postViewModelState(CallViewModel.State.CALL_RECONNECTING)
-                timeoutExecutor.schedule(CheckReconnectedRunnable(callId, this), 5, TimeUnit.SECONDS)
-                timeoutExecutor.schedule(ReconnectTimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                callManager.postConnectionEvent(Event.IceDisconnect) {
+                    callManager.postViewModelState(CallViewModel.State.CALL_RECONNECTING)
+                    scheduledReconnect = timeoutExecutor.schedule(CheckReconnectedRunnable(callId, this), RECONNECT_SECONDS, TimeUnit.SECONDS)
+                    scheduledReconnectTimeout = timeoutExecutor.schedule(ReconnectTimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                }
             } ?: run {
                 val intent = hangupIntent(this)
                 startService(intent)

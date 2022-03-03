@@ -675,17 +675,15 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         val callId = callId ?: return
         val recipient = recipient ?: return
 
-        if (isReestablishing) return
-        isReestablishing = true
-        Log.d("Loki", "start re-establish")
+        postConnectionEvent(Event.NetworkReconnect) {
+            Log.d("Loki", "start re-establish")
 
-        val offer = connection.createOffer(MediaConstraints().apply {
-            mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
-        })
-        connection.setLocalDescription(offer)
+            val offer = connection.createOffer(MediaConstraints().apply {
+                mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+            })
+            connection.setLocalDescription(offer)
 
-        MessageSender.sendNonDurably(CallMessage.offer(offer.description, callId), recipient.address).success {
-            isReestablishing = false
+            MessageSender.sendNonDurably(CallMessage.offer(offer.description, callId), recipient.address)
         }
     }
 

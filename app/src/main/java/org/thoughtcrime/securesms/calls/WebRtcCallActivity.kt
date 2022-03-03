@@ -40,6 +40,7 @@ import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_CONNECTED
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_INCOMING
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_OUTGOING
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_PRE_INIT
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_RECONNECTING
 import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_RINGING
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.EARPIECE
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.SPEAKER_PHONE
@@ -223,6 +224,8 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
                     state !in listOf(CALL_CONNECTED, CALL_RINGING, CALL_PRE_INIT) || wantsToAnswer
                 incomingControlGroup.isVisible =
                     state in listOf(CALL_RINGING, CALL_PRE_INIT) && !wantsToAnswer
+                reconnectingText.isVisible = state == CALL_RECONNECTING
+                endCallButton.isVisible = endCallButton.isVisible || state == CALL_RECONNECTING
             }
         }
     }
