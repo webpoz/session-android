@@ -21,6 +21,7 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
         CALL_RINGING,
         CALL_BUSY,
         CALL_DISCONNECTED,
+        CALL_RECONNECTING,
 
         NETWORK_FAILURE,
         RECIPIENT_UNAVAILABLE,

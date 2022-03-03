@@ -1,5 +1,7 @@
 package org.thoughtcrime.securesms.webrtc.data
 
+import org.session.libsignal.utilities.Log
+import org.thoughtcrime.securesms.webrtc.data.State.Companion.CAN_DECLINE_STATES
 import org.thoughtcrime.securesms.webrtc.data.State.Companion.CAN_HANGUP_STATES
 
 sealed class State {
@@ -13,6 +15,10 @@ sealed class State {
     object Reconnecting : State()
     object Disconnected : State()
     companion object {
+
+        val ALL_STATES = arrayOf(Idle, RemotePreOffer, RemoteRing, LocalPreOffer, LocalRing,
+            Connecting, Connected, Reconnecting, Disconnected)
+
         val CAN_DECLINE_STATES = arrayOf(RemotePreOffer, RemoteRing)
         val PENDING_CONNECTION_STATES = arrayOf(
             LocalPreOffer,
@@ -26,10 +32,17 @@ sealed class State {
             LocalRing,
         )
         val CAN_HANGUP_STATES =
-            arrayOf(LocalPreOffer, LocalRing, Connecting, Connected, Reconnecting)
+            arrayOf(RemotePreOffer, RemoteRing, LocalPreOffer, LocalRing, Connecting, Connected, Reconnecting)
         val CAN_RECEIVE_ICE_STATES =
             arrayOf(RemoteRing, LocalRing, Connecting, Connected, Reconnecting)
     }
+
+    fun withState(vararg expectedState: State, body: ()->Unit) {
+        if (this in expectedState) {
+            body()
+        }
+    }
+
 }
 
 sealed class Event(vararg val expectedStates: State, val outputState: State) {
@@ -47,7 +60,8 @@ sealed class Event(vararg val expectedStates: State, val outputState: State) {
     object NetworkReconnect : Event(State.Reconnecting, outputState = State.Connecting)
     object TimeOut :
         Event(State.Connecting, State.LocalRing, State.RemoteRing, outputState = State.Disconnected)
-
+    object Error : Event(*State.ALL_STATES, outputState = State.Disconnected)
+    object DeclineCall : Event(*CAN_DECLINE_STATES, outputState = State.Disconnected)
     object Hangup : Event(*CAN_HANGUP_STATES, outputState = State.Disconnected)
     object Cleanup : Event(State.Disconnected, outputState = State.Idle)
 }
@@ -62,6 +76,7 @@ open class StateProcessor(initialState: State) {
             sideEffect()
             return true
         }
+        Log.e("Loki-Call", "error transitioning from $currentState with ${event::class.simpleName}")
         return false
     }
 }

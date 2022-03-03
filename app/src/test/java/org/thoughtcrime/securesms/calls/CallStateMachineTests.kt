@@ -1,8 +1,13 @@
 package org.thoughtcrime.securesms.calls
 
+import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
+import org.mockito.MockedStatic
+import org.mockito.Mockito.any
+import org.mockito.Mockito.mockStatic
+import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.webrtc.data.Event
 import org.thoughtcrime.securesms.webrtc.data.State
 
@@ -10,9 +15,19 @@ class CallStateMachineTests {
 
     private lateinit var stateProcessor: TestStateProcessor
 
+    lateinit var mock: MockedStatic<Log>
+
     @Before
     fun setup() {
         stateProcessor = TestStateProcessor(State.Idle)
+        mock = mockStatic(Log::class.java).apply {
+            `when`<Unit> { Log.e(any(), any(), any()) }.then { /* do nothing */ }
+        }
+    }
+
+    @After
+    fun teardown() {
+        mock.close()
     }
 
     @Test
@@ -119,6 +134,10 @@ class CallStateMachineTests {
             Event.ReceiveOffer,
             Event.SendAnswer,
             Event.IceFailed,
+            Event.Cleanup,
+            Event.ReceivePreOffer,
+            Event.ReceiveOffer,
+            Event.DeclineCall,
             Event.Cleanup
         )
 
