@@ -6,8 +6,6 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.ConnectivityManager
 import android.net.Network
-import android.os.Build
-import android.util.SparseArray
 import org.session.libsignal.utilities.Log
 
 class NetworkChangeReceiver(private val onNetworkChangedCallback: (Boolean)->Unit) {
@@ -20,58 +18,58 @@ class NetworkChangeReceiver(private val onNetworkChangedCallback: (Boolean)->Uni
         }
     }
 
-    private fun checkNetworks() {
-
-    }
-
     val defaultObserver = object: ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) {
-            Log.d("Loki", "onAvailable: $network")
+            Log.i("Loki", "onAvailable: $network")
             networkList += network
+            onNetworkChangedCallback(networkList.isNotEmpty())
         }
 
         override fun onLosing(network: Network, maxMsToLive: Int) {
-            Log.d("Loki", "onLosing: $network, maxMsToLive: $maxMsToLive")
+            Log.i("Loki", "onLosing: $network, maxMsToLive: $maxMsToLive")
         }
 
         override fun onLost(network: Network) {
-            Log.d("Loki", "onLost: $network")
+            Log.i("Loki", "onLost: $network")
             networkList -= network
             onNetworkChangedCallback(networkList.isNotEmpty())
         }
 
         override fun onUnavailable() {
-            Log.d("Loki", "onUnavailable")
+            Log.i("Loki", "onUnavailable")
         }
     }
 
     fun receiveBroadcast(context: Context, intent: Intent) {
-        Log.d("Loki", intent.toString())
-        onNetworkChangedCallback(context.isConnected())
+        val connected = context.isConnected()
+        Log.i("Loki", "received broadcast, network connected: $connected")
+        onNetworkChangedCallback(connected)
     }
 
     fun Context.isConnected() : Boolean {
         val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        return cm.activeNetworkInfo?.isConnected ?: false
+        return cm.activeNetwork != null
     }
 
     fun register(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            cm.registerDefaultNetworkCallback(defaultObserver)
-        } else {
-            val intentFilter = IntentFilter("android.net.conn.CONNECTIVITY_CHANGE")
-            context.registerReceiver(broadcastDelegate, intentFilter)
-        }
+        val intentFilter = IntentFilter("android.net.conn.CONNECTIVITY_CHANGE")
+        context.registerReceiver(broadcastDelegate, intentFilter)
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+//            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+//            cm.registerDefaultNetworkCallback(defaultObserver)
+//        } else {
+//
+//        }
     }
 
     fun unregister(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            cm.unregisterNetworkCallback(defaultObserver)
-        } else {
-            context.unregisterReceiver(broadcastDelegate)
-        }
+        context.unregisterReceiver(broadcastDelegate)
+//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+//            val cm = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+//            cm.unregisterNetworkCallback(defaultObserver)
+//        } else {
+//
+//        }
     }
 
 }

@@ -396,18 +396,22 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     }
 
     fun onNewOffer(offer: String, callId: UUID, recipient: Recipient): Promise<Unit, Exception> {
-        // TODO transition to ice reestablished
         if (callId != this.callId) return Promise.ofFail(NullPointerException("No callId"))
         if (recipient != this.recipient) return Promise.ofFail(NullPointerException("No recipient"))
 
         val connection = peerConnection ?: return Promise.ofFail(NullPointerException("No peer connection"))
 
-        connection.setNewOffer(SessionDescription(SessionDescription.Type.OFFER, offer))
-        val answer = connection.createAnswer(MediaConstraints().apply {
-            mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
-        })
-        val answerMessage = CallMessage.answer(answer.description, callId)
-        return MessageSender.sendNonDurably(answerMessage, recipient.address)
+        val reconnected = stateProcessor.processEvent(Event.NetworkReconnect)
+        return if (reconnected) {
+            connection.setNewOffer(SessionDescription(SessionDescription.Type.OFFER, offer))
+            val answer = connection.createAnswer(MediaConstraints().apply {
+                mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+            })
+            val answerMessage = CallMessage.answer(answer.description, callId)
+            MessageSender.sendNonDurably(answerMessage, recipient.address)
+        } else {
+            Promise.ofFail(Exception("Couldn't reconnect from current state"))
+        }
     }
 
     fun onIncomingRing(offer: String, callId: UUID, recipient: Recipient, callTime: Long, onSuccess: () -> Unit) {
@@ -551,6 +555,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             CallState.LocalRing,
             CallState.RemoteRing -> postViewModelState(CallViewModel.State.RECIPIENT_UNAVAILABLE)
             else -> postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
+        }
+        if (!stateProcessor.processEvent(Event.Hangup)) {
+            Log.e("Loki", "")
+            stateProcessor.processEvent(Event.Error)
         }
     }
 
