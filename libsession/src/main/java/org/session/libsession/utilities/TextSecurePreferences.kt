@@ -154,6 +154,8 @@ interface TextSecurePreferences {
     fun setLastOpenDate()
     fun hasSeenLinkPreviewSuggestionDialog(): Boolean
     fun setHasSeenLinkPreviewSuggestionDialog()
+    fun hasHiddenMessageRequests(): Boolean
+    fun setHasHiddenMessageRequests()
     fun setShownCallWarning(): Boolean
     fun setShownCallNotification(): Boolean
     fun isCallNotificationsEnabled(): Boolean
@@ -233,6 +235,7 @@ interface TextSecurePreferences {
         const val CONFIGURATION_SYNCED = "pref_configuration_synced"
         const val LAST_PROFILE_UPDATE_TIME = "pref_last_profile_update_time"
         const val LAST_OPEN_DATE = "pref_last_open_date"
+        const val HAS_HIDDEN_MESSAGE_REQUESTS = "pref_message_requests_hidden"
         const val CALL_NOTIFICATIONS_ENABLED = "pref_call_notifications_enabled"
         const val SHOWN_CALL_WARNING = "pref_shown_call_warning" // call warning is user-facing warning of enabling calls
         const val SHOWN_CALL_NOTIFICATION = "pref_shown_call_notification" // call notification is a promp to check privacy settings
@@ -880,6 +883,16 @@ interface TextSecurePreferences {
         }
 
         @JvmStatic
+        fun hasHiddenMessageRequests(context: Context): Boolean {
+            return getBooleanPreference(context, HAS_HIDDEN_MESSAGE_REQUESTS, false)
+        }
+
+        @JvmStatic
+        fun removeHasHiddenMessageRequests(context: Context) {
+            removePreference(context, HAS_HIDDEN_MESSAGE_REQUESTS)
+        }
+
+        @JvmStatic
         fun setShownCallWarning(context: Context): Boolean {
             val previousValue = getBooleanPreference(context, SHOWN_CALL_WARNING, false)
             if (previousValue) {
@@ -1444,6 +1457,14 @@ class AppTextSecurePreferences @Inject constructor(
 
     override fun setHasSeenLinkPreviewSuggestionDialog() {
         setBooleanPreference("has_seen_link_preview_suggestion_dialog", true)
+    }
+
+    override fun hasHiddenMessageRequests(): Boolean {
+        return getBooleanPreference(TextSecurePreferences.HAS_HIDDEN_MESSAGE_REQUESTS, false)
+    }
+
+    override fun setHasHiddenMessageRequests() {
+        setBooleanPreference(TextSecurePreferences.HAS_HIDDEN_MESSAGE_REQUESTS, true)
     }
 
     override fun isCallNotificationsEnabled(): Boolean {

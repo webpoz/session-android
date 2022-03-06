@@ -34,26 +34,34 @@ class ControlMessageView : LinearLayout {
         binding.iconImageView.visibility = View.GONE
         val tintColor = if (message.isMissedCall) R.color.destructive else R.color.text
         binding.iconImageView.imageTintList = ColorStateList.valueOf(ContextCompat.getColor(context,tintColor))
-        if (message.isExpirationTimerUpdate) {
-            binding.iconImageView.setImageDrawable(
-                ResourcesCompat.getDrawable(resources, R.drawable.ic_timer, context.theme)
-            )
-            binding.iconImageView.visibility = View.VISIBLE
-        } else if (message.isMediaSavedNotification) {
-            binding.iconImageView.setImageDrawable(
-                ResourcesCompat.getDrawable(resources, R.drawable.ic_file_download_white_36dp, context.theme)
-            )
-            binding.iconImageView.visibility = View.VISIBLE
-        } else if (message.isCallLog) {
-            val drawable = when {
-                message.isIncomingCall -> R.drawable.ic_incoming_call
-                message.isOutgoingCall -> R.drawable.ic_outgoing_call
-                else -> R.drawable.ic_missed_call
+        var messageBody: CharSequence = message.getDisplayBody(context)
+        when {
+            message.isExpirationTimerUpdate -> {
+                binding.iconImageView.setImageDrawable(
+                    ResourcesCompat.getDrawable(resources, R.drawable.ic_timer, context.theme)
+                )
+                binding.iconImageView.visibility = View.VISIBLE
             }
-            binding.iconImageView.setImageDrawable(ResourcesCompat.getDrawable(resources, drawable, context.theme))
-            binding.iconImageView.visibility = View.VISIBLE
+            message.isMediaSavedNotification -> {
+                binding.iconImageView.setImageDrawable(
+                    ResourcesCompat.getDrawable(resources, R.drawable.ic_file_download_white_36dp, context.theme)
+                )
+                binding.iconImageView.visibility = View.VISIBLE
+            }
+            message.isCallLog -> {
+                val drawable = when {
+                    message.isIncomingCall -> R.drawable.ic_incoming_call
+                    message.isOutgoingCall -> R.drawable.ic_outgoing_call
+                    else -> R.drawable.ic_missed_call
+                }
+                binding.iconImageView.setImageDrawable(ResourcesCompat.getDrawable(resources, drawable, context.theme))
+                binding.iconImageView.visibility = View.VISIBLE
+            }
+            message.isMessageRequestResponse -> {
+                messageBody = context.getString(R.string.message_requests_accepted)
+            }
         }
-        binding.textView.text = message.getDisplayBody(context)
+        binding.textView.text = messageBody
     }
 
     fun recycle() {

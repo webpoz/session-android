@@ -5,7 +5,14 @@ import org.session.libsession.messaging.MessagingModuleConfiguration
 import org.session.libsession.messaging.jobs.AttachmentDownloadJob
 import org.session.libsession.messaging.jobs.JobQueue
 import org.session.libsession.messaging.messages.Message
-import org.session.libsession.messaging.messages.control.*
+import org.session.libsession.messaging.messages.control.ClosedGroupControlMessage
+import org.session.libsession.messaging.messages.control.ConfigurationMessage
+import org.session.libsession.messaging.messages.control.DataExtractionNotification
+import org.session.libsession.messaging.messages.control.ExpirationTimerUpdate
+import org.session.libsession.messaging.messages.control.MessageRequestResponse
+import org.session.libsession.messaging.messages.control.ReadReceipt
+import org.session.libsession.messaging.messages.control.TypingIndicator
+import org.session.libsession.messaging.messages.control.UnsendRequest
 import org.session.libsession.messaging.messages.visible.Attachment
 import org.session.libsession.messaging.messages.visible.VisibleMessage
 import org.session.libsession.messaging.sending_receiving.attachments.PointerAttachment
@@ -16,7 +23,12 @@ import org.session.libsession.messaging.sending_receiving.pollers.ClosedGroupPol
 import org.session.libsession.messaging.sending_receiving.quotes.QuoteModel
 import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.snode.SnodeAPI
-import org.session.libsession.utilities.*
+import org.session.libsession.utilities.Address
+import org.session.libsession.utilities.GroupRecord
+import org.session.libsession.utilities.GroupUtil
+import org.session.libsession.utilities.ProfileKeyUtil
+import org.session.libsession.utilities.SSKEnvironment
+import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.crypto.ecc.DjbECPrivateKey
 import org.session.libsignal.crypto.ecc.DjbECPublicKey
@@ -29,8 +41,7 @@ import org.session.libsignal.utilities.guava.Optional
 import org.session.libsignal.utilities.removing05PrefixIfNeeded
 import org.session.libsignal.utilities.toHexString
 import java.security.MessageDigest
-import java.util.*
-import kotlin.collections.ArrayList
+import java.util.LinkedList
 
 internal fun MessageReceiver.isBlocked(publicKey: String): Boolean {
     val context = MessagingModuleConfiguration.shared.context
@@ -47,6 +58,7 @@ fun MessageReceiver.handle(message: Message, proto: SignalServiceProtos.Content,
         is DataExtractionNotification -> handleDataExtractionNotification(message)
         is ConfigurationMessage -> handleConfigurationMessage(message)
         is UnsendRequest -> handleUnsendRequest(message)
+        is MessageRequestResponse -> handleMessageRequestResponse(message)
         is VisibleMessage -> handleVisibleMessage(message, proto, openGroupID)
         is CallMessage -> handleCallMessage(message)
     }
@@ -167,6 +179,10 @@ fun MessageReceiver.handleUnsendRequest(message: UnsendRequest) {
         SSKEnvironment.shared.notificationManager.updateNotification(context)
     }
 }
+
+fun handleMessageRequestResponse(message: MessageRequestResponse) {
+    MessagingModuleConfiguration.shared.storage.insertMessageRequestResponse(message)
+}
 //endregion
 
 // region Visible Messages
@@ -184,10 +200,10 @@ fun MessageReceiver.handleVisibleMessage(message: VisibleMessage, proto: SignalS
         throw MessageReceiver.Error.NoThread
     }
     // Update profile if needed
+    val recipient = Recipient.from(context, Address.fromSerialized(message.sender!!), false)
     val profile = message.profile
     if (profile != null && userPublicKey != message.sender) {
         val profileManager = SSKEnvironment.shared.profileManager
-        val recipient = Recipient.from(context, Address.fromSerialized(message.sender!!), false)
         val name = profile.displayName!!
         if (name.isNotEmpty()) {
             profileManager.setName(context, recipient, name)
@@ -276,6 +292,8 @@ private fun MessageReceiver.handleClosedGroupControlMessage(message: ClosedGroup
 
 private fun MessageReceiver.handleNewClosedGroup(message: ClosedGroupControlMessage) {
     val kind = message.kind!! as? ClosedGroupControlMessage.Kind.New ?: return
+    val recipient = Recipient.from(MessagingModuleConfiguration.shared.context, Address.fromSerialized(message.sender!!), false)
+    if (!recipient.isApproved) return
     val groupPublicKey = kind.publicKey.toByteArray().toHexString()
     val members = kind.members.map { it.toByteArray().toHexString() }
     val admins = kind.admins.map { it.toByteArray().toHexString() }
