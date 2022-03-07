@@ -550,9 +550,10 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
                 handleLocalHangup(intent)
                 return
             }
+            val isNewSession = callManager.currentConnectionState == CallState.Reconnecting
             val callId = getCallId(intent)
             val description = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION)
-            callManager.handleResponseMessage(recipient, callId, SessionDescription(SessionDescription.Type.ANSWER, description))
+            callManager.handleResponseMessage(recipient, callId, SessionDescription(SessionDescription.Type.ANSWER, description), isNewSession)
         } catch (e: PeerConnectionException) {
             terminate()
         }

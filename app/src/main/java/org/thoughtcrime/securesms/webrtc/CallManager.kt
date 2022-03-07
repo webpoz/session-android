@@ -631,13 +631,15 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         }
     }
 
-    fun handleResponseMessage(recipient: Recipient, callId: UUID, answer: SessionDescription) {
+    fun handleResponseMessage(recipient: Recipient, callId: UUID, answer: SessionDescription, isNewSession: Boolean) {
         if (recipient != this.recipient || callId != this.callId) {
             Log.w(TAG,"Got answer for recipient and call ID we're not currently dialing")
             return
         }
 
-        stateProcessor.processEvent(Event.ReceiveAnswer) {
+        val event = if (isNewSession) Event.Connect else Event.ReceiveAnswer
+
+        stateProcessor.processEvent(event) {
             val connection = peerConnection ?: throw AssertionError("assert")
 
             connection.setRemoteDescription(answer)
