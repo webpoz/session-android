@@ -399,15 +399,23 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         if (callId != this.callId) return Promise.ofFail(NullPointerException("No callId"))
         if (recipient != this.recipient) return Promise.ofFail(NullPointerException("No recipient"))
 
-        val connection = peerConnection ?: return Promise.ofFail(NullPointerException("No peer connection"))
+        val connection = peerConnection ?: return Promise.ofFail(NullPointerException("No peer connection wrapper"))
 
         val reconnected = stateProcessor.processEvent(Event.NetworkReconnect)
         return if (reconnected) {
+            Log.i("Loki", "Handling new offer, restarting ice session")
             connection.setNewOffer(SessionDescription(SessionDescription.Type.OFFER, offer))
+            // re-established an ice
             val answer = connection.createAnswer(MediaConstraints().apply {
                 mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
             })
+            connection.setLocalDescription(answer)
+            pendingIncomingIceUpdates.toList().forEach { update ->
+                connection.addIceCandidate(update)
+            }
+            pendingIncomingIceUpdates.clear()
             val answerMessage = CallMessage.answer(answer.description, callId)
+            Log.i("Loki", "Posting new answer")
             MessageSender.sendNonDurably(answerMessage, recipient.address)
         } else {
             Promise.ofFail(Exception("Couldn't reconnect from current state"))
@@ -647,11 +655,13 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         }
 
         val connection = peerConnection
-        if (connection != null && connection.readyForIce) {
+        if (connection != null && connection.readyForIce && currentConnectionState != CallState.Reconnecting) {
+            Log.i("Loki", "Handling connection ice candidate")
             iceCandidates.forEach { candidate ->
                 connection.addIceCandidate(candidate)
             }
         } else {
+            Log.i("Loki", "Handling add to pending ice candidate")
             pendingIncomingIceUpdates.addAll(iceCandidates)
         }
     }

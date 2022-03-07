@@ -49,7 +49,7 @@ sealed class Event(vararg val expectedStates: State, val outputState: State) {
     object ReceivePreOffer :
         Event(State.Idle, State.RemotePreOffer, outputState = State.RemotePreOffer)
 
-    object ReceiveOffer : Event(State.RemotePreOffer, outputState = State.RemoteRing)
+    object ReceiveOffer : Event(State.RemotePreOffer, State.Reconnecting, outputState = State.RemoteRing)
     object SendPreOffer : Event(State.Idle, outputState = State.LocalPreOffer)
     object SendOffer : Event(State.LocalPreOffer, outputState = State.LocalRing)
     object SendAnswer : Event(State.RemoteRing, outputState = State.Connecting)
