@@ -103,7 +103,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         const val EXTRA_WANTS_TO_ANSWER = "wants_to_answer"
 
         const val INVALID_NOTIFICATION_ID = -1
-        private const val TIMEOUT_SECONDS = 30L
+        private const val TIMEOUT_SECONDS = 90L
         private const val RECONNECT_SECONDS = 5L
         private const val MAX_RECONNECTS = 5
 
@@ -820,6 +820,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
                     .setAction(ACTION_ICE_CONNECTED)
                 startService(intent)
             } else if (newState in arrayOf(FAILED, DISCONNECTED) && scheduledReconnect == null) {
+                callManager.resetPeerConnection()
                 callManager.callId?.let { callId ->
                     callManager.postConnectionEvent(Event.IceDisconnect) {
                         val currentNetwork = getCurrentNetwork()

@@ -143,9 +143,6 @@ class PeerConnectionWrapper(private val context: Context,
     fun setNewRemoteDescription(description: SessionDescription) {
         val future = SettableFuture<Boolean>()
 
-        peerConnection?.close()
-        initPeerConnection()
-
         peerConnection!!.setRemoteDescription(object: SdpObserver {
             override fun onCreateSuccess(p0: SessionDescription?) {
                 throw AssertionError()
@@ -242,9 +239,6 @@ class PeerConnectionWrapper(private val context: Context,
 
     fun createNewOffer(mediaConstraints: MediaConstraints): SessionDescription {
         val future = SettableFuture<SessionDescription>()
-
-        peerConnection?.close()
-        initPeerConnection()
 
         peerConnection!!.createOffer(object:SdpObserver {
             override fun onCreateSuccess(sdp: SessionDescription?) {
@@ -362,5 +356,10 @@ class PeerConnectionWrapper(private val context: Context,
         // mirror rotation offset
         rotationVideoSink.mirrored = newCameraState.activeDirection == CameraState.Direction.FRONT
         cameraEventListener.onCameraSwitchCompleted(newCameraState)
+    }
+
+    fun resetPeerConnection() {
+        peerConnection?.close()
+        initPeerConnection()
     }
 }
