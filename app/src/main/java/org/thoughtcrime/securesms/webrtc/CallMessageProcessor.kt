@@ -57,7 +57,7 @@ class CallMessageProcessor(private val context: Context, private val textSecureP
                     END_CALL -> incomingHangup(nextMessage)
                     ICE_CANDIDATES -> handleIceCandidates(nextMessage)
                     PRE_OFFER -> incomingPreOffer(nextMessage)
-                    PROVISIONAL_ANSWER -> {} // TODO: if necessary
+                    PROVISIONAL_ANSWER, null -> {} // TODO: if necessary
                 }
             }
         }
