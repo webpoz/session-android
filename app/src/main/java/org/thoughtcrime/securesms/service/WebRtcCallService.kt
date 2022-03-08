@@ -270,6 +270,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
                 action == ACTION_FLIP_CAMERA -> handleSetCameraFlip(intent)
                 action == ACTION_WIRED_HEADSET_CHANGE -> handleWiredHeadsetChanged(intent)
                 action == ACTION_SCREEN_OFF -> handleScreenOffChange(intent)
+                action == ACTION_RESPONSE_MESSAGE && isSameCall(intent) && callManager.currentConnectionState == CallState.Reconnecting -> handleResponseMessage(intent)
                 action == ACTION_RESPONSE_MESSAGE -> handleResponseMessage(intent)
                 action == ACTION_ICE_MESSAGE -> handleRemoteIceCandidate(intent)
                 action == ACTION_ICE_CONNECTED -> handleIceConnected(intent)
@@ -550,10 +551,9 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
                 handleLocalHangup(intent)
                 return
             }
-            val isNewSession = callManager.currentConnectionState == CallState.Reconnecting
             val callId = getCallId(intent)
             val description = intent.getStringExtra(EXTRA_REMOTE_DESCRIPTION)
-            callManager.handleResponseMessage(recipient, callId, SessionDescription(SessionDescription.Type.ANSWER, description), isNewSession)
+            callManager.handleResponseMessage(recipient, callId, SessionDescription(SessionDescription.Type.ANSWER, description))
         } catch (e: PeerConnectionException) {
             terminate()
         }
@@ -800,35 +800,43 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
     }
 
     override fun onIceConnectionChange(newState: PeerConnection.IceConnectionState?) {
-        if (newState == CONNECTED) {
-            scheduledTimeout?.cancel(false)
-            scheduledReconnect?.cancel(false)
-            scheduledTimeout = null
-            scheduledReconnect = null
-            activeNetwork = getCurrentNetwork()
+        newState?.let { state -> processIceConnectionChange(state) }
+    }
 
-            val intent = Intent(this, WebRtcCallService::class.java)
+    private fun processIceConnectionChange(newState: PeerConnection.IceConnectionState) {
+        serviceExecutor.execute {
+            if (newState == CONNECTED) {
+                scheduledTimeout?.cancel(false)
+                scheduledReconnect?.cancel(false)
+                scheduledTimeout = null
+                scheduledReconnect = null
+                activeNetwork = getCurrentNetwork()
+
+                val intent = Intent(this, WebRtcCallService::class.java)
                     .setAction(ACTION_ICE_CONNECTED)
-            startService(intent)
-        } else if (newState in arrayOf(FAILED, DISCONNECTED) && scheduledReconnect == null) {
-            callManager.callId?.let { callId ->
-                callManager.postConnectionEvent(Event.IceDisconnect) {
-                    val currentNetwork = getCurrentNetwork()
-                    callManager.postViewModelState(CallViewModel.State.CALL_RECONNECTING)
-                    if (activeNetwork != currentNetwork || currentNetwork == null) {
-                        Log.i("Loki", "Starting reconnect timer")
-                        scheduledReconnect = timeoutExecutor.schedule(CheckReconnectedRunnable(callId, this), RECONNECT_SECONDS, TimeUnit.SECONDS)
-                    } else {
-                        Log.i("Loki", "Starting timeout, awaiting new reconnect")
-                        scheduledTimeout = timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
-                    }
-                }
-            } ?: run {
-                val intent = hangupIntent(this)
                 startService(intent)
+            } else if (newState in arrayOf(FAILED, DISCONNECTED) && scheduledReconnect == null) {
+                callManager.callId?.let { callId ->
+                    callManager.postConnectionEvent(Event.IceDisconnect) {
+                        val currentNetwork = getCurrentNetwork()
+                        callManager.postViewModelState(CallViewModel.State.CALL_RECONNECTING)
+                        if (activeNetwork != currentNetwork || currentNetwork == null) {
+                            Log.i("Loki", "Starting reconnect timer")
+                            scheduledReconnect = timeoutExecutor.schedule(CheckReconnectedRunnable(callId, this), RECONNECT_SECONDS, TimeUnit.SECONDS)
+                        } else {
+                            Log.i("Loki", "Starting timeout, awaiting new reconnect")
+                            callManager.postConnectionEvent(Event.PrepareForNewOffer) {
+                                scheduledTimeout = timeoutExecutor.schedule(TimeoutRunnable(callId, this), TIMEOUT_SECONDS, TimeUnit.SECONDS)
+                            }
+                        }
+                    }
+                } ?: run {
+                    val intent = hangupIntent(this)
+                    startService(intent)
+                }
             }
+            Log.i("Loki", "onIceConnectionChange: $newState")
         }
-        Log.i("Loki", "onIceConnectionChange: $newState")
     }
 
     override fun onIceConnectionReceivingChange(p0: Boolean) {}

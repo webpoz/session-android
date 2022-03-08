@@ -140,7 +140,7 @@ class PeerConnectionWrapper(private val context: Context,
         peerConnection?.dispose()
     }
 
-    fun setNewOffer(description: SessionDescription) {
+    fun setNewRemoteDescription(description: SessionDescription) {
         val future = SettableFuture<Boolean>()
 
         peerConnection?.close()
@@ -238,6 +238,39 @@ class PeerConnectionWrapper(private val context: Context,
                 .replace(".+urn:ietf:params:rtp-hdrext:ssrc-audio-level.*\r?\n".toRegex(), "")
 
         return SessionDescription(sessionDescription.type, updatedSdp)
+    }
+
+    fun createNewOffer(mediaConstraints: MediaConstraints): SessionDescription {
+        val future = SettableFuture<SessionDescription>()
+
+        peerConnection?.close()
+        initPeerConnection()
+
+        peerConnection!!.createOffer(object:SdpObserver {
+            override fun onCreateSuccess(sdp: SessionDescription?) {
+                future.set(sdp)
+            }
+
+            override fun onSetSuccess() {
+                throw AssertionError()
+            }
+
+            override fun onCreateFailure(p0: String?) {
+                future.setException(PeerConnectionException(p0))
+            }
+
+            override fun onSetFailure(p0: String?) {
+                throw AssertionError()
+            }
+        }, mediaConstraints)
+
+        try {
+            return correctSessionDescription(future.get())
+        } catch (e: InterruptedException) {
+            throw AssertionError()
+        } catch (e: ExecutionException) {
+            throw PeerConnectionException(e)
+        }
     }
 
     fun createOffer(mediaConstraints: MediaConstraints): SessionDescription {

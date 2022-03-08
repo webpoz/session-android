@@ -21,7 +21,14 @@ class CallStateMachineTests {
     fun setup() {
         stateProcessor = TestStateProcessor(State.Idle)
         mock = mockStatic(Log::class.java).apply {
-            `when`<Unit> { Log.e(any(), any(), any()) }.then { /* do nothing */ }
+            `when`<Unit> { Log.e(any(), any(), any()) }.then { invocation ->
+                val msg = invocation.getArgument<Any>(1)
+                println(msg)
+            }
+            `when`<Unit> { Log.i(any(), any(), any()) }.then { invocation ->
+                val msg = invocation.getArgument<Any>(1)
+                println(msg)
+            }
         }
     }
 
@@ -127,6 +134,18 @@ class CallStateMachineTests {
             Event.Connect,
             Event.IceDisconnect,
             Event.NetworkReconnect,
+            Event.ReceiveAnswer,
+            Event.Connect,
+            Event.Hangup,
+            Event.Cleanup,
+            Event.ReceivePreOffer,
+            Event.ReceiveOffer,
+            Event.SendAnswer,
+            Event.Connect,
+            Event.IceDisconnect,
+            Event.PrepareForNewOffer,
+            Event.ReceiveOffer,
+            Event.SendAnswer,
             Event.Connect,
             Event.Hangup,
             Event.Cleanup,
@@ -136,15 +155,14 @@ class CallStateMachineTests {
             Event.IceFailed,
             Event.Cleanup,
             Event.ReceivePreOffer,
-            Event.ReceiveOffer,
             Event.DeclineCall,
             Event.Cleanup
         )
 
         executions.forEach { event -> stateProcessor.processEvent(event) }
 
-        assertEquals(stateProcessor.transitions, executions.size)
-        assertEquals(stateProcessor.currentState, State.Idle)
+        assertEquals(State.Idle, stateProcessor.currentState)
+        assertEquals(executions.size, stateProcessor.transitions)
     }
 
 }

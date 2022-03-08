@@ -401,10 +401,10 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
         val connection = peerConnection ?: return Promise.ofFail(NullPointerException("No peer connection wrapper"))
 
-        val reconnected = stateProcessor.processEvent(Event.NetworkReconnect)
+        val reconnected = stateProcessor.processEvent(Event.ReceiveOffer) && stateProcessor.processEvent(Event.SendAnswer)
         return if (reconnected) {
             Log.i("Loki", "Handling new offer, restarting ice session")
-            connection.setNewOffer(SessionDescription(SessionDescription.Type.OFFER, offer))
+            connection.setNewRemoteDescription(SessionDescription(SessionDescription.Type.OFFER, offer))
             // re-established an ice
             val answer = connection.createAnswer(MediaConstraints().apply {
                 mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
@@ -631,15 +631,13 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         }
     }
 
-    fun handleResponseMessage(recipient: Recipient, callId: UUID, answer: SessionDescription, isNewSession: Boolean) {
+    fun handleResponseMessage(recipient: Recipient, callId: UUID, answer: SessionDescription) {
         if (recipient != this.recipient || callId != this.callId) {
             Log.w(TAG,"Got answer for recipient and call ID we're not currently dialing")
             return
         }
 
-        val event = if (isNewSession) Event.Connect else Event.ReceiveAnswer
-
-        stateProcessor.processEvent(event) {
+        stateProcessor.processEvent(Event.ReceiveAnswer) {
             val connection = peerConnection ?: throw AssertionError("assert")
 
             connection.setRemoteDescription(answer)
@@ -698,7 +696,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         postConnectionEvent(Event.NetworkReconnect) {
             Log.d("Loki", "start re-establish")
 
-            val offer = connection.createOffer(MediaConstraints().apply {
+            val offer = connection.createNewOffer(MediaConstraints().apply {
                 mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
             })
             connection.setLocalDescription(offer)

@@ -36,6 +36,7 @@ class CallMessageProcessor(private val context: Context, private val textSecureP
                 Log.d("Loki", nextMessage.type?.name ?: "CALL MESSAGE RECEIVED")
                 val sender = nextMessage.sender ?: continue
                 val approvedContact = Recipient.from(context, Address.fromSerialized(sender), false).isApproved
+                Log.i("Loki", "Contact is approved?: $approvedContact")
                 if (!approvedContact && storage.getUserPublicKey() != sender) continue
 
                 if (!textSecurePreferences.isCallNotificationsEnabled()) {
