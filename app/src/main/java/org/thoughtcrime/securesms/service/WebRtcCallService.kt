@@ -103,7 +103,7 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         const val EXTRA_WANTS_TO_ANSWER = "wants_to_answer"
 
         const val INVALID_NOTIFICATION_ID = -1
-        private const val TIMEOUT_SECONDS = 90L
+        private const val TIMEOUT_SECONDS = 30L
         private const val RECONNECT_SECONDS = 5L
         private const val MAX_RECONNECTS = 5
 
@@ -219,6 +219,10 @@ class WebRtcCallService: Service(), CallManager.WebRtcListener {
         currentTimeouts = 0
         isNetworkAvailable = true
         activeNetwork = null
+        scheduledTimeout?.cancel(false)
+        scheduledReconnect?.cancel(false)
+        scheduledTimeout = null
+        scheduledReconnect = null
         stopForeground(true)
     }
 
