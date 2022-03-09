@@ -388,7 +388,7 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
 
     // called from onCreate
     private fun setUpToolBar() {
-        val actionBar = supportActionBar!!
+        val actionBar = supportActionBar ?: return
         actionBarBinding = ActivityConversationV2ActionBarBinding.inflate(layoutInflater)
         actionBar.title = ""
         actionBar.customView = actionBarBinding!!.root
@@ -581,9 +581,11 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
             if (viewModel.recipient.isContactRecipient) {
                 binding?.blockedBanner?.isVisible = viewModel.recipient.isBlocked
             }
+            invalidateOptionsMenu()
             updateSubtitle()
             showOrHideInputIfNeeded()
             actionBarBinding?.profilePictureView?.update(recipient)
+            actionBarBinding?.conversationTitleView?.text = recipient.toShortString()
         }
     }
 
@@ -623,9 +625,7 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
     }
 
     private fun isMessageRequestThread(): Boolean {
-        val hasSent = threadDb.getLastSeenAndHasSent(viewModel.threadId).second()
-        return (!viewModel.recipient.isGroupRecipient && !hasSent) ||
-                (!viewModel.recipient.isGroupRecipient && hasSent && !(viewModel.recipient.hasApprovedMe() || viewModel.hasReceived()))
+        return !viewModel.recipient.isGroupRecipient && !viewModel.recipient.isApproved
     }
 
     private fun isOutgoingMessageRequestThread(): Boolean {
@@ -1001,6 +1001,9 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
     override fun sendMessage() {
         if (isIncomingMessageRequestThread()) {
             acceptMessageRequest()
+        } else if (!viewModel.recipient.isApproved) {
+            // edge case for new outgoing thread on new recipient without sending approval messages
+            viewModel.setRecipientApproved()
         }
         if (viewModel.recipient.isContactRecipient && viewModel.recipient.isBlocked) {
             BlockedDialog(viewModel.recipient).show(supportFragmentManager, "Blocked Dialog")
