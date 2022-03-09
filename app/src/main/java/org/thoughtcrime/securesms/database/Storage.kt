@@ -124,6 +124,14 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
             senderAddress
         }
         val targetRecipient = Recipient.from(context, targetAddress, false)
+        if (!targetRecipient.isGroupRecipient) {
+            val recipientDb = DatabaseComponent.get(context).recipientDatabase()
+            if (isUserSender) {
+                recipientDb.setApproved(targetRecipient, true)
+            } else {
+                recipientDb.setApprovedMe(targetRecipient, true)
+            }
+        }
         if (message.isMediaMessage() || attachments.isNotEmpty()) {
             val quote: Optional<QuoteModel> = if (quotes != null) Optional.of(quotes) else Optional.absent()
             val linkPreviews: Optional<List<LinkPreview>> = if (linkPreview.isEmpty()) Optional.absent() else Optional.of(linkPreview.mapNotNull { it!! })

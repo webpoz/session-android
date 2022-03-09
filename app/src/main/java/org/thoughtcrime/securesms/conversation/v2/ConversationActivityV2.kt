@@ -585,6 +585,7 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
             updateSubtitle()
             showOrHideInputIfNeeded()
             actionBarBinding?.profilePictureView?.update(recipient)
+            actionBarBinding?.conversationTitleView?.text = recipient.toShortString()
         }
     }
 

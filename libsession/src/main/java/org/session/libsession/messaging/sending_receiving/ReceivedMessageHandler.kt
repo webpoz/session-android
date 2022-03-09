@@ -208,8 +208,6 @@ fun MessageReceiver.handleVisibleMessage(message: VisibleMessage, proto: SignalS
             profileManager.setUnidentifiedAccessMode(context, recipient, Recipient.UnidentifiedAccessMode.UNKNOWN)
             profileManager.setProfilePictureURL(context, recipient, profile.profilePictureURL!!)
         }
-        // set approved on receive message
-        storage.setRecipientApprovedMe(recipient, true)
     }
     // Parse quote if needed
     var quoteModel: QuoteModel? = null
