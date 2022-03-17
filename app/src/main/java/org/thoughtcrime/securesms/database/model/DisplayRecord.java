@@ -122,6 +122,6 @@ public abstract class DisplayRecord {
 
   public boolean isControlMessage() {
     return isGroupUpdateMessage() || isExpirationTimerUpdate() || isDataExtractionNotification()
-            || isMessageRequestResponse() ||  || isCallLog();
+            || isMessageRequestResponse() || isCallLog();
   }
 }
