@@ -8,7 +8,9 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
-import android.view.*
+import android.view.MenuItem
+import android.view.OrientationEventListener
+import android.view.WindowManager
 import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
@@ -25,6 +27,7 @@ import network.loki.messenger.databinding.ActivityWebrtcBinding
 import org.apache.commons.lang3.time.DurationFormatUtils
 import org.session.libsession.avatars.ProfileContactPhoto
 import org.session.libsession.messaging.contacts.Contact
+import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.PassphraseRequiredActionBarActivity
 import org.thoughtcrime.securesms.dependencies.DatabaseComponent
 import org.thoughtcrime.securesms.mms.GlideApp
@@ -33,9 +36,15 @@ import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.thoughtcrime.securesms.util.AvatarPlaceholderGenerator
 import org.thoughtcrime.securesms.webrtc.AudioManagerCommand
 import org.thoughtcrime.securesms.webrtc.CallViewModel
-import org.thoughtcrime.securesms.webrtc.CallViewModel.State.*
-import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.*
-import java.util.*
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_CONNECTED
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_INCOMING
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_OUTGOING
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_PRE_INIT
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_RECONNECTING
+import org.thoughtcrime.securesms.webrtc.CallViewModel.State.CALL_RINGING
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.EARPIECE
+import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice.SPEAKER_PHONE
+import org.thoughtcrime.securesms.webrtc.data.quadrantRotation
 
 @AndroidEntryPoint
 class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
@@ -62,6 +71,17 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
         }
     private var hangupReceiver: BroadcastReceiver? = null
 
+    private val rotationListener by lazy {
+        object : OrientationEventListener(this) {
+            override fun onOrientationChanged(orientation: Int) {
+                if ((orientation + 15) % 90 < 30) {
+                    viewModel.deviceRotation = orientation
+                    updateControlsRotation(orientation.quadrantRotation() * -1)
+                }
+            }
+        }
+    }
+
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         if (item.itemId == android.R.id.home) {
             finish()
@@ -80,6 +100,7 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?, ready: Boolean) {
         super.onCreate(savedInstanceState, ready)
+        rotationListener.enable()
         binding = ActivityWebrtcBinding.inflate(layoutInflater)
         setContentView(binding.root)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
@@ -165,6 +186,7 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
         hangupReceiver?.let { receiver ->
             LocalBroadcastManager.getInstance(this).unregisterReceiver(receiver)
         }
+        rotationListener.disable()
     }
 
     private fun answerCall() {
@@ -172,8 +194,20 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
         ContextCompat.startForegroundService(this, answerIntent)
     }
 
-    private fun updateControls(state: CallViewModel.State? = null) {
+    private fun updateControlsRotation(newRotation: Int) {
         with (binding) {
+            val rotation = newRotation.toFloat()
+            remoteRecipient.rotation = rotation
+            speakerPhoneButton.rotation = rotation
+            microphoneButton.rotation = rotation
+            enableCameraButton.rotation = rotation
+            switchCameraButton.rotation = rotation
+            endCallButton.rotation = rotation
+        }
+    }
+
+    private fun updateControls(state: CallViewModel.State? = null) {
+        with(binding) {
             if (state == null) {
                 if (wantsToAnswer) {
                     controlGroup.isVisible = true
@@ -181,7 +215,6 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
                     incomingControlGroup.isVisible = false
                 }
             } else {
-
                 controlGroup.isVisible = state in listOf(
                     CALL_CONNECTED,
                     CALL_OUTGOING,
@@ -191,6 +224,8 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
                     state !in listOf(CALL_CONNECTED, CALL_RINGING, CALL_PRE_INIT) || wantsToAnswer
                 incomingControlGroup.isVisible =
                     state in listOf(CALL_RINGING, CALL_PRE_INIT) && !wantsToAnswer
+                reconnectingText.isVisible = state == CALL_RECONNECTING
+                endCallButton.isVisible = endCallButton.isVisible || state == CALL_RECONNECTING
             }
         }
     }
@@ -210,6 +245,7 @@ class WebRtcCallActivity : PassphraseRequiredActionBarActivity() {
 
             launch {
                 viewModel.callState.collect { state ->
+                    Log.d("Loki", "Consuming view model state $state")
                     when (state) {
                         CALL_RINGING -> {
                             if (wantsToAnswer) {

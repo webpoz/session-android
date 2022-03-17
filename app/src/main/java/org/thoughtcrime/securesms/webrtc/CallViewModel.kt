@@ -21,6 +21,7 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
         CALL_RINGING,
         CALL_BUSY,
         CALL_DISCONNECTED,
+        CALL_RECONNECTING,
 
         NETWORK_FAILURE,
         RECIPIENT_UNAVAILABLE,
@@ -65,6 +66,12 @@ class CallViewModel @Inject constructor(private val callManager: CallManager): V
 
     val remoteVideoEnabledState
         get() = callManager.remoteVideoEvents.map { it.isEnabled }
+
+    var deviceRotation: Int = 0
+        set(value) {
+            field = value
+            callManager.setDeviceRotation(value)
+        }
 
     val currentCallState
         get() = callManager.currentCallState

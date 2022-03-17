@@ -4,8 +4,12 @@ import android.content.Context
 import android.telephony.TelephonyManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import nl.komponents.kovenant.Promise
 import nl.komponents.kovenant.functional.bind
 import org.session.libsession.database.StorageProtocol
@@ -18,26 +22,40 @@ import org.session.libsession.utilities.Util
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES
 import org.session.libsignal.utilities.Log
-import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.*
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.AudioDeviceUpdate
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.AudioEnabled
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.RecipientUpdate
+import org.thoughtcrime.securesms.webrtc.CallManager.StateEvent.VideoEnabled
 import org.thoughtcrime.securesms.webrtc.audio.AudioManagerCompat
 import org.thoughtcrime.securesms.webrtc.audio.OutgoingRinger
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager
 import org.thoughtcrime.securesms.webrtc.audio.SignalAudioManager.AudioDevice
+import org.thoughtcrime.securesms.webrtc.data.Event
+import org.thoughtcrime.securesms.webrtc.data.StateProcessor
 import org.thoughtcrime.securesms.webrtc.locks.LockManager
 import org.thoughtcrime.securesms.webrtc.video.CameraEventListener
 import org.thoughtcrime.securesms.webrtc.video.CameraState
-import org.webrtc.*
+import org.thoughtcrime.securesms.webrtc.video.RemoteRotationVideoProxySink
+import org.webrtc.DataChannel
+import org.webrtc.DefaultVideoDecoderFactory
+import org.webrtc.DefaultVideoEncoderFactory
+import org.webrtc.EglBase
+import org.webrtc.IceCandidate
+import org.webrtc.MediaConstraints
+import org.webrtc.MediaStream
+import org.webrtc.PeerConnection
 import org.webrtc.PeerConnection.IceConnectionState
+import org.webrtc.PeerConnectionFactory
+import org.webrtc.RtpReceiver
+import org.webrtc.SessionDescription
+import org.webrtc.SurfaceViewRenderer
 import java.nio.ByteBuffer
-import java.util.*
-import java.util.concurrent.Executors
+import java.util.ArrayDeque
+import java.util.UUID
+import org.thoughtcrime.securesms.webrtc.data.State as CallState
 
 class CallManager(context: Context, audioManager: AudioManagerCompat, private val storage: StorageProtocol): PeerConnection.Observer,
         SignalAudioManager.EventListener, CameraEventListener, DataChannel.Observer {
-
-    enum class CallState {
-        STATE_IDLE, STATE_PRE_OFFER, STATE_DIALING, STATE_ANSWERING, STATE_REMOTE_RINGING, STATE_LOCAL_RINGING, STATE_CONNECTED
-    }
 
     sealed class StateEvent {
         data class AudioEnabled(val isEnabled: Boolean): StateEvent()
@@ -57,19 +75,6 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         val HANGUP_JSON by lazy { buildJsonObject { put("hangup", true) } }
 
         private val TAG = Log.tag(CallManager::class.java)
-        val CONNECTED_STATES = arrayOf(CallState.STATE_CONNECTED)
-        val PENDING_CONNECTION_STATES = arrayOf(
-                CallState.STATE_DIALING,
-                CallState.STATE_ANSWERING,
-                CallState.STATE_LOCAL_RINGING,
-                CallState.STATE_REMOTE_RINGING,
-                CallState.STATE_PRE_OFFER,
-        )
-        val OUTGOING_STATES = arrayOf(
-                CallState.STATE_DIALING,
-                CallState.STATE_REMOTE_RINGING,
-                CallState.STATE_CONNECTED
-        )
         private const val DATA_CHANNEL_NAME = "signaling"
     }
 
@@ -91,8 +96,9 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     val videoEvents = _videoEvents.asSharedFlow()
     private val _remoteVideoEvents = MutableStateFlow(VideoEnabled(false))
     val remoteVideoEvents = _remoteVideoEvents.asSharedFlow()
-    private val _connectionEvents = MutableStateFlow<StateEvent>(CallStateUpdate(CallState.STATE_IDLE))
-    val connectionEvents = _connectionEvents.asSharedFlow()
+
+    private val stateProcessor = StateProcessor(CallState.Idle)
+
     private val _callStateEvents = MutableStateFlow(CallViewModel.State.CALL_PENDING)
     val callStateEvents = _callStateEvents.asSharedFlow()
     private val _recipientEvents = MutableStateFlow(RecipientUpdate.UNKNOWN)
@@ -103,7 +109,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     val audioDeviceEvents = _audioDeviceEvents.asSharedFlow()
 
     val currentConnectionState
-        get() = (_connectionEvents.value as CallStateUpdate).state
+        get() = stateProcessor.currentState
 
     val currentCallState
         get() = _callStateEvents.value
@@ -133,6 +139,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     private val outgoingIceDebouncer = Debouncer(200L)
 
     var localRenderer: SurfaceViewRenderer? = null
+    var remoteRotationSink: RemoteRotationVideoProxySink? = null
     var remoteRenderer: SurfaceViewRenderer? = null
     private var peerConnectionFactory: PeerConnectionFactory? = null
 
@@ -156,20 +163,25 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         signalAudioManager.handleCommand(AudioManagerCommand.SilenceIncomingRinger)
     }
 
-    fun postConnectionEvent(newState: CallState) {
-        _connectionEvents.value = CallStateUpdate(newState)
+    fun postConnectionEvent(transition: Event, onSuccess: ()->Unit): Boolean {
+        return stateProcessor.processEvent(transition, onSuccess)
+    }
+
+    fun postConnectionError(): Boolean {
+        return stateProcessor.processEvent(Event.Error)
     }
 
     fun postViewModelState(newState: CallViewModel.State) {
+        Log.d("Loki", "Posting view model state $newState")
         _callStateEvents.value = newState
     }
 
-    fun isBusy(context: Context, callId: UUID) = callId != this.callId && (currentConnectionState != CallState.STATE_IDLE
+    fun isBusy(context: Context, callId: UUID) = callId != this.callId && (currentConnectionState != CallState.Idle
             || context.getSystemService(TelephonyManager::class.java).callState  != TelephonyManager.CALL_STATE_IDLE)
 
-    fun isPreOffer() = currentConnectionState == CallState.STATE_PRE_OFFER
+    fun isPreOffer() = currentConnectionState == CallState.RemotePreOffer
 
-    fun isIdle() = currentConnectionState == CallState.STATE_IDLE
+    fun isIdle() = currentConnectionState == CallState.Idle
 
     fun isCurrentUser(recipient: Recipient) = recipient.address.serialize() == storage.getUserPublicKey()
 
@@ -177,12 +189,20 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         Util.runOnMainSync {
             val base = EglBase.create()
             eglBase = base
-            localRenderer = SurfaceViewRenderer(context)
-            remoteRenderer = SurfaceViewRenderer(context)
+            localRenderer = SurfaceViewRenderer(context).apply {
+//                setScalingType(SCALE_ASPECT_FIT)
+            }
+
+            remoteRenderer = SurfaceViewRenderer(context).apply {
+//                setScalingType(SCALE_ASPECT_FIT)
+            }
+            remoteRotationSink = RemoteRotationVideoProxySink()
+
 
             localRenderer?.init(base.eglBaseContext, null)
-            localRenderer?.setMirror(true)
+            localRenderer?.setMirror(localCameraState.activeDirection == CameraState.Direction.FRONT)
             remoteRenderer?.init(base.eglBaseContext, null)
+            remoteRotationSink!!.setSink(remoteRenderer!!)
 
             val encoderFactory = DefaultVideoEncoderFactory(base.eglBaseContext, true, true)
             val decoderFactory = DefaultVideoDecoderFactory(base.eglBaseContext)
@@ -205,7 +225,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     }
 
     fun setAudioEnabled(isEnabled: Boolean) {
-        currentConnectionState.withState(*(CONNECTED_STATES + PENDING_CONNECTION_STATES)) {
+        currentConnectionState.withState(*CallState.CAN_HANGUP_STATES) {
             peerConnection?.setAudioEnabled(isEnabled)
             _audioEvents.value = AudioEnabled(true)
         }
@@ -216,6 +236,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     }
 
     override fun onIceConnectionChange(newState: IceConnectionState) {
+        Log.d("Loki", "New ice connection state = $newState")
         iceState = newState
         peerConnectionObservers.forEach { listener -> listener.onIceConnectionChange(newState) }
         if (newState == IceConnectionState.CONNECTED) {
@@ -279,7 +300,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         if (stream.videoTracks != null && stream.videoTracks.size == 1) {
             val videoTrack = stream.videoTracks.first()
             videoTrack.setEnabled(true)
-            videoTrack.addSink(remoteRenderer)
+            videoTrack.addSink(remoteRotationSink)
         }
     }
 
@@ -328,75 +349,89 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         _audioDeviceEvents.value = AudioDeviceUpdate(activeDevice, devices)
     }
 
-    private fun CallState.withState(vararg expected: CallState, transition: () -> Unit) {
-        if (this in expected) transition()
-        else Log.w(TAG,"Tried to transition state $this but expected $expected")
-    }
-
     fun stop() {
-        signalAudioManager.handleCommand(AudioManagerCommand.Stop(currentConnectionState in OUTGOING_STATES))
-        peerConnection?.dispose()
-        peerConnection = null
+        val isOutgoing = currentConnectionState in CallState.OUTGOING_STATES
+        stateProcessor.processEvent(Event.Cleanup) {
+            signalAudioManager.handleCommand(AudioManagerCommand.Stop(isOutgoing))
+            peerConnection?.dispose()
+            peerConnection = null
 
-        localRenderer?.release()
-        remoteRenderer?.release()
-        eglBase?.release()
+            localRenderer?.release()
+            remoteRotationSink?.release()
+            remoteRenderer?.release()
+            eglBase?.release()
 
-        localRenderer = null
-        remoteRenderer = null
-        eglBase = null
+            localRenderer = null
+            remoteRenderer = null
+            eglBase = null
 
-        _connectionEvents.value = CallStateUpdate(CallState.STATE_IDLE)
-        localCameraState = CameraState.UNKNOWN
-        recipient = null
-        callId = null
-        pendingOfferTime = -1
-        pendingOffer = null
-        callStartTime = -1
-        _audioEvents.value = AudioEnabled(false)
-        _videoEvents.value = VideoEnabled(false)
-        _remoteVideoEvents.value = VideoEnabled(false)
-        pendingOutgoingIceUpdates.clear()
-        pendingIncomingIceUpdates.clear()
+            localCameraState = CameraState.UNKNOWN
+            recipient = null
+            callId = null
+            pendingOfferTime = -1
+            pendingOffer = null
+            callStartTime = -1
+            _audioEvents.value = AudioEnabled(false)
+            _videoEvents.value = VideoEnabled(false)
+            _remoteVideoEvents.value = VideoEnabled(false)
+            pendingOutgoingIceUpdates.clear()
+            pendingIncomingIceUpdates.clear()
+        }
     }
 
     override fun onCameraSwitchCompleted(newCameraState: CameraState) {
         localCameraState = newCameraState
     }
 
-    fun onPreOffer(callId: UUID, recipient: Recipient, sentTimestamp: Long) {
-        if (preOfferCallData != null) {
-            Log.d(TAG, "Received new pre-offer when we are already expecting one")
+    fun onPreOffer(callId: UUID, recipient: Recipient, onSuccess: () -> Unit) {
+        stateProcessor.processEvent(Event.ReceivePreOffer) {
+            if (preOfferCallData != null) {
+                Log.d(TAG, "Received new pre-offer when we are already expecting one")
+            }
+            this.recipient = recipient
+            this.callId = callId
+            preOfferCallData = PreOffer(callId, recipient)
+            onSuccess()
         }
-        this.recipient = recipient
-        this.callId = callId
-        preOfferCallData = PreOffer(callId, recipient)
-        postConnectionEvent(CallState.STATE_PRE_OFFER)
     }
 
     fun onNewOffer(offer: String, callId: UUID, recipient: Recipient): Promise<Unit, Exception> {
         if (callId != this.callId) return Promise.ofFail(NullPointerException("No callId"))
         if (recipient != this.recipient) return Promise.ofFail(NullPointerException("No recipient"))
 
-        val connection = peerConnection ?: return Promise.ofFail(NullPointerException("No peer connection"))
+        val connection = peerConnection ?: return Promise.ofFail(NullPointerException("No peer connection wrapper"))
 
-        connection.setNewOffer(SessionDescription(SessionDescription.Type.OFFER, offer))
-        val answer = connection.createAnswer(MediaConstraints().apply {
-            mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
-        })
-        val answerMessage = CallMessage.answer(answer.description, callId)
-        return MessageSender.sendNonDurably(answerMessage, recipient.address)
+        val reconnected = stateProcessor.processEvent(Event.ReceiveOffer) && stateProcessor.processEvent(Event.SendAnswer)
+        return if (reconnected) {
+            Log.i("Loki", "Handling new offer, restarting ice session")
+            connection.setNewRemoteDescription(SessionDescription(SessionDescription.Type.OFFER, offer))
+            // re-established an ice
+            val answer = connection.createAnswer(MediaConstraints().apply {
+                mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+            })
+            connection.setLocalDescription(answer)
+            pendingIncomingIceUpdates.toList().forEach { update ->
+                connection.addIceCandidate(update)
+            }
+            pendingIncomingIceUpdates.clear()
+            val answerMessage = CallMessage.answer(answer.description, callId)
+            Log.i("Loki", "Posting new answer")
+            MessageSender.sendNonDurably(answerMessage, recipient.address)
+        } else {
+            Promise.ofFail(Exception("Couldn't reconnect from current state"))
+        }
     }
 
-    fun onIncomingRing(offer: String, callId: UUID, recipient: Recipient, callTime: Long) {
-        if (currentConnectionState !in arrayOf(CallState.STATE_IDLE, CallState.STATE_PRE_OFFER)) return
-
-        this.callId = callId
-        this.recipient = recipient
-        this.pendingOffer = offer
-        this.pendingOfferTime = callTime
-        initializeAudioForCall()
-        startIncomingRinger()
+    fun onIncomingRing(offer: String, callId: UUID, recipient: Recipient, callTime: Long, onSuccess: () -> Unit) {
+        postConnectionEvent(Event.ReceiveOffer) {
+            this.callId = callId
+            this.recipient = recipient
+            this.pendingOffer = offer
+            this.pendingOfferTime = callTime
+            initializeAudioForCall()
+            startIncomingRinger()
+            onSuccess()
+        }
     }
 
     fun onIncomingCall(context: Context, isAlwaysTurn: Boolean = false): Promise<Unit, Exception> {
@@ -453,7 +488,12 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
                 ?: return Promise.ofFail(NullPointerException("localRenderer is null"))
         val base = eglBase ?: return Promise.ofFail(NullPointerException("eglBase is null"))
 
-        val connection = PeerConnectionWrapper(
+        val sentOffer = stateProcessor.processEvent(Event.SendOffer)
+
+        if (!sentOffer) {
+            return Promise.ofFail(Exception("Couldn't transition to sent offer state"))
+        } else {
+            val connection = PeerConnectionWrapper(
                 context,
                 factory,
                 this,
@@ -461,25 +501,24 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
                 this,
                 base,
                 isAlwaysTurn
-        )
+            )
 
-        peerConnection = connection
-        localCameraState = connection.getCameraState()
-        val dataChannel = connection.createDataChannel(DATA_CHANNEL_NAME)
-        dataChannel.registerObserver(this)
-        this.dataChannel = dataChannel
-        val offer = connection.createOffer(MediaConstraints())
-        connection.setLocalDescription(offer)
+            peerConnection = connection
+            localCameraState = connection.getCameraState()
+            val dataChannel = connection.createDataChannel(DATA_CHANNEL_NAME)
+            dataChannel.registerObserver(this)
+            this.dataChannel = dataChannel
+            val offer = connection.createOffer(MediaConstraints())
+            connection.setLocalDescription(offer)
 
-        Log.i(TAG, "Sending offer: ${offer.description}")
-
-        return MessageSender.sendNonDurably(CallMessage.preOffer(
+            return MessageSender.sendNonDurably(CallMessage.preOffer(
                 callId
-        ), recipient.address).bind {
-            MessageSender.sendNonDurably(CallMessage.offer(
+            ), recipient.address).bind {
+                MessageSender.sendNonDurably(CallMessage.offer(
                     offer.description,
                     callId
-            ), recipient.address)
+                ), recipient.address)
+            }
         }
     }
 
@@ -490,9 +529,11 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         val callId = callId ?: return
         val recipient = recipient ?: return
         val userAddress = storage.getUserPublicKey() ?: return
-        MessageSender.sendNonDurably(CallMessage.endCall(callId), Address.fromSerialized(userAddress))
-        MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
-        insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_MISSED)
+        stateProcessor.processEvent(Event.DeclineCall) {
+            MessageSender.sendNonDurably(CallMessage.endCall(callId), Address.fromSerialized(userAddress))
+            MessageSender.sendNonDurably(CallMessage.endCall(callId), recipient.address)
+            insertCallMessage(recipient.address.serialize(), CallMessageType.CALL_MISSED)
+        }
     }
 
     fun handleLocalHangup(intentRecipient: Recipient?) {
@@ -503,6 +544,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         val sendHangup = intentRecipient == null || (intentRecipient == recipient && recipient.address.serialize() != currentUserPublicKey)
 
         postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
+        stateProcessor.processEvent(Event.Hangup)
         if (sendHangup) {
             dataChannel?.let { channel ->
                 val buffer = DataChannel.Buffer(ByteBuffer.wrap(HANGUP_JSON.toString().encodeToByteArray()), false)
@@ -518,9 +560,13 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
 
     fun handleRemoteHangup() {
         when (currentConnectionState) {
-            CallState.STATE_DIALING,
-            CallState.STATE_REMOTE_RINGING -> postViewModelState(CallViewModel.State.RECIPIENT_UNAVAILABLE)
+            CallState.LocalRing,
+            CallState.RemoteRing -> postViewModelState(CallViewModel.State.RECIPIENT_UNAVAILABLE)
             else -> postViewModelState(CallViewModel.State.CALL_DISCONNECTED)
+        }
+        if (!stateProcessor.processEvent(Event.Hangup)) {
+            Log.e("Loki", "")
+            stateProcessor.processEvent(Event.Error)
         }
     }
 
@@ -539,7 +585,7 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
             channel.send(buffer)
         }
 
-        if (currentConnectionState == CallState.STATE_CONNECTED) {
+        if (currentConnectionState == CallState.Connected) {
             if (connection.isVideoEnabled()) lockManager.updatePhoneState(LockManager.PhoneState.IN_VIDEO)
             else lockManager.updatePhoneState(LockManager.PhoneState.IN_CALL)
         }
@@ -558,13 +604,19 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         peerConnection?.let { connection ->
             connection.flipCamera()
             localCameraState = connection.getCameraState()
+            localRenderer?.setMirror(localCameraState.activeDirection == CameraState.Direction.FRONT)
         }
     }
 
+    fun setDeviceRotation(newRotation: Int) {
+        peerConnection?.setDeviceRotation(newRotation)
+        remoteRotationSink?.rotation = newRotation
+    }
+
     fun handleWiredHeadsetChanged(present: Boolean) {
-        if (currentConnectionState in arrayOf(CallState.STATE_CONNECTED,
-                        CallState.STATE_DIALING,
-                        CallState.STATE_REMOTE_RINGING)) {
+        if (currentConnectionState in arrayOf(CallState.Connected,
+                        CallState.LocalRing,
+                        CallState.RemoteRing)) {
             if (present && signalAudioManager.isSpeakerphoneOn()) {
                 signalAudioManager.handleCommand(AudioManagerCommand.SetUserDevice(AudioDevice.WIRED_HEADSET))
             } else if (!present && !signalAudioManager.isSpeakerphoneOn() && !signalAudioManager.isBluetoothScoOn() && localCameraState.enabled) {
@@ -574,24 +626,26 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
     }
 
     fun handleScreenOffChange() {
-        if (currentConnectionState in arrayOf(CallState.STATE_ANSWERING, CallState.STATE_LOCAL_RINGING)) {
+        if (currentConnectionState in arrayOf(CallState.Connecting, CallState.LocalRing)) {
             signalAudioManager.handleCommand(AudioManagerCommand.SilenceIncomingRinger)
         }
     }
 
     fun handleResponseMessage(recipient: Recipient, callId: UUID, answer: SessionDescription) {
-        if (currentConnectionState !in arrayOf(CallState.STATE_DIALING, CallState.STATE_CONNECTED) || recipient != this.recipient || callId != this.callId) {
+        if (recipient != this.recipient || callId != this.callId) {
             Log.w(TAG,"Got answer for recipient and call ID we're not currently dialing")
             return
         }
 
-        val connection = peerConnection ?: throw AssertionError("assert")
+        stateProcessor.processEvent(Event.ReceiveAnswer) {
+            val connection = peerConnection ?: throw AssertionError("assert")
 
-        connection.setRemoteDescription(answer)
-        while (pendingIncomingIceUpdates.isNotEmpty()) {
-            connection.addIceCandidate(pendingIncomingIceUpdates.pop())
+            connection.setRemoteDescription(answer)
+            while (pendingIncomingIceUpdates.isNotEmpty()) {
+                connection.addIceCandidate(pendingIncomingIceUpdates.pop())
+            }
+            queueOutgoingIce(callId, recipient)
         }
-        queueOutgoingIce(callId, recipient)
     }
 
     fun handleRemoteIceCandidate(iceCandidates: List<IceCandidate>, callId: UUID) {
@@ -601,11 +655,13 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         }
 
         val connection = peerConnection
-        if (connection != null && connection.readyForIce) {
+        if (connection != null && connection.readyForIce && currentConnectionState != CallState.Reconnecting) {
+            Log.i("Loki", "Handling connection ice candidate")
             iceCandidates.forEach { candidate ->
                 connection.addIceCandidate(candidate)
             }
         } else {
+            Log.i("Loki", "Handling add to pending ice candidate")
             pendingIncomingIceUpdates.addAll(iceCandidates)
         }
     }
@@ -637,18 +693,20 @@ class CallManager(context: Context, audioManager: AudioManagerCompat, private va
         val callId = callId ?: return
         val recipient = recipient ?: return
 
-        if (isReestablishing) return
-        isReestablishing = true
-        Log.d("Loki", "start re-establish")
+        postConnectionEvent(Event.NetworkReconnect) {
+            Log.d("Loki", "start re-establish")
 
-        val offer = connection.createOffer(MediaConstraints().apply {
-            mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
-        })
-        connection.setLocalDescription(offer)
+            val offer = connection.createNewOffer(MediaConstraints().apply {
+                mandatory.add(MediaConstraints.KeyValuePair("IceRestart", "true"))
+            })
+            connection.setLocalDescription(offer)
 
-        MessageSender.sendNonDurably(CallMessage.offer(offer.description, callId), recipient.address).success {
-            isReestablishing = false
+            MessageSender.sendNonDurably(CallMessage.offer(offer.description, callId), recipient.address)
         }
+    }
+
+    fun resetPeerConnection() {
+        peerConnection?.resetPeerConnection()
     }
 
     interface WebRtcListener: PeerConnection.Observer {

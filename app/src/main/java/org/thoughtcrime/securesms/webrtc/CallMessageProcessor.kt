@@ -14,7 +14,13 @@ import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.TextSecurePreferences
-import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.*
+import org.session.libsession.utilities.recipients.Recipient
+import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.ANSWER
+import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.END_CALL
+import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.ICE_CANDIDATES
+import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.OFFER
+import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.PRE_OFFER
+import org.session.libsignal.protos.SignalServiceProtos.CallMessage.Type.PROVISIONAL_ANSWER
 import org.session.libsignal.utilities.Log
 import org.thoughtcrime.securesms.service.WebRtcCallService
 import org.thoughtcrime.securesms.util.CallNotificationBuilder
@@ -29,7 +35,9 @@ class CallMessageProcessor(private val context: Context, private val textSecureP
                 val nextMessage = WebRtcUtils.SIGNAL_QUEUE.receive()
                 Log.d("Loki", nextMessage.type?.name ?: "CALL MESSAGE RECEIVED")
                 val sender = nextMessage.sender ?: continue
-                if (!storage.conversationHasOutgoing(sender) && storage.getUserPublicKey() != sender) continue
+                val approvedContact = Recipient.from(context, Address.fromSerialized(sender), false).isApproved
+                Log.i("Loki", "Contact is approved?: $approvedContact")
+                if (!approvedContact && storage.getUserPublicKey() != sender) continue
 
                 if (!textSecurePreferences.isCallNotificationsEnabled()) {
                     Log.d("Loki","Dropping call message if call notifications disabled")
@@ -49,7 +57,7 @@ class CallMessageProcessor(private val context: Context, private val textSecureP
                     END_CALL -> incomingHangup(nextMessage)
                     ICE_CANDIDATES -> handleIceCandidates(nextMessage)
                     PRE_OFFER -> incomingPreOffer(nextMessage)
-                    PROVISIONAL_ANSWER -> {} // TODO: if necessary
+                    PROVISIONAL_ANSWER, null -> {} // TODO: if necessary
                 }
             }
         }
