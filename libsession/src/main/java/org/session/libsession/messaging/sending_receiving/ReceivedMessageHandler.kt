@@ -1,11 +1,19 @@
 package org.session.libsession.messaging.sending_receiving
 
 import android.text.TextUtils
+import org.session.libsession.avatars.AvatarHelper
 import org.session.libsession.messaging.MessagingModuleConfiguration
 import org.session.libsession.messaging.jobs.AttachmentDownloadJob
 import org.session.libsession.messaging.jobs.JobQueue
 import org.session.libsession.messaging.messages.Message
-import org.session.libsession.messaging.messages.control.*
+import org.session.libsession.messaging.messages.control.ClosedGroupControlMessage
+import org.session.libsession.messaging.messages.control.ConfigurationMessage
+import org.session.libsession.messaging.messages.control.DataExtractionNotification
+import org.session.libsession.messaging.messages.control.ExpirationTimerUpdate
+import org.session.libsession.messaging.messages.control.MessageRequestResponse
+import org.session.libsession.messaging.messages.control.ReadReceipt
+import org.session.libsession.messaging.messages.control.TypingIndicator
+import org.session.libsession.messaging.messages.control.UnsendRequest
 import org.session.libsession.messaging.messages.visible.Attachment
 import org.session.libsession.messaging.messages.visible.VisibleMessage
 import org.session.libsession.messaging.sending_receiving.attachments.PointerAttachment
@@ -16,7 +24,12 @@ import org.session.libsession.messaging.sending_receiving.pollers.ClosedGroupPol
 import org.session.libsession.messaging.sending_receiving.quotes.QuoteModel
 import org.session.libsession.messaging.utilities.WebRtcUtils
 import org.session.libsession.snode.SnodeAPI
-import org.session.libsession.utilities.*
+import org.session.libsession.utilities.Address
+import org.session.libsession.utilities.GroupRecord
+import org.session.libsession.utilities.GroupUtil
+import org.session.libsession.utilities.ProfileKeyUtil
+import org.session.libsession.utilities.SSKEnvironment
+import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.crypto.ecc.DjbECPrivateKey
 import org.session.libsignal.crypto.ecc.DjbECPublicKey
@@ -29,8 +42,7 @@ import org.session.libsignal.utilities.guava.Optional
 import org.session.libsignal.utilities.removing05PrefixIfNeeded
 import org.session.libsignal.utilities.toHexString
 import java.security.MessageDigest
-import java.util.*
-import kotlin.collections.ArrayList
+import java.util.LinkedList
 
 internal fun MessageReceiver.isBlocked(publicKey: String): Boolean {
     val context = MessagingModuleConfiguration.shared.context
@@ -47,6 +59,7 @@ fun MessageReceiver.handle(message: Message, proto: SignalServiceProtos.Content,
         is DataExtractionNotification -> handleDataExtractionNotification(message)
         is ConfigurationMessage -> handleConfigurationMessage(message)
         is UnsendRequest -> handleUnsendRequest(message)
+        is MessageRequestResponse -> handleMessageRequestResponse(message)
         is VisibleMessage -> handleVisibleMessage(message, proto, openGroupID)
         is CallMessage -> handleCallMessage(message)
     }
@@ -119,13 +132,18 @@ private fun handleConfigurationMessage(message: ConfigurationMessage) {
         && !TextSecurePreferences.shouldUpdateProfile(context, message.sentTimestamp!!)) return
     val userPublicKey = storage.getUserPublicKey()
     if (userPublicKey == null || message.sender != storage.getUserPublicKey()) return
+
+    val firstTimeSync = !TextSecurePreferences.getConfigurationMessageSynced(context)
+
     TextSecurePreferences.setConfigurationMessageSynced(context, true)
     TextSecurePreferences.setLastProfileUpdateTime(context, message.sentTimestamp!!)
-    val allClosedGroupPublicKeys = storage.getAllClosedGroupPublicKeys()
-    for (closedGroup in message.closedGroups) {
-        if (allClosedGroupPublicKeys.contains(closedGroup.publicKey)) continue
-        handleNewClosedGroup(message.sender!!, message.sentTimestamp!!, closedGroup.publicKey, closedGroup.name,
-            closedGroup.encryptionKeyPair!!, closedGroup.members, closedGroup.admins, message.sentTimestamp!!, closedGroup.expirationTimer)
+    if (firstTimeSync) {
+        val allClosedGroupPublicKeys = storage.getAllClosedGroupPublicKeys()
+        for (closedGroup in message.closedGroups) {
+            if (allClosedGroupPublicKeys.contains(closedGroup.publicKey)) continue
+            handleNewClosedGroup(message.sender!!, message.sentTimestamp!!, closedGroup.publicKey, closedGroup.name,
+                closedGroup.encryptionKeyPair!!, closedGroup.members, closedGroup.admins, message.sentTimestamp!!, closedGroup.expirationTimer)
+        }
     }
     val allV2OpenGroups = storage.getAllV2OpenGroups().map { it.value.joinURL }
     for (openGroup in message.openGroups) {
@@ -167,6 +185,10 @@ fun MessageReceiver.handleUnsendRequest(message: UnsendRequest) {
         SSKEnvironment.shared.notificationManager.updateNotification(context)
     }
 }
+
+fun handleMessageRequestResponse(message: MessageRequestResponse) {
+    MessagingModuleConfiguration.shared.storage.insertMessageRequestResponse(message)
+}
 //endregion
 
 // region Visible Messages
@@ -174,28 +196,33 @@ fun MessageReceiver.handleVisibleMessage(message: VisibleMessage, proto: SignalS
     val storage = MessagingModuleConfiguration.shared.storage
     val context = MessagingModuleConfiguration.shared.context
     val userPublicKey = storage.getUserPublicKey()
+    val messageSender: String? = message.sender
     // Get or create thread
     // FIXME: In case this is an open group this actually * doesn't * create the thread if it doesn't yet
     //        exist. This is intentional, but it's very non-obvious.
     val threadID = storage.getOrCreateThreadIdFor(message.syncTarget
-        ?: message.sender!!, message.groupPublicKey, openGroupID)
+        ?: messageSender!!, message.groupPublicKey, openGroupID)
     if (threadID < 0) {
         // Thread doesn't exist; should only be reached in a case where we are processing open group messages for a no longer existent thread
         throw MessageReceiver.Error.NoThread
     }
     // Update profile if needed
+    val recipient = Recipient.from(context, Address.fromSerialized(messageSender!!), false)
     val profile = message.profile
-    if (profile != null && userPublicKey != message.sender) {
+    if (profile != null && userPublicKey != messageSender) {
         val profileManager = SSKEnvironment.shared.profileManager
-        val recipient = Recipient.from(context, Address.fromSerialized(message.sender!!), false)
         val name = profile.displayName!!
         if (name.isNotEmpty()) {
             profileManager.setName(context, recipient, name)
         }
         val newProfileKey = profile.profileKey
-        if (newProfileKey?.isNotEmpty() == true && (newProfileKey.size == 16 || newProfileKey.size == 32) && profile.profilePictureURL?.isNotEmpty() == true
-            && (recipient.profileKey == null || !MessageDigest.isEqual(recipient.profileKey, newProfileKey))) {
-            profileManager.setProfileKey(context, recipient, newProfileKey)
+
+        val needsProfilePicture = !AvatarHelper.avatarFileExists(context, Address.fromSerialized(messageSender))
+        val profileKeyValid = newProfileKey?.isNotEmpty() == true && (newProfileKey.size == 16 || newProfileKey.size == 32) && profile.profilePictureURL?.isNotEmpty() == true
+        val profileKeyChanged = (recipient.profileKey == null || !MessageDigest.isEqual(recipient.profileKey, newProfileKey))
+
+        if ((profileKeyValid && profileKeyChanged) || (profileKeyValid && needsProfilePicture)) {
+            profileManager.setProfileKey(context, recipient, newProfileKey!!)
             profileManager.setUnidentifiedAccessMode(context, recipient, Recipient.UnidentifiedAccessMode.UNKNOWN)
             profileManager.setProfilePictureURL(context, recipient, profile.profilePictureURL!!)
         }
@@ -276,6 +303,8 @@ private fun MessageReceiver.handleClosedGroupControlMessage(message: ClosedGroup
 
 private fun MessageReceiver.handleNewClosedGroup(message: ClosedGroupControlMessage) {
     val kind = message.kind!! as? ClosedGroupControlMessage.Kind.New ?: return
+    val recipient = Recipient.from(MessagingModuleConfiguration.shared.context, Address.fromSerialized(message.sender!!), false)
+    if (!recipient.isApproved) return
     val groupPublicKey = kind.publicKey.toByteArray().toHexString()
     val members = kind.members.map { it.toByteArray().toHexString() }
     val admins = kind.admins.map { it.toByteArray().toHexString() }

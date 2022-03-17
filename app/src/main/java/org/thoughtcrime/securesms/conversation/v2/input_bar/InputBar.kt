@@ -24,8 +24,6 @@ import org.thoughtcrime.securesms.database.model.MmsMessageRecord
 import org.thoughtcrime.securesms.mms.GlideRequests
 import org.thoughtcrime.securesms.util.toDp
 import org.thoughtcrime.securesms.util.toPx
-import kotlin.math.max
-import kotlin.math.roundToInt
 
 class InputBar : RelativeLayout, InputBarEditTextDelegate, QuoteViewDelegate, LinkPreviewDraftViewDelegate {
     private lateinit var binding: ViewInputBarBinding
@@ -39,6 +37,12 @@ class InputBar : RelativeLayout, InputBarEditTextDelegate, QuoteViewDelegate, Li
     var linkPreview: LinkPreview? = null
     var showInput: Boolean = true
         set(value) { field = value; showOrHideInputIfNeeded() }
+    var showMediaControls: Boolean = true
+        set(value) {
+            field = value
+            showOrHideMediaControlsIfNeeded()
+            binding.inputBarEditText.showMediaControls = value
+        }
 
     var text: String
         get() { return binding.inputBarEditText.text?.toString() ?: "" }
@@ -164,6 +168,10 @@ class InputBar : RelativeLayout, InputBarEditTextDelegate, QuoteViewDelegate, Li
         }
     }
 
+    private fun showOrHideMediaControlsIfNeeded() {
+        setOf(attachmentsButton, microphoneButton).forEach { it.snIsEnabled = showMediaControls }
+    }
+
     fun addTextChangedListener(textWatcher: TextWatcher) {
         binding.inputBarEditText.addTextChangedListener(textWatcher)
     }
@@ -176,7 +184,6 @@ class InputBar : RelativeLayout, InputBarEditTextDelegate, QuoteViewDelegate, Li
 
 interface InputBarDelegate {
 
-    fun inputBarHeightChanged(newValue: Int)
     fun inputBarEditTextContentChanged(newContent: CharSequence)
     fun toggleAttachmentOptions()
     fun showVoiceMessageUI()

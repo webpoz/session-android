@@ -5,10 +5,22 @@ import android.net.Uri
 import org.session.libsession.database.StorageProtocol
 import org.session.libsession.messaging.calls.CallMessageType
 import org.session.libsession.messaging.contacts.Contact
-import org.session.libsession.messaging.jobs.*
+import org.session.libsession.messaging.jobs.AttachmentUploadJob
+import org.session.libsession.messaging.jobs.GroupAvatarDownloadJob
+import org.session.libsession.messaging.jobs.Job
+import org.session.libsession.messaging.jobs.JobQueue
+import org.session.libsession.messaging.jobs.MessageReceiveJob
+import org.session.libsession.messaging.jobs.MessageSendJob
+import org.session.libsession.messaging.jobs.TrimThreadJob
 import org.session.libsession.messaging.messages.control.ConfigurationMessage
-import org.session.libsession.messaging.messages.signal.*
+import org.session.libsession.messaging.messages.control.MessageRequestResponse
+import org.session.libsession.messaging.messages.signal.IncomingEncryptedMessage
+import org.session.libsession.messaging.messages.signal.IncomingGroupMessage
+import org.session.libsession.messaging.messages.signal.IncomingMediaMessage
 import org.session.libsession.messaging.messages.signal.IncomingTextMessage
+import org.session.libsession.messaging.messages.signal.OutgoingGroupMediaMessage
+import org.session.libsession.messaging.messages.signal.OutgoingMediaMessage
+import org.session.libsession.messaging.messages.signal.OutgoingTextMessage
 import org.session.libsession.messaging.messages.visible.Attachment
 import org.session.libsession.messaging.messages.visible.VisibleMessage
 import org.session.libsession.messaging.open_groups.OpenGroupV2
@@ -19,8 +31,12 @@ import org.session.libsession.messaging.sending_receiving.link_preview.LinkPrevi
 import org.session.libsession.messaging.sending_receiving.quotes.QuoteModel
 import org.session.libsession.messaging.utilities.UpdateMessageData
 import org.session.libsession.snode.OnionRequestAPI
-import org.session.libsession.utilities.*
+import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.Address.Companion.fromSerialized
+import org.session.libsession.utilities.GroupRecord
+import org.session.libsession.utilities.GroupUtil
+import org.session.libsession.utilities.ProfileKeyUtil
+import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.crypto.ecc.ECKeyPair
 import org.session.libsignal.messages.SignalServiceAttachmentPointer
@@ -109,6 +125,14 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
             senderAddress
         }
         val targetRecipient = Recipient.from(context, targetAddress, false)
+        if (!targetRecipient.isGroupRecipient) {
+            val recipientDb = DatabaseComponent.get(context).recipientDatabase()
+            if (isUserSender) {
+                recipientDb.setApproved(targetRecipient, true)
+            } else {
+                recipientDb.setApprovedMe(targetRecipient, true)
+            }
+        }
         if (message.isMediaMessage() || attachments.isNotEmpty()) {
             val quote: Optional<QuoteModel> = if (quotes != null) Optional.of(quotes) else Optional.absent()
             val linkPreviews: Optional<List<LinkPreview>> = if (linkPreview.isEmpty()) Optional.absent() else Optional.of(linkPreview.mapNotNull { it!! })
@@ -582,7 +606,19 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
             recipientDatabase.setProfileSharing(recipient, true)
             recipientDatabase.setRegistered(recipient, Recipient.RegisteredState.REGISTERED)
             // create Thread if needed
-            threadDatabase.getOrCreateThreadIdFor(recipient)
+            val threadId = threadDatabase.getOrCreateThreadIdFor(recipient)
+            if (contact.didApproveMe == true) {
+                recipientDatabase.setApprovedMe(recipient, true)
+                threadDatabase.setHasSent(threadId, true)
+            }
+            if (contact.isApproved == true) {
+                recipientDatabase.setApproved(recipient, true)
+                threadDatabase.setHasSent(threadId, true)
+            }
+            if (contact.isBlocked == true) {
+                recipientDatabase.setBlocked(recipient, true)
+                threadDatabase.deleteConversation(threadId)
+            }
         }
         if (contacts.isNotEmpty()) {
             threadDatabase.notifyConversationListListeners()
@@ -614,19 +650,73 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
 
         if (recipient.isBlocked) return
 
-        val mediaMessage = IncomingMediaMessage(address, sentTimestamp, -1,
-                0, false,
-                false,
-                Optional.absent(),
-                Optional.absent(),
-                Optional.absent(),
-                Optional.absent(),
-                Optional.absent(),
-                Optional.absent(),
-                Optional.of(message))
+        val mediaMessage = IncomingMediaMessage(
+            address,
+            sentTimestamp,
+            -1,
+            0,
+            false,
+            false,
+            false,
+            Optional.absent(),
+            Optional.absent(),
+            Optional.absent(),
+            Optional.absent(),
+            Optional.absent(),
+            Optional.absent(),
+            Optional.of(message)
+        )
 
         database.insertSecureDecryptedMessageInbox(mediaMessage, -1)
     }
+
+    override fun insertMessageRequestResponse(response: MessageRequestResponse) {
+        val userPublicKey = getUserPublicKey()
+        val senderPublicKey = response.sender!!
+        val recipientPublicKey = response.recipient!!
+        if (userPublicKey == null || (userPublicKey != recipientPublicKey && userPublicKey != senderPublicKey)) return
+        val recipientDb = DatabaseComponent.get(context).recipientDatabase()
+        val threadDB = DatabaseComponent.get(context).threadDatabase()
+        if (userPublicKey == senderPublicKey) {
+            val requestRecipient = Recipient.from(context, fromSerialized(recipientPublicKey), false)
+            recipientDb.setApproved(requestRecipient, true)
+            val threadId = threadDB.getOrCreateThreadIdFor(requestRecipient)
+            threadDB.setHasSent(threadId, true)
+        } else {
+            val mmsDb = DatabaseComponent.get(context).mmsDatabase()
+            val senderAddress = fromSerialized(senderPublicKey)
+            val requestSender = Recipient.from(context, senderAddress, false)
+            recipientDb.setApprovedMe(requestSender, true)
+
+            val message = IncomingMediaMessage(
+                senderAddress,
+                response.sentTimestamp!!,
+                -1,
+                0,
+                false,
+                false,
+                true,
+                Optional.absent(),
+                Optional.absent(),
+                Optional.absent(),
+                Optional.absent(),
+                Optional.absent(),
+                Optional.absent(),
+                Optional.absent()
+            )
+            val threadId = getOrCreateThreadIdFor(senderAddress)
+            mmsDb.insertSecureDecryptedMessageInbox(message, threadId)
+        }
+    }
+
+    override fun setRecipientApproved(recipient: Recipient, approved: Boolean) {
+        DatabaseComponent.get(context).recipientDatabase().setApproved(recipient, approved)
+    }
+
+    override fun setRecipientApprovedMe(recipient: Recipient, approvedMe: Boolean) {
+        DatabaseComponent.get(context).recipientDatabase().setApprovedMe(recipient, approvedMe)
+    }
+
 
     override fun insertCallMessage(senderPublicKey: String, callMessageType: CallMessageType, sentTimestamp: Long) {
         val database = DatabaseComponent.get(context).smsDatabase()
