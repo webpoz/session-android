@@ -126,6 +126,7 @@ class OpenGroupPoller(private val server: String, private val executorService: S
             name = pollInfo.details?.name ?: "",
             infoUpdates = pollInfo.details?.infoUpdates ?: 0,
             publicKey = publicKey,
+            canWrite = pollInfo.write
         )
         // - Open Group changes
         storage.updateOpenGroup(openGroup)

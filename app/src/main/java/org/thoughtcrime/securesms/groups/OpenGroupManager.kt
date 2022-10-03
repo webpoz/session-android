@@ -83,7 +83,7 @@ object OpenGroupManager {
         if (threadID < 0) {
             threadID = GroupManager.createOpenGroup(openGroupID, context, null, info.name).threadId
         }
-        val openGroup = OpenGroup(server, room, info.name, info.infoUpdates, publicKey)
+        val openGroup = OpenGroup(server, room, info.name, info.infoUpdates, publicKey, info.write)
         threadDB.setOpenGroupChat(openGroup, threadID)
     }
 

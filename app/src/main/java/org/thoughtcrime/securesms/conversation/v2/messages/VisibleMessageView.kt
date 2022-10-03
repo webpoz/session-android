@@ -153,12 +153,13 @@ class VisibleMessageView : LinearLayout {
 
         if (isGroupThread && !message.isOutgoing) {
             if (isEndOfMessageCluster) {
+                val openGroup = lokiThreadDb.getOpenGroupChat(threadID)
                 binding.profilePictureView.root.publicKey = senderSessionID
                 binding.profilePictureView.root.glide = glide
                 binding.profilePictureView.root.update(message.individualRecipient)
                 binding.profilePictureView.root.setOnClickListener {
                     if (thread.isOpenGroupRecipient) {
-                        if (IdPrefix.fromValue(senderSessionID) == IdPrefix.BLINDED) {
+                        if (IdPrefix.fromValue(senderSessionID) == IdPrefix.BLINDED && openGroup?.canWrite == true) {
                             val intent = Intent(context, ConversationActivityV2::class.java)
                             intent.putExtra(ConversationActivityV2.FROM_GROUP_THREAD_ID, threadID)
                             intent.putExtra(ConversationActivityV2.ADDRESS, Address.fromSerialized(senderSessionID))
@@ -169,7 +170,7 @@ class VisibleMessageView : LinearLayout {
                     }
                 }
                 if (thread.isOpenGroupRecipient) {
-                    val openGroup = lokiThreadDb.getOpenGroupChat(threadID) ?: return
+                    openGroup ?: return
                     var standardPublicKey = ""
                     var blindedPublicKey: String? = null
                     if (IdPrefix.fromValue(senderSessionID) == IdPrefix.BLINDED) {

@@ -12,15 +12,17 @@ data class OpenGroup(
     val name: String,
     val publicKey: String,
     val infoUpdates: Int,
+    val canWrite: Boolean,
 ) {
 
-    constructor(server: String, room: String, name: String, infoUpdates: Int, publicKey: String) : this(
+    constructor(server: String, room: String, name: String, infoUpdates: Int, publicKey: String, canWrite: Boolean) : this(
         server = server,
         room = room,
         id = "$server.$room",
         name = name,
         publicKey = publicKey,
         infoUpdates = infoUpdates,
+        canWrite = canWrite
     )
 
     companion object {
@@ -29,13 +31,13 @@ data class OpenGroup(
             return try {
                 val json = JsonUtil.fromJson(jsonAsString)
                 if (!json.has("room")) return null
-                val room = json.get("room").asText().toLowerCase(Locale.US)
-                val server = json.get("server").asText().toLowerCase(Locale.US)
+                val room = json.get("room").asText().lowercase(Locale.US)
+                val server = json.get("server").asText().lowercase(Locale.US)
                 val displayName = json.get("displayName").asText()
                 val publicKey = json.get("publicKey").asText()
                 val infoUpdates = json.get("infoUpdates")?.asText()?.toIntOrNull() ?: 0
-                val capabilities = json.get("capabilities")?.asText()?.split(",") ?: emptyList()
-                OpenGroup(server, room, displayName, infoUpdates, publicKey)
+                val canWrite = json.get("canWrite")?.asText()?.toBoolean() ?: true
+                OpenGroup(server, room, displayName, infoUpdates, publicKey, canWrite)
             } catch (e: Exception) {
                 Log.w("Loki", "Couldn't parse open group from JSON: $jsonAsString.", e);
                 null
@@ -59,6 +61,7 @@ data class OpenGroup(
         "displayName" to name,
         "publicKey" to publicKey,
         "infoUpdates" to infoUpdates.toString(),
+        "canWrite" to canWrite.toString()
     )
 
     val joinURL: String get() = "$server/$room?public_key=$publicKey"
