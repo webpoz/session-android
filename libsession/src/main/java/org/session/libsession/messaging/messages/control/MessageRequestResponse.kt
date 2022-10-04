@@ -5,7 +5,7 @@ import org.session.libsession.messaging.messages.visible.Profile
 import org.session.libsignal.protos.SignalServiceProtos
 import org.session.libsignal.utilities.Log
 
-class MessageRequestResponse(val isApproved: Boolean, val profile: Profile? = null) : ControlMessage() {
+class MessageRequestResponse(val isApproved: Boolean, var profile: Profile? = null) : ControlMessage() {
 
     override val isSelfSendValid: Boolean = true
 
