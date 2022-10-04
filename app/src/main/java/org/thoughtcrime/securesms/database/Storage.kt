@@ -2,6 +2,7 @@ package org.thoughtcrime.securesms.database
 
 import android.content.Context
 import android.net.Uri
+import org.session.libsession.avatars.AvatarHelper
 import org.session.libsession.database.StorageProtocol
 import org.session.libsession.messaging.BlindedIdMapping
 import org.session.libsession.messaging.calls.CallMessageType
@@ -42,6 +43,7 @@ import org.session.libsession.utilities.Address.Companion.fromSerialized
 import org.session.libsession.utilities.GroupRecord
 import org.session.libsession.utilities.GroupUtil
 import org.session.libsession.utilities.ProfileKeyUtil
+import org.session.libsession.utilities.SSKEnvironment
 import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.crypto.ecc.ECKeyPair
@@ -59,6 +61,7 @@ import org.thoughtcrime.securesms.groups.OpenGroupManager
 import org.thoughtcrime.securesms.jobs.RetrieveProfileAvatarJob
 import org.thoughtcrime.securesms.mms.PartAuthority
 import org.thoughtcrime.securesms.util.SessionMetaProtocol
+import java.security.MessageDigest
 
 class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context, helper), StorageProtocol {
     
@@ -760,6 +763,25 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
             val smsDb = DatabaseComponent.get(context).smsDatabase()
             val sender = Recipient.from(context, fromSerialized(senderPublicKey), false)
             val threadId = threadDB.getOrCreateThreadIdFor(sender)
+            val profile = response.profile
+            if (profile != null) {
+                val profileManager = SSKEnvironment.shared.profileManager
+                val name = profile.displayName!!
+                if (name.isNotEmpty()) {
+                    profileManager.setName(context, sender, name)
+                }
+                val newProfileKey = profile.profileKey
+
+                val needsProfilePicture = !AvatarHelper.avatarFileExists(context, sender.address)
+                val profileKeyValid = newProfileKey?.isNotEmpty() == true && (newProfileKey.size == 16 || newProfileKey.size == 32) && profile.profilePictureURL?.isNotEmpty() == true
+                val profileKeyChanged = (sender.profileKey == null || !MessageDigest.isEqual(sender.profileKey, newProfileKey))
+
+                if ((profileKeyValid && profileKeyChanged) || (profileKeyValid && needsProfilePicture)) {
+                    profileManager.setProfileKey(context, sender, newProfileKey!!)
+                    profileManager.setUnidentifiedAccessMode(context, sender, Recipient.UnidentifiedAccessMode.UNKNOWN)
+                    profileManager.setProfilePictureURL(context, sender, profile.profilePictureURL!!)
+                }
+            }
             threadDB.setHasSent(threadId, true)
             val mappingDb = DatabaseComponent.get(context).blindedIdMappingDatabase()
             val mappings = mutableMapOf<String, BlindedIdMapping>()
