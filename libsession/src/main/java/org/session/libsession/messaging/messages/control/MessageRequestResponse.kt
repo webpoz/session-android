@@ -36,7 +36,7 @@ class MessageRequestResponse(val isApproved: Boolean, var profile: Profile? = nu
             val profileProto = messageRequestResponseProto.profile
             val profile = Profile().apply {
                 displayName = profileProto.displayName
-                profileKey = messageRequestResponseProto.profileKey.toByteArray()
+                profileKey = if (messageRequestResponseProto.hasProfileKey()) messageRequestResponseProto.profileKey.toByteArray() else null
                 profilePictureURL = profileProto.profilePicture
             }
             return MessageRequestResponse(isApproved, profile)
