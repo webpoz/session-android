@@ -343,7 +343,11 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
         super.onResume()
         ApplicationContext.getInstance(this).messageNotifier.setVisibleThread(viewModel.threadId)
         val recipient = viewModel.recipient ?: return
-        threadDb.markAllAsRead(viewModel.threadId, recipient.isOpenGroupRecipient)
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            threadDb.markAllAsRead(viewModel.threadId, recipient.isOpenGroupRecipient)
+        }
+
         contentResolver.registerContentObserver(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             true,
