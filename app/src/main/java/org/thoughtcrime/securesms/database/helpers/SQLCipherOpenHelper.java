@@ -82,6 +82,7 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
 
   // Loki - onUpgrade(...) must be updated to use Loki version numbers if Signal makes any database changes
   private static final int    DATABASE_VERSION         = lokiV38;
+  private static final int    MIN_DATABASE_VERSION     = lokiV7;
   private static final String CIPHER3_DATABASE_NAME    = "signal.db";
   private static final String DATABASE_NAME            = "signal_v4.db";
 
@@ -89,7 +90,7 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
   private final DatabaseSecret databaseSecret;
 
   public SQLCipherOpenHelper(@NonNull Context context, @NonNull DatabaseSecret databaseSecret) {
-    super(context, DATABASE_NAME, databaseSecret.asString(), null, DATABASE_VERSION, DATABASE_VERSION, null, new SQLiteDatabaseHook() {
+    super(context, DATABASE_NAME, databaseSecret.asString(), null, DATABASE_VERSION, MIN_DATABASE_VERSION, null, new SQLiteDatabaseHook() {
       @Override
       public void preKey(SQLiteConnection connection) {
         connection.execute("PRAGMA cipher_default_kdf_iter = 256000;", null, null);
