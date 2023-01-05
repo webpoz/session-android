@@ -33,7 +33,7 @@ import androidx.annotation.VisibleForTesting;
 
 import com.bumptech.glide.Glide;
 
-import net.sqlcipher.database.SQLiteDatabase;
+import net.zetetic.database.sqlcipher.SQLiteDatabase;
 
 import org.json.JSONArray;
 import org.json.JSONException;

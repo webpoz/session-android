@@ -2,7 +2,7 @@ package org.thoughtcrime.securesms.database
 
 import android.content.ContentValues
 import android.content.Context
-import net.sqlcipher.database.SQLiteDatabase.CONFLICT_REPLACE
+import net.zetetic.database.sqlcipher.SQLiteDatabase.CONFLICT_REPLACE
 import org.session.libsignal.database.LokiMessageDatabaseProtocol
 import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper
 

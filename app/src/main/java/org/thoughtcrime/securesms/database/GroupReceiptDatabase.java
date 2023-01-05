@@ -1,13 +1,12 @@
 package org.thoughtcrime.securesms.database;
 
-
 import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 
 import androidx.annotation.NonNull;
 
-import net.sqlcipher.database.SQLiteDatabase;
+import net.zetetic.database.sqlcipher.SQLiteDatabase;
 
 import org.session.libsession.utilities.Address;
 import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper;

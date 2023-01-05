@@ -1,14 +1,16 @@
 package org.thoughtcrime.securesms.database.helpers;
 
-
 import android.content.Context;
 import android.database.Cursor;
 
 import androidx.annotation.NonNull;
 
-import net.sqlcipher.database.SQLiteDatabase;
-import net.sqlcipher.database.SQLiteDatabaseHook;
-import net.sqlcipher.database.SQLiteOpenHelper;
+import net.zetetic.database.DatabaseErrorHandler;
+import net.zetetic.database.DatabaseUtils;
+import net.zetetic.database.sqlcipher.SQLiteConnection;
+import net.zetetic.database.sqlcipher.SQLiteDatabase;
+import net.zetetic.database.sqlcipher.SQLiteDatabaseHook;
+import net.zetetic.database.sqlcipher.SQLiteOpenHelper;
 
 import org.session.libsession.utilities.TextSecurePreferences;
 import org.session.libsignal.utilities.Log;
@@ -35,6 +37,8 @@ import org.thoughtcrime.securesms.database.SessionContactDatabase;
 import org.thoughtcrime.securesms.database.SessionJobDatabase;
 import org.thoughtcrime.securesms.database.SmsDatabase;
 import org.thoughtcrime.securesms.database.ThreadDatabase;
+
+import java.io.File;
 
 public class SQLCipherOpenHelper extends SQLiteOpenHelper {
 
@@ -77,36 +81,115 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
   private static final int lokiV38                          = 59;
 
   // Loki - onUpgrade(...) must be updated to use Loki version numbers if Signal makes any database changes
-  private static final int    DATABASE_VERSION = lokiV38;
-  private static final String DATABASE_NAME    = "signal.db";
+  private static final int    DATABASE_VERSION         = lokiV38;
+  private static final String CIPHER3_DATABASE_NAME    = "signal.db";
+  private static final String DATABASE_NAME            = "signal_v4.db";
 
   private final Context        context;
   private final DatabaseSecret databaseSecret;
 
   public SQLCipherOpenHelper(@NonNull Context context, @NonNull DatabaseSecret databaseSecret) {
-    super(context, DATABASE_NAME, null, DATABASE_VERSION, new SQLiteDatabaseHook() {
+    super(context, DATABASE_NAME, databaseSecret.asString(), null, DATABASE_VERSION, DATABASE_VERSION, null, new SQLiteDatabaseHook() {
       @Override
-      public void preKey(SQLiteDatabase db) {
-        db.rawExecSQL("PRAGMA cipher_default_kdf_iter = 1;");
-        db.rawExecSQL("PRAGMA cipher_default_page_size = 4096;");
+      public void preKey(SQLiteConnection connection) {
+        connection.execute("PRAGMA cipher_default_kdf_iter = 256000;", null, null);
+        connection.execute("PRAGMA cipher_default_page_size = 4096;", null, null);
       }
 
       @Override
-      public void postKey(SQLiteDatabase db) {
-        db.rawExecSQL("PRAGMA kdf_iter = '1';");
-        db.rawExecSQL("PRAGMA cipher_page_size = 4096;");
+      public void postKey(SQLiteConnection connection) {
+        connection.execute("PRAGMA kdf_iter = '256000';", null, null);
+        connection.execute("PRAGMA cipher_page_size = 4096;", null, null);
         // if not vacuumed in a while, perform that operation
         long currentTime = System.currentTimeMillis();
         // 7 days
         if (currentTime - TextSecurePreferences.getLastVacuumTime(context) > 604_800_000) {
-          db.rawExecSQL("VACUUM;");
+          connection.execute("VACUUM;", null, null);
           TextSecurePreferences.setLastVacuumNow(context);
         }
       }
-    });
+    }, true);
 
     this.context        = context.getApplicationContext();
     this.databaseSecret = databaseSecret;
+  }
+
+  public static void migrateSqlCipher3To4IfNeeded(@NonNull Context context, @NonNull DatabaseSecret databaseSecret) {
+    String oldDbPath = context.getDatabasePath(CIPHER3_DATABASE_NAME).getPath();
+    File oldDbFile = new File(oldDbPath);
+
+    // If the old SQLCipher3 database file doesn't exist then just return early
+    if (!oldDbFile.exists()) { return; }
+
+    // If the new database file already exists then we probably had a failed migration and it's likely in
+    // an invalid state so should delete it
+    String newDbPath = context.getDatabasePath(DATABASE_NAME).getPath();
+    File newDbFile = new File(newDbPath);
+
+    if (newDbFile.exists()) { newDbFile.delete(); }
+
+    try {
+      newDbFile.createNewFile();
+    }
+    catch (Exception e) {
+      // TODO: Communicate the error somehow???
+      return;
+    }
+
+    try {
+      // Open the old database
+      SQLiteDatabase oldDb = SQLiteDatabase.openOrCreateDatabase(oldDbPath, databaseSecret.asString(), null, null, new SQLiteDatabaseHook() {
+        @Override
+        public void preKey(SQLiteConnection connection) {
+          connection.execute("PRAGMA cipher_compatibility = 3;", null, null);
+          connection.execute("PRAGMA kdf_iter = '1';", null, null);
+          connection.execute("PRAGMA cipher_page_size = 4096;", null, null);
+        }
+
+        @Override
+        public void postKey(SQLiteConnection connection) {
+          connection.execute("PRAGMA cipher_compatibility = 3;", null, null);
+          connection.execute("PRAGMA kdf_iter = '1';", null, null);
+          connection.execute("PRAGMA cipher_page_size = 4096;", null, null);
+        }
+      });
+
+      // Export the old database to the new one (will have the default 'kdf_iter' and 'page_size' settings)
+      int oldDbVersion = oldDb.getVersion();
+      oldDb.rawExecSQL(
+        String.format("ATTACH DATABASE '%s' AS sqlcipher4 KEY '%s'", newDbPath, databaseSecret.asString())
+      );
+      Cursor cursor = oldDb.rawQuery("SELECT sqlcipher_export('sqlcipher4')");
+      cursor.moveToLast();
+      cursor.close();
+      oldDb.rawExecSQL("DETACH DATABASE sqlcipher4");
+      oldDb.close();
+
+      // TODO: Performance testing
+
+      SQLiteDatabase newDb = SQLiteDatabase.openDatabase(newDbPath, databaseSecret.asString(), null, SQLiteDatabase.OPEN_READWRITE, new SQLiteDatabaseHook() {
+        @Override
+        public void preKey(SQLiteConnection connection) {
+          connection.execute("PRAGMA cipher_default_kdf_iter = 256000;", null, null);
+          connection.execute("PRAGMA cipher_default_page_size = 4096;", null, null);
+        }
+
+        @Override
+        public void postKey(SQLiteConnection connection) {
+          connection.execute("PRAGMA cipher_default_kdf_iter = 256000;", null, null);
+          connection.execute("PRAGMA cipher_default_page_size = 4096;", null, null);
+        }
+      });
+      newDb.setVersion(oldDbVersion);
+      newDb.close();
+
+      // TODO: Delete 'CIPHER3_DATABASE_NAME'
+      // TODO: What do we do if the deletion fails??? (The current logic will end up re-migrating...)
+//      oldDbFile.delete();
+    }
+    catch (Exception e) {
+      // TODO: Communicate the error somehow???
+    }
   }
 
   @Override
@@ -195,9 +278,7 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
   @Override
   public void onConfigure(SQLiteDatabase db) {
     super.onConfigure(db);
-    // Loki - Enable write ahead logging mode and increase the cache size.
-    // This should be disabled if we ever run into serious race condition bugs.
-    db.enableWriteAheadLogging();
+
     db.execSQL("PRAGMA cache_size = 10000");
   }
 
@@ -418,14 +499,6 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
     } finally {
       db.endTransaction();
     }
-  }
-
-  public SQLiteDatabase getReadableDatabase() {
-    return getReadableDatabase(databaseSecret.asString());
-  }
-
-  public SQLiteDatabase getWritableDatabase() {
-    return getWritableDatabase(databaseSecret.asString());
   }
 
   public void markCurrent(SQLiteDatabase db) {
