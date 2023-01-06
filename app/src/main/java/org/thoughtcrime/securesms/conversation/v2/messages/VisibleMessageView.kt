@@ -20,6 +20,7 @@ import androidx.core.os.bundleOf
 import androidx.core.view.isInvisible
 import androidx.core.view.isVisible
 import androidx.core.view.marginBottom
+import androidx.lifecycle.LifecycleCoroutineScope
 import dagger.hilt.android.AndroidEntryPoint
 import network.loki.messenger.R
 import network.loki.messenger.databinding.ViewVisibleMessageBinding
@@ -122,6 +123,7 @@ class VisibleMessageView : LinearLayout {
         contact: Contact?,
         senderSessionID: String,
         delegate: VisibleMessageViewDelegate?,
+        lifecycleCoroutineScope: LifecycleCoroutineScope
     ) {
         val threadID = message.threadId
         val thread = threadDb.getRecipientForThreadId(threadID) ?: return
@@ -230,7 +232,8 @@ class VisibleMessageView : LinearLayout {
             glide,
             thread,
             searchQuery,
-            message.isOutgoing || isGroupThread || (contact?.isTrusted ?: false)
+            message.isOutgoing || isGroupThread || (contact?.isTrusted ?: false),
+            lifecycleCoroutineScope
         )
         binding.messageContentView.delegate = delegate
         onDoubleTap = { binding.messageContentView.onContentDoubleTap?.invoke() }

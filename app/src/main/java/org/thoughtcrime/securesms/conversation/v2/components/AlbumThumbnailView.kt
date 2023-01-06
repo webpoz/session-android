@@ -11,6 +11,9 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.view.children
 import androidx.core.view.isVisible
+import androidx.lifecycle.LifecycleCoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import network.loki.messenger.R
 import network.loki.messenger.databinding.AlbumThumbnailViewBinding
 import org.session.libsession.messaging.jobs.AttachmentDownloadJob
@@ -63,7 +66,7 @@ class AlbumThumbnailView : FrameLayout {
 
     // region Interaction
 
-    fun calculateHitObject(event: MotionEvent, mms: MmsMessageRecord, threadRecipient: Recipient) {
+    fun calculateHitObject(event: MotionEvent, mms: MmsMessageRecord, threadRecipient: Recipient, lifecycleCoroutineScope: LifecycleCoroutineScope) {
         val rawXInt = event.rawX.toInt()
         val rawYInt = event.rawY.toInt()
         val eventRect = Rect(rawXInt, rawYInt, rawXInt, rawYInt)
@@ -76,10 +79,14 @@ class AlbumThumbnailView : FrameLayout {
                 val slide = slides.getOrNull(index) ?: return
                 // only open to downloaded images
                 if (slide.transferState == AttachmentTransferProgress.TRANSFER_PROGRESS_FAILED) {
-                    // restart download here
+                    // Restart download here (on IO thread)
                     (slide.asAttachment() as? DatabaseAttachment)?.let { attachment ->
                         val attachmentId = attachment.attachmentId.rowId
-                        JobQueue.shared.add(AttachmentDownloadJob(attachmentId, mms.getId()))
+
+                        // Start download (on IO thread)
+                        lifecycleCoroutineScope.launch(Dispatchers.IO) {
+                            JobQueue.shared.add(AttachmentDownloadJob(attachmentId, mms.getId()))
+                        }
                     }
                 }
                 if (slide.isInProgress) return
