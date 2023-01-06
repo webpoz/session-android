@@ -84,7 +84,7 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
   private static final int    DATABASE_VERSION         = lokiV38;
   private static final int    MIN_DATABASE_VERSION     = lokiV7;
   private static final String CIPHER3_DATABASE_NAME    = "signal.db";
-  private static final String DATABASE_NAME            = "signal_v4.db";
+  public static final String DATABASE_NAME            = "signal_v4.db";
 
   private final Context        context;
   private final DatabaseSecret databaseSecret;

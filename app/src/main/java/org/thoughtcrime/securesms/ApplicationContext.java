@@ -57,6 +57,7 @@ import org.thoughtcrime.securesms.database.EmojiSearchDatabase;
 import org.thoughtcrime.securesms.database.JobDatabase;
 import org.thoughtcrime.securesms.database.LokiAPIDatabase;
 import org.thoughtcrime.securesms.database.Storage;
+import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper;
 import org.thoughtcrime.securesms.database.model.EmojiSearchData;
 import org.thoughtcrime.securesms.dependencies.DatabaseComponent;
 import org.thoughtcrime.securesms.dependencies.DatabaseModule;
@@ -537,7 +538,7 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
             TextSecurePreferences.setProfileName(this, displayName);
         }
         getSharedPreferences(PREFERENCES_NAME, 0).edit().clear().commit();
-        if (!deleteDatabase("signal.db")) {
+        if (!deleteDatabase(SQLCipherOpenHelper.DATABASE_NAME)) {
             Log.d("Loki", "Failed to delete database.");
         }
         Util.runOnMain(() -> new Handler().postDelayed(ApplicationContext.this::restartApplication, 200));
