@@ -245,6 +245,12 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
         Log.i(TAG, "App is now visible.");
         KeyCachingService.onAppForegrounded(this);
 
+        // If the user account hasn't been created or onboarding wasn't finished then don't start
+        // the pollers
+        if (TextSecurePreferences.getLocalNumber(this) == null || !TextSecurePreferences.hasSeenWelcomeScreen(this)) {
+            return;
+        }
+
         ThreadUtils.queue(()->{
             if (poller != null) {
                 poller.setCaughtUp(false);

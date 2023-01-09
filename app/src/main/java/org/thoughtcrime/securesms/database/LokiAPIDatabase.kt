@@ -300,6 +300,11 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
         val lastHash = database.insertOrUpdate(lastMessageHashValueTable2, row, query, arrayOf( snode.toString(), publicKey, namespace.toString() ))
     }
 
+    override fun clearAllLastMessageHashes() {
+        val database = databaseHelper.writableDatabase
+        database.delete(lastMessageHashValueTable2, null, null)
+    }
+
     override fun getReceivedMessageHashValues(publicKey: String, namespace: Int): Set<String>? {
         val database = databaseHelper.readableDatabase
         val query = "${Companion.publicKey} = ? AND ${Companion.receivedMessageHashNamespace} = ?"
@@ -319,6 +324,11 @@ class LokiAPIDatabase(context: Context, helper: SQLCipherOpenHelper) : Database(
         ))
         val query = "${Companion.publicKey} = ? AND $receivedMessageHashNamespace = ?"
         database.insertOrUpdate(receivedMessageHashValuesTable, row, query, arrayOf( publicKey, namespace.toString() ))
+    }
+
+    override fun clearReceivedMessageHashValues() {
+        val database = databaseHelper.writableDatabase
+        database.delete(receivedMessageHashValuesTable, null, null)
     }
 
     override fun getAuthToken(server: String): String? {

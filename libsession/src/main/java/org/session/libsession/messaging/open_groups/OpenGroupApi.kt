@@ -91,7 +91,7 @@ object OpenGroupApi {
         val created: Long = 0,
         val activeUsers: Int = 0,
         val activeUsersCutoff: Int = 0,
-        val imageId: Long? = null,
+        val imageId: String? = null,
         val pinnedMessages: List<PinnedMessage> = emptyList(),
         val admin: Boolean = false,
         val globalAdmin: Boolean = false,
@@ -337,7 +337,7 @@ object OpenGroupApi {
                     .plus(request.verb.rawValue.toByteArray())
                     .plus("/${request.endpoint.value}".toByteArray())
                     .plus(bodyHash)
-                if (serverCapabilities.contains(Capability.BLIND.name.lowercase())) {
+                if (serverCapabilities.isEmpty() || serverCapabilities.contains(Capability.BLIND.name.lowercase())) {
                     SodiumUtilities.blindedKeyPair(publicKey, ed25519KeyPair)?.let { keyPair ->
                         pubKey = SessionId(
                             IdPrefix.BLINDED,
@@ -395,13 +395,13 @@ object OpenGroupApi {
     fun downloadOpenGroupProfilePicture(
         server: String,
         roomID: String,
-        imageId: Long
+        imageId: String
     ): Promise<ByteArray, Exception> {
         val request = Request(
             verb = GET,
             room = roomID,
             server = server,
-            endpoint = Endpoint.RoomFileIndividual(roomID, imageId.toString())
+            endpoint = Endpoint.RoomFileIndividual(roomID, imageId)
         )
         return getResponseBody(request)
     }
@@ -794,16 +794,14 @@ object OpenGroupApi {
 
     private fun sequentialBatch(
         server: String,
-        requests: MutableList<BatchRequestInfo<*>>,
-        authRequired: Boolean = true
+        requests: MutableList<BatchRequestInfo<*>>
     ): Promise<List<BatchResponse<*>>, Exception> {
         val request = Request(
             verb = POST,
             room = null,
             server = server,
             endpoint = Endpoint.Sequence,
-            parameters = requests.map { it.request },
-            isAuthRequired = authRequired
+            parameters = requests.map { it.request }
         )
         return getBatchResponseJson(request, requests)
     }
@@ -912,8 +910,7 @@ object OpenGroupApi {
 
     fun getCapabilitiesAndRoomInfo(
         room: String,
-        server: String,
-        authRequired: Boolean = true
+        server: String
     ): Promise<Pair<Capabilities, RoomInfo>, Exception> {
         val requests = mutableListOf<BatchRequestInfo<*>>(
             BatchRequestInfo(
@@ -933,7 +930,7 @@ object OpenGroupApi {
                 responseType = object : TypeReference<RoomInfo>(){}
             )
         )
-        return sequentialBatch(server, requests, authRequired).map {
+        return sequentialBatch(server, requests).map {
             val capabilities = it.firstOrNull()?.body as? Capabilities ?: throw Error.ParsingFailed
             val roomInfo = it.lastOrNull()?.body as? RoomInfo ?: throw Error.ParsingFailed
             capabilities to roomInfo
