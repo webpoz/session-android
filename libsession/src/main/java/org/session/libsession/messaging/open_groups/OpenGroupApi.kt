@@ -148,7 +148,7 @@ object OpenGroupApi {
     )
 
     enum class Capability {
-        BLIND, REACTIONS
+        SOGS, BLIND, REACTIONS
     }
 
     @JsonNaming(PropertyNamingStrategy.SnakeCaseStrategy::class)
