@@ -192,15 +192,16 @@ class VisibleMessageView : LinearLayout {
         binding.dateBreakTextView.text = if (showDateBreak) DateUtils.getDisplayFormattedTimeSpanString(context, Locale.getDefault(), message.timestamp) else null
         binding.dateBreakTextView.isVisible = showDateBreak
         // Message status indicator
-        val (iconID, iconColor) = getMessageStatusImage(message)
-        if (iconID != null) {
-            val drawable = ContextCompat.getDrawable(context, iconID)?.mutate()
-            if (iconColor != null) {
-                drawable?.setTint(iconColor)
-            }
-            binding.messageStatusImageView.setImageDrawable(drawable)
-        }
         if (message.isOutgoing) {
+            val (iconID, iconColor) = getMessageStatusImage(message)
+            if (iconID != null) {
+                val drawable = ContextCompat.getDrawable(context, iconID)?.mutate()
+                if (iconColor != null) {
+                    drawable?.setTint(iconColor)
+                }
+                binding.messageStatusImageView.setImageDrawable(drawable)
+            }
+
             val lastMessageID = mmsSmsDb.getLastMessageID(message.threadId)
             binding.messageStatusImageView.isVisible =
                 !message.isSent || message.id == lastMessageID
@@ -213,13 +214,17 @@ class VisibleMessageView : LinearLayout {
         val emojiLayoutParams = binding.emojiReactionsView.layoutParams as ConstraintLayout.LayoutParams
         emojiLayoutParams.horizontalBias = if (message.isOutgoing) 1f else 0f
         binding.emojiReactionsView.layoutParams = emojiLayoutParams
-        val capabilities = lokiThreadDb.getOpenGroupChat(threadID)?.server?.let { lokiApiDb.getServerCapabilities(it) }
-        if (message.reactions.isNotEmpty() &&
-            (capabilities.isNullOrEmpty() || capabilities.contains(OpenGroupApi.Capability.REACTIONS.name.lowercase()))
-        ) {
-            binding.emojiReactionsView.setReactions(message.id, message.reactions, message.isOutgoing, delegate)
-            binding.emojiReactionsView.isVisible = true
-        } else {
+
+        if (message.reactions.isNotEmpty()) {
+            val capabilities = lokiThreadDb.getOpenGroupChat(threadID)?.server?.let { lokiApiDb.getServerCapabilities(it) }
+            if (capabilities.isNullOrEmpty() || capabilities.contains(OpenGroupApi.Capability.REACTIONS.name.lowercase())) {
+                binding.emojiReactionsView.setReactions(message.id, message.reactions, message.isOutgoing, delegate)
+                binding.emojiReactionsView.isVisible = true
+            } else {
+                binding.emojiReactionsView.isVisible = false
+            }
+        }
+        else {
             binding.emojiReactionsView.isVisible = false
         }
 

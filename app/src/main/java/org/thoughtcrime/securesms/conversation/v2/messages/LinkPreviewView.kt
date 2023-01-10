@@ -80,7 +80,7 @@ class LinkPreviewView : LinearLayout {
         val rawYInt = event.rawY.toInt()
         val hitRect = Rect(rawXInt, rawYInt, rawXInt, rawYInt)
         val previewRect = Rect()
-        binding.mainLinkPreviewParent.getGlobalVisibleRect(previewRect)
+        binding.mainLinkPreviewContainer.getGlobalVisibleRect(previewRect)
         if (previewRect.contains(hitRect)) {
             openURL()
             return
