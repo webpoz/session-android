@@ -38,7 +38,7 @@ data class OpenGroup(
                 val imageId = json.get("imageId")?.asText()
                 val infoUpdates = json.get("infoUpdates")?.asText()?.toIntOrNull() ?: 0
                 val capabilities = json.get("capabilities")?.asText()?.split(",") ?: emptyList()
-                OpenGroup(server, room, displayName, publicKey, imageId, infoUpdates)
+                OpenGroup(server = server, room = room, name = displayName, publicKey = publicKey, imageId = imageId, infoUpdates = infoUpdates)
             } catch (e: Exception) {
                 Log.w("Loki", "Couldn't parse open group from JSON: $jsonAsString.", e);
                 null
