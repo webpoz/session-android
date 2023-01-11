@@ -39,8 +39,9 @@ class ConversationAdapter(
     private val onItemSwipeToReply: (MessageRecord, Int) -> Unit,
     private val onItemLongPress: (MessageRecord, Int, VisibleMessageView) -> Unit,
     private val onDeselect: (MessageRecord, Int) -> Unit,
+    private val onAttachmentNeedsDownload: (Long, Long) -> Unit,
     private val glide: GlideRequests,
-    private val lifecycleCoroutineScope: LifecycleCoroutineScope
+    lifecycleCoroutineScope: LifecycleCoroutineScope
 ) : CursorRecyclerViewAdapter<ViewHolder>(context, cursor) {
     private val messageDB by lazy { DatabaseComponent.get(context).mmsSmsDatabase() }
     private val contactDB by lazy { DatabaseComponent.get(context).sessionContactDatabase() }
@@ -128,7 +129,7 @@ class ConversationAdapter(
                         contact,
                         senderId,
                         visibleMessageViewDelegate,
-                        lifecycleCoroutineScope
+                        onAttachmentNeedsDownload
                 )
 
                 if (!message.isDeleted) {

@@ -40,6 +40,8 @@ import network.loki.messenger.databinding.ViewVisibleMessageBinding
 import nl.komponents.kovenant.ui.successUi
 import org.session.libsession.messaging.MessagingModuleConfiguration
 import org.session.libsession.messaging.contacts.Contact
+import org.session.libsession.messaging.jobs.AttachmentDownloadJob
+import org.session.libsession.messaging.jobs.JobQueue
 import org.session.libsession.messaging.mentions.Mention
 import org.session.libsession.messaging.mentions.MentionsManager
 import org.session.libsession.messaging.messages.control.DataExtractionNotification
@@ -248,6 +250,12 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
             onDeselect = { message, position ->
                 actionMode?.let {
                     onDeselect(message, position, it)
+                }
+            },
+            onAttachmentNeedsDownload = { attachmentId, mmsId ->
+                // Start download (on IO thread)
+                lifecycleScope.launch(Dispatchers.IO) {
+                    JobQueue.shared.add(AttachmentDownloadJob(attachmentId, mmsId))
                 }
             },
             glide = glide,

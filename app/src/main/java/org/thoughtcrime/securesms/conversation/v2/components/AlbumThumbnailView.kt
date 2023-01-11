@@ -11,13 +11,8 @@ import android.widget.FrameLayout
 import android.widget.TextView
 import androidx.core.view.children
 import androidx.core.view.isVisible
-import androidx.lifecycle.LifecycleCoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import network.loki.messenger.R
 import network.loki.messenger.databinding.AlbumThumbnailViewBinding
-import org.session.libsession.messaging.jobs.AttachmentDownloadJob
-import org.session.libsession.messaging.jobs.JobQueue
 import org.session.libsession.messaging.sending_receiving.attachments.AttachmentTransferProgress
 import org.session.libsession.messaging.sending_receiving.attachments.DatabaseAttachment
 import org.session.libsession.utilities.recipients.Recipient
@@ -66,7 +61,7 @@ class AlbumThumbnailView : FrameLayout {
 
     // region Interaction
 
-    fun calculateHitObject(event: MotionEvent, mms: MmsMessageRecord, threadRecipient: Recipient, lifecycleCoroutineScope: LifecycleCoroutineScope) {
+    fun calculateHitObject(event: MotionEvent, mms: MmsMessageRecord, threadRecipient: Recipient, onAttachmentNeedsDownload: (Long, Long) -> Unit) {
         val rawXInt = event.rawX.toInt()
         val rawYInt = event.rawY.toInt()
         val eventRect = Rect(rawXInt, rawYInt, rawXInt, rawYInt)
@@ -81,12 +76,7 @@ class AlbumThumbnailView : FrameLayout {
                 if (slide.transferState == AttachmentTransferProgress.TRANSFER_PROGRESS_FAILED) {
                     // Restart download here (on IO thread)
                     (slide.asAttachment() as? DatabaseAttachment)?.let { attachment ->
-                        val attachmentId = attachment.attachmentId.rowId
-
-                        // Start download (on IO thread)
-                        lifecycleCoroutineScope.launch(Dispatchers.IO) {
-                            JobQueue.shared.add(AttachmentDownloadJob(attachmentId, mms.getId()))
-                        }
+                        onAttachmentNeedsDownload(attachment.attachmentId.rowId, mms.getId())
                     }
                 }
                 if (slide.isInProgress) return

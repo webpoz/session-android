@@ -23,15 +23,10 @@ import androidx.core.graphics.BlendModeCompat
 import androidx.core.text.getSpans
 import androidx.core.text.toSpannable
 import androidx.core.view.isVisible
-import androidx.lifecycle.LifecycleCoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import network.loki.messenger.R
 import network.loki.messenger.databinding.ViewVisibleMessageContentBinding
 import okhttp3.HttpUrl
 import org.session.libsession.messaging.MessagingModuleConfiguration
-import org.session.libsession.messaging.jobs.AttachmentDownloadJob
-import org.session.libsession.messaging.jobs.JobQueue
 import org.session.libsession.messaging.sending_receiving.attachments.AttachmentTransferProgress
 import org.session.libsession.messaging.sending_receiving.attachments.DatabaseAttachment
 import org.session.libsession.utilities.getColorFromAttr
@@ -76,7 +71,7 @@ class VisibleMessageContentView : LinearLayout {
         thread: Recipient,
         searchQuery: String?,
         contactIsTrusted: Boolean,
-        lifecycleCoroutineScope: LifecycleCoroutineScope
+        onAttachmentNeedsDownload: (Long, Long) -> Unit
     ) {
         // Background
         val background = getBackground(message.isOutgoing)
@@ -152,10 +147,7 @@ class VisibleMessageContentView : LinearLayout {
                 val attachmentId = dbAttachment.attachmentId.rowId
                 if (attach.transferState == AttachmentTransferProgress.TRANSFER_PROGRESS_PENDING
                     && MessagingModuleConfiguration.shared.storage.getAttachmentUploadJob(attachmentId) == null) {
-                    // Start download (on IO thread)
-                    lifecycleCoroutineScope.launch(Dispatchers.IO) {
-                        JobQueue.shared.add(AttachmentDownloadJob(attachmentId, dbAttachment.mmsId))
-                    }
+                    onAttachmentNeedsDownload(attachmentId, dbAttachment.mmsId)
                 }
             }
             message.linkPreviews.forEach { preview ->
@@ -163,10 +155,7 @@ class VisibleMessageContentView : LinearLayout {
                 val attachmentId = previewThumbnail.attachmentId.rowId
                 if (previewThumbnail.transferState == AttachmentTransferProgress.TRANSFER_PROGRESS_PENDING
                     && MessagingModuleConfiguration.shared.storage.getAttachmentUploadJob(attachmentId) == null) {
-                    // Start download (on IO thread)
-                    lifecycleCoroutineScope.launch(Dispatchers.IO) {
-                        JobQueue.shared.add(AttachmentDownloadJob(attachmentId, previewThumbnail.mmsId))
-                    }
+                    onAttachmentNeedsDownload(attachmentId, previewThumbnail.mmsId)
                 }
             }
         }
@@ -221,7 +210,7 @@ class VisibleMessageContentView : LinearLayout {
                     layoutParams.horizontalBias = if (message.isOutgoing) 1f else 0f
                     binding.albumThumbnailView.layoutParams = layoutParams
                     onContentClick.add { event ->
-                        binding.albumThumbnailView.calculateHitObject(event, message, thread, lifecycleCoroutineScope)
+                        binding.albumThumbnailView.calculateHitObject(event, message, thread, onAttachmentNeedsDownload)
                     }
                 } else {
                     hideBody = true
