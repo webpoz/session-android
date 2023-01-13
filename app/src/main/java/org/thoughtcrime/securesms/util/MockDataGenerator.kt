@@ -368,7 +368,7 @@ object MockDataGenerator {
                     )
                 )
                 storage.setUserCount(roomName, serverName, numGroupMembers)
-                lokiThreadDB.setOpenGroupChat(OpenGroup(serverName, roomName, roomName, 0, randomGroupPublicKey), threadId)
+                lokiThreadDB.setOpenGroupChat(OpenGroup(server = serverName, room = roomName, publicKey = randomGroupPublicKey, name = roomName, imageId = null, infoUpdates = 0), threadId)
 
                 // Generate the message history (Note: Unapproved message requests will only include incoming messages)
                 logProgress("Open Group Thread $threadIndex", "Generate $numMessages Messages")

@@ -16,6 +16,7 @@ import org.session.libsession.messaging.messages.visible.Reaction
 import org.session.libsession.messaging.messages.visible.VisibleMessage
 import org.session.libsession.messaging.open_groups.GroupMember
 import org.session.libsession.messaging.open_groups.OpenGroup
+import org.session.libsession.messaging.open_groups.OpenGroupApi
 import org.session.libsession.messaging.sending_receiving.attachments.AttachmentId
 import org.session.libsession.messaging.sending_receiving.attachments.DatabaseAttachment
 import org.session.libsession.messaging.sending_receiving.data_extraction.DataExtractionNotificationInfoMessage
@@ -552,8 +553,8 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
         return DatabaseComponent.get(context).groupDatabase().allGroups
     }
 
-    override fun addOpenGroup(urlAsString: String) {
-        OpenGroupManager.addOpenGroup(urlAsString, context)
+    override fun addOpenGroup(urlAsString: String): OpenGroupApi.RoomInfo? {
+        return OpenGroupManager.addOpenGroup(urlAsString, context)
     }
 
     override fun onOpenGroupAdded(server: String) {

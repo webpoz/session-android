@@ -51,6 +51,9 @@ public class EmojiTextView extends AppCompatTextView {
   @Override public void setText(@Nullable CharSequence text, BufferType type) {
     // No need to do anything special if the text is null or empty
     if (text == null || text.length() == 0) {
+      previousText         = text;
+      previousOverflowText = overflowText;
+      previousBufferType   = type;
       super.setText(text, type);
       return;
     }

@@ -100,14 +100,9 @@ class VisibleMessageContentView : ConstraintLayout {
         } else {
             binding.deletedMessageView.root.isVisible = false
         }
-        // clear the
-        binding.bodyTextView.text = null
-
 
         binding.quoteView.root.isVisible = message is MmsMessageRecord && message.quote != null
-
         binding.linkPreviewView.root.isVisible = message is MmsMessageRecord && message.linkPreviews.isNotEmpty()
-
         binding.untrustedView.root.isVisible = !contactIsTrusted && message is MmsMessageRecord && message.quote == null && message.linkPreviews.isEmpty()
         binding.voiceMessageView.root.isVisible = contactIsTrusted && message is MmsMessageRecord && message.slideDeck.audioSlide != null
         binding.documentView.root.isVisible = contactIsTrusted && message is MmsMessageRecord && message.slideDeck.documentSlide != null
