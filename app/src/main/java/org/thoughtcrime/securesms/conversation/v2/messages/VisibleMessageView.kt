@@ -190,7 +190,14 @@ class VisibleMessageView : LinearLayout {
         binding.dateBreakTextView.text = if (showDateBreak) DateUtils.getDisplayFormattedTimeSpanString(context, Locale.getDefault(), message.timestamp) else null
         binding.dateBreakTextView.isVisible = showDateBreak
         // Message status indicator
-        val (iconID, iconColor) = getMessageStatusImage(message)
+        val (iconID, iconColor, textId) = getMessageStatusImage(message)
+        if (textId != null) {
+            binding.messageStatusTextView.setText(textId)
+
+            if (iconColor != null) {
+                binding.messageStatusTextView.setTextColor(iconColor)
+            }
+        }
         if (iconID != null) {
             val drawable = ContextCompat.getDrawable(context, iconID)?.mutate()
             if (iconColor != null) {
@@ -200,9 +207,12 @@ class VisibleMessageView : LinearLayout {
         }
         if (message.isOutgoing) {
             val lastMessageID = mmsSmsDb.getLastMessageID(message.threadId)
+            binding.messageStatusTextView.isVisible =
+                !message.isSent || message.id == lastMessageID
             binding.messageStatusImageView.isVisible =
                 !message.isSent || message.id == lastMessageID
         } else {
+            binding.messageStatusTextView.isVisible = false
             binding.messageStatusImageView.isVisible = false
         }
         // Expiration timer
@@ -256,13 +266,17 @@ class VisibleMessageView : LinearLayout {
         }
     }
 
-    private fun getMessageStatusImage(message: MessageRecord): Pair<Int?,Int?> {
+    private fun getMessageStatusImage(message: MessageRecord): Triple<Int?,Int?,Int?> {
         return when {
-            !message.isOutgoing -> null to null
-            message.isFailed -> R.drawable.ic_error to resources.getColor(R.color.destructive, context.theme)
-            message.isPending -> R.drawable.ic_circle_dot_dot_dot to null
-            message.isRead -> R.drawable.ic_filled_circle_check to null
-            else -> R.drawable.ic_circle_check to null
+            !message.isOutgoing -> Triple(null, null, null)
+            message.isFailed ->
+                Triple(R.drawable.ic_delivery_status_failed, resources.getColor(R.color.destructive, context.theme), R.string.delivery_status_failed)
+            message.isPending ->
+                Triple(R.drawable.ic_delivery_status_sending, context.getColorFromAttr(R.attr.message_status_color), R.string.delivery_status_sending)
+            message.isRead ->
+                Triple(R.drawable.ic_delivery_status_read, context.getColorFromAttr(R.attr.message_status_color), R.string.delivery_status_read)
+            else ->
+                Triple(R.drawable.ic_delivery_status_sent, context.getColorFromAttr(R.attr.message_status_color), R.string.delivery_status_sent)
         }
     }
 
