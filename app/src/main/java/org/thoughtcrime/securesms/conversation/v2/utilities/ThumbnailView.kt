@@ -194,31 +194,4 @@ open class ThumbnailView: FrameLayout {
 
         return future
     }
-
-//    fun showDownloadText(showDownloadText: Boolean) {
-//        getTransferControls()?.setShowDownloadText(showDownloadText);
-//    }
-//
-//    fun setDownloadClickListener(listener: SlidesClickedListener) {
-//        this.downloadClickListener = listener;
-//    }
-//
-//    private fun getTransferControls(): TransferControlView? {
-//        if (transferControls == null) {
-//            transferControls = ViewUtil.inflateStub(this, R.id.transfer_controls_stub);
-//        }
-//
-//        return transferControls
-//    }
-    // endregion
-
-//    private class DownloadClickDispatcher : OnClickListener {
-//        override fun onClick(view: View?) {
-//            if (downloadClickListener != null && slide != null) {
-//                downloadClickListener.onClick(view, Collections.singletonList(slide))
-//            } else {
-//                Log.w(TAG, "Received a download button click, but unable to execute it. slide: " + String.valueOf(slide) + "  downloadClickListener: " + String.valueOf(downloadClickListener))
-//            }
-//        }
-//    }
 }
