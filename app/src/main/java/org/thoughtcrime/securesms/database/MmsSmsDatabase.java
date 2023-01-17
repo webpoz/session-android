@@ -188,7 +188,7 @@ public class MmsSmsDatabase extends Database {
   }
 
   public Cursor getConversationSnippet(long threadId) {
-    String order     = MmsSmsColumns.NORMALIZED_DATE_RECEIVED + " DESC";
+    String order     = MmsSmsColumns.NORMALIZED_DATE_SENT + " DESC";
     String selection = MmsSmsColumns.THREAD_ID + " = " + threadId;
 
     return queryTables(PROJECTION, selection, order, null);
@@ -205,7 +205,7 @@ public class MmsSmsDatabase extends Database {
   }
 
   public Cursor getUnread() {
-    String order           = MmsSmsColumns.NORMALIZED_DATE_RECEIVED + " ASC";
+    String order           = MmsSmsColumns.NORMALIZED_DATE_SENT + " ASC";
     String selection       = "(" + MmsSmsColumns.READ + " = 0 OR " + MmsSmsColumns.REACTIONS_UNREAD + " = 1) AND " + MmsSmsColumns.NOTIFIED + " = 0";
 
     return queryTables(PROJECTION, selection, order, null);
@@ -240,7 +240,7 @@ public class MmsSmsDatabase extends Database {
   }
 
   public int getQuotedMessagePosition(long threadId, long quoteId, @NonNull Address address) {
-    String order     = MmsSmsColumns.NORMALIZED_DATE_RECEIVED + " DESC";
+    String order     = MmsSmsColumns.NORMALIZED_DATE_SENT + " DESC";
     String selection = MmsSmsColumns.THREAD_ID + " = " + threadId;
 
     try (Cursor cursor = queryTables(new String[]{ MmsSmsColumns.NORMALIZED_DATE_SENT, MmsSmsColumns.ADDRESS }, selection, order, null)) {
