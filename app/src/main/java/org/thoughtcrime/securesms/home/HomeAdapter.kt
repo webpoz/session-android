@@ -1,12 +1,14 @@
 package org.thoughtcrime.securesms.home
 
 import android.content.Context
+import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListUpdateCallback
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.RecyclerView.NO_ID
+import network.loki.messenger.R
 import org.thoughtcrime.securesms.database.model.ThreadRecord
 import org.thoughtcrime.securesms.mms.GlideRequests
 
@@ -76,19 +78,20 @@ class HomeAdapter(
                 HeaderFooterViewHolder(header!!)
             }
             ITEM -> {
-                val view = ConversationView(context)
-                view.setOnClickListener { view.thread?.let { listener.onConversationClick(it) } }
-                view.setOnLongClickListener {
-                    view.thread?.let { listener.onLongConversationClick(it) }
+                val conversationView = LayoutInflater.from(parent.context).inflate(R.layout.view_conversation, parent, false) as ConversationView
+                val viewHolder = ConversationViewHolder(conversationView)
+                viewHolder.view.setOnClickListener { viewHolder.view.thread?.let { listener.onConversationClick(it) } }
+                viewHolder.view.setOnLongClickListener {
+                    viewHolder.view.thread?.let { listener.onLongConversationClick(it) }
                     true
                 }
-                ViewHolder(view)
+                viewHolder
             }
             else -> throw Exception("viewType $viewType isn't valid")
         }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        if (holder is ViewHolder) {
+        if (holder is ConversationViewHolder) {
             val offset = if (hasHeaderView()) position - 1 else position
             val thread = data[offset]
             val isTyping = typingThreadIDs.contains(thread.threadId)
@@ -97,7 +100,7 @@ class HomeAdapter(
     }
 
     override fun onViewRecycled(holder: RecyclerView.ViewHolder) {
-        if (holder is ViewHolder) {
+        if (holder is ConversationViewHolder) {
             holder.view.recycle()
         } else {
             super.onViewRecycled(holder)
@@ -110,7 +113,7 @@ class HomeAdapter(
 
     override fun getItemCount(): Int = data.size + if (hasHeaderView()) 1 else 0
 
-    class ViewHolder(val view: ConversationView) : RecyclerView.ViewHolder(view)
+    class ConversationViewHolder(val view: ConversationView) : RecyclerView.ViewHolder(view)
 
     class HeaderFooterViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView)
 

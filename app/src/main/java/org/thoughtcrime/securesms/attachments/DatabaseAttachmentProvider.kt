@@ -74,10 +74,10 @@ class DatabaseAttachmentProvider(context: Context, helper: SQLCipherOpenHelper) 
         attachmentDatabase.setTransferState(messageID, attachmentId, attachmentState.value)
     }
 
-    override fun getMessageForQuote(timestamp: Long, author: Address): Pair<Long, Boolean>? {
+    override fun getMessageForQuote(timestamp: Long, author: Address): Triple<Long, Boolean, String>? {
         val messagingDatabase = DatabaseComponent.get(context).mmsSmsDatabase()
         val message = messagingDatabase.getMessageFor(timestamp, author)
-        return if (message != null) Pair(message.id, message.isMms) else null
+        return if (message != null) Triple(message.id, message.isMms, message.body) else null
     }
 
     override fun getAttachmentsAndLinkPreviewFor(mmsId: Long): List<Attachment> {
@@ -184,16 +184,18 @@ class DatabaseAttachmentProvider(context: Context, helper: SQLCipherOpenHelper) 
         DatabaseComponent.get(context).lokiMessageDatabase().deleteMessageServerHash(messageID)
     }
 
-    override fun updateMessageAsDeleted(timestamp: Long, author: String) {
+    override fun updateMessageAsDeleted(timestamp: Long, author: String): Long? {
         val database = DatabaseComponent.get(context).mmsSmsDatabase()
         val address = Address.fromSerialized(author)
-        val message = database.getMessageFor(timestamp, address) ?: return
+        val message = database.getMessageFor(timestamp, address) ?: return null
         val messagingDatabase: MessagingDatabase = if (message.isMms)  DatabaseComponent.get(context).mmsDatabase()
                                                    else DatabaseComponent.get(context).smsDatabase()
-        messagingDatabase.markAsDeleted(message.id, message.isRead)
+        messagingDatabase.markAsDeleted(message.id, message.isRead, message.hasMention)
         if (message.isOutgoing) {
             messagingDatabase.deleteMessage(message.id)
         }
+
+        return message.id
     }
 
     override fun getServerHashForMessage(messageID: Long): String? {

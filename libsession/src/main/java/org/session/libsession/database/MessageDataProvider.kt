@@ -21,7 +21,7 @@ interface MessageDataProvider {
      */
     fun getMessageID(serverId: Long, threadId: Long): Pair<Long, Boolean>?
     fun deleteMessage(messageID: Long, isSms: Boolean)
-    fun updateMessageAsDeleted(timestamp: Long, author: String)
+    fun updateMessageAsDeleted(timestamp: Long, author: String): Long?
     fun getServerHashForMessage(messageID: Long): String?
     fun getDatabaseAttachment(attachmentId: Long): DatabaseAttachment?
     fun getAttachmentStream(attachmentId: Long): SessionServiceAttachmentStream?
@@ -36,7 +36,7 @@ interface MessageDataProvider {
     fun isOutgoingMessage(timestamp: Long): Boolean
     fun handleSuccessfulAttachmentUpload(attachmentId: Long, attachmentStream: SignalServiceAttachmentStream, attachmentKey: ByteArray, uploadResult: UploadResult)
     fun handleFailedAttachmentUpload(attachmentId: Long)
-    fun getMessageForQuote(timestamp: Long, author: Address): Pair<Long, Boolean>?
+    fun getMessageForQuote(timestamp: Long, author: Address): Triple<Long, Boolean, String>?
     fun getAttachmentsAndLinkPreviewFor(mmsId: Long): List<Attachment>
     fun getMessageBodyFor(timestamp: Long, author: String): String
     fun getAttachmentIDsFor(messageID: Long): List<Long>

@@ -75,7 +75,9 @@ public class MmsSmsDatabase extends Database {
                                               MmsDatabase.QUOTE_ATTACHMENT,
                                               MmsDatabase.SHARED_CONTACTS,
                                               MmsDatabase.LINK_PREVIEWS,
-                                              ReactionDatabase.REACTION_JSON_ALIAS};
+                                              ReactionDatabase.REACTION_JSON_ALIAS,
+                                              MmsSmsColumns.HAS_MENTION
+  };
 
   public MmsSmsDatabase(Context context, SQLCipherOpenHelper databaseHelper) {
     super(context, databaseHelper);
@@ -337,7 +339,9 @@ public class MmsSmsDatabase extends Database {
                               MmsDatabase.QUOTE_MISSING,
                               MmsDatabase.QUOTE_ATTACHMENT,
                               MmsDatabase.SHARED_CONTACTS,
-                              MmsDatabase.LINK_PREVIEWS};
+                              MmsDatabase.LINK_PREVIEWS,
+                              MmsSmsColumns.HAS_MENTION
+    };
 
     String[] smsProjection = {SmsDatabase.DATE_SENT + " AS " + MmsSmsColumns.NORMALIZED_DATE_SENT,
                               SmsDatabase.DATE_RECEIVED + " AS " + MmsSmsColumns.NORMALIZED_DATE_RECEIVED,
@@ -364,7 +368,9 @@ public class MmsSmsDatabase extends Database {
                               MmsDatabase.QUOTE_MISSING,
                               MmsDatabase.QUOTE_ATTACHMENT,
                               MmsDatabase.SHARED_CONTACTS,
-                              MmsDatabase.LINK_PREVIEWS};
+                              MmsDatabase.LINK_PREVIEWS,
+                              MmsSmsColumns.HAS_MENTION
+    };
 
     SQLiteQueryBuilder mmsQueryBuilder = new SQLiteQueryBuilder();
     SQLiteQueryBuilder smsQueryBuilder = new SQLiteQueryBuilder();
@@ -408,6 +414,7 @@ public class MmsSmsDatabase extends Database {
     mmsColumnsPresent.add(MmsDatabase.STATUS);
     mmsColumnsPresent.add(MmsDatabase.UNIDENTIFIED);
     mmsColumnsPresent.add(MmsDatabase.NETWORK_FAILURE);
+    mmsColumnsPresent.add(MmsSmsColumns.HAS_MENTION);
 
     mmsColumnsPresent.add(AttachmentDatabase.ROW_ID);
     mmsColumnsPresent.add(AttachmentDatabase.UNIQUE_ID);
@@ -470,6 +477,7 @@ public class MmsSmsDatabase extends Database {
     smsColumnsPresent.add(SmsDatabase.DATE_RECEIVED);
     smsColumnsPresent.add(SmsDatabase.STATUS);
     smsColumnsPresent.add(SmsDatabase.UNIDENTIFIED);
+    smsColumnsPresent.add(MmsSmsColumns.HAS_MENTION);
     smsColumnsPresent.add(ReactionDatabase.ROW_ID);
     smsColumnsPresent.add(ReactionDatabase.MESSAGE_ID);
     smsColumnsPresent.add(ReactionDatabase.IS_MMS);
