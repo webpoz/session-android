@@ -1,15 +1,17 @@
 package org.thoughtcrime.securesms.database.helpers;
 
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.content.Context;
 import android.database.Cursor;
 
 import androidx.annotation.NonNull;
+import androidx.core.app.NotificationCompat;
 
-import net.zetetic.database.DatabaseErrorHandler;
-import net.zetetic.database.DatabaseUtils;
 import net.zetetic.database.sqlcipher.SQLiteConnection;
 import net.zetetic.database.sqlcipher.SQLiteDatabase;
 import net.zetetic.database.sqlcipher.SQLiteDatabaseHook;
+import net.zetetic.database.sqlcipher.SQLiteException;
 import net.zetetic.database.sqlcipher.SQLiteOpenHelper;
 
 import org.session.libsession.utilities.TextSecurePreferences;
@@ -37,8 +39,11 @@ import org.thoughtcrime.securesms.database.SessionContactDatabase;
 import org.thoughtcrime.securesms.database.SessionJobDatabase;
 import org.thoughtcrime.securesms.database.SmsDatabase;
 import org.thoughtcrime.securesms.database.ThreadDatabase;
+import org.thoughtcrime.securesms.notifications.NotificationChannels;
 
 import java.io.File;
+
+import network.loki.messenger.R;
 
 public class SQLCipherOpenHelper extends SQLiteOpenHelper {
 
@@ -85,7 +90,7 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
   private static final int    DATABASE_VERSION         = lokiV39;
   private static final int    MIN_DATABASE_VERSION     = lokiV7;
   private static final String CIPHER3_DATABASE_NAME    = "signal.db";
-  public static final String DATABASE_NAME             = "signal_v4.db";
+  public static final String  DATABASE_NAME            = "signal_v4.db";
 
   private final Context        context;
   private final DatabaseSecret databaseSecret;
@@ -94,14 +99,13 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
     super(context, DATABASE_NAME, databaseSecret.asString(), null, DATABASE_VERSION, MIN_DATABASE_VERSION, null, new SQLiteDatabaseHook() {
       @Override
       public void preKey(SQLiteConnection connection) {
-        connection.execute("PRAGMA cipher_default_kdf_iter = 256000;", null, null);
-        connection.execute("PRAGMA cipher_default_page_size = 4096;", null, null);
+        SQLCipherOpenHelper.applySQLCipherPragmas(connection, true);
       }
 
       @Override
       public void postKey(SQLiteConnection connection) {
-        connection.execute("PRAGMA kdf_iter = '256000';", null, null);
-        connection.execute("PRAGMA cipher_page_size = 4096;", null, null);
+        SQLCipherOpenHelper.applySQLCipherPragmas(connection, true);
+
         // if not vacuumed in a while, perform that operation
         long currentTime = System.currentTimeMillis();
         // 7 days
@@ -116,48 +120,69 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
     this.databaseSecret = databaseSecret;
   }
 
-  public static void migrateSqlCipher3To4IfNeeded(@NonNull Context context, @NonNull DatabaseSecret databaseSecret) {
+  private static void applySQLCipherPragmas(SQLiteConnection connection, boolean useSQLCipher4) {
+    if (useSQLCipher4) {
+      connection.execute("PRAGMA kdf_iter = '256000';", null, null);
+    }
+    else {
+      connection.execute("PRAGMA cipher_compatibility = 3;", null, null);
+      connection.execute("PRAGMA kdf_iter = '1';", null, null);
+    }
+
+    connection.execute("PRAGMA cipher_page_size = 4096;", null, null);
+  }
+
+  private static SQLiteDatabase open(String path, DatabaseSecret databaseSecret, boolean useSQLCipher4) throws SQLiteException {
+    return SQLiteDatabase.openDatabase(path, databaseSecret.asString(), null, SQLiteDatabase.OPEN_READWRITE, new SQLiteDatabaseHook() {
+      @Override
+      public void preKey(SQLiteConnection connection) { SQLCipherOpenHelper.applySQLCipherPragmas(connection, useSQLCipher4); }
+
+      @Override
+      public void postKey(SQLiteConnection connection) { SQLCipherOpenHelper.applySQLCipherPragmas(connection, useSQLCipher4); }
+    });
+  }
+
+  public static void migrateSqlCipher3To4IfNeeded(@NonNull Context context, @NonNull DatabaseSecret databaseSecret) throws Exception {
     String oldDbPath = context.getDatabasePath(CIPHER3_DATABASE_NAME).getPath();
     File oldDbFile = new File(oldDbPath);
 
-    // If the old SQLCipher3 database file doesn't exist then just return early
+    // If the old SQLCipher3 database file doesn't exist then no need to do anything
     if (!oldDbFile.exists()) { return; }
 
-    // If the new database file already exists then we probably had a failed migration and it's likely in
-    // an invalid state so should delete it
-    String newDbPath = context.getDatabasePath(DATABASE_NAME).getPath();
-    File newDbFile = new File(newDbPath);
-
-    if (newDbFile.exists()) { newDbFile.delete(); }
-
     try {
-      newDbFile.createNewFile();
-    }
-    catch (Exception e) {
-      // TODO: Communicate the error somehow???
-      return;
-    }
+      // Define the location for the new database
+      String newDbPath = context.getDatabasePath(DATABASE_NAME).getPath();
+      File newDbFile = new File(newDbPath);
 
-    try {
-      // Open the old database
-      SQLiteDatabase oldDb = SQLiteDatabase.openOrCreateDatabase(oldDbPath, databaseSecret.asString(), null, null, new SQLiteDatabaseHook() {
-        @Override
-        public void preKey(SQLiteConnection connection) {
-          connection.execute("PRAGMA cipher_compatibility = 3;", null, null);
-          connection.execute("PRAGMA kdf_iter = '1';", null, null);
-          connection.execute("PRAGMA cipher_page_size = 4096;", null, null);
+      // If the new database file already exists then check if it's valid first, if it's in an
+      // invalid state we should delete it and try to migrate again
+      if (newDbFile.exists()) {
+        // If the old database hasn't been modified since the new database was created, then we can
+        // assume the user hasn't downgraded for some reason and made changes to the old database and
+        // can remove the old database file (it won't be used anymore)
+        if (oldDbFile.lastModified() <= newDbFile.lastModified()) {
+          // TODO: Delete 'CIPHER3_DATABASE_NAME' once enough time has past
+//          //noinspection ResultOfMethodCallIgnored
+//          oldDbFile.delete();
+          return;
         }
 
-        @Override
-        public void postKey(SQLiteConnection connection) {
-          connection.execute("PRAGMA cipher_compatibility = 3;", null, null);
-          connection.execute("PRAGMA kdf_iter = '1';", null, null);
-          connection.execute("PRAGMA cipher_page_size = 4096;", null, null);
+        // If the old database does have newer changes then the new database could have stale/invalid
+        // data and we should re-migrate to avoid losing any data or issues
+        if (!newDbFile.delete()) {
+          throw new Exception("Failed to remove invalid new database");
         }
-      });
+      }
+
+      if (!newDbFile.createNewFile()) {
+        throw new Exception("Failed to create new database");
+      }
+
+      // Open the old database and extract it's version
+      SQLiteDatabase oldDb = SQLCipherOpenHelper.open(oldDbPath, databaseSecret, false);
+      int oldDbVersion = oldDb.getVersion();
 
       // Export the old database to the new one (will have the default 'kdf_iter' and 'page_size' settings)
-      int oldDbVersion = oldDb.getVersion();
       oldDb.rawExecSQL(
         String.format("ATTACH DATABASE '%s' AS sqlcipher4 KEY '%s'", newDbPath, databaseSecret.asString())
       );
@@ -167,30 +192,46 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
       oldDb.rawExecSQL("DETACH DATABASE sqlcipher4");
       oldDb.close();
 
-      // TODO: Performance testing
-
-      SQLiteDatabase newDb = SQLiteDatabase.openDatabase(newDbPath, databaseSecret.asString(), null, SQLiteDatabase.OPEN_READWRITE, new SQLiteDatabaseHook() {
-        @Override
-        public void preKey(SQLiteConnection connection) {
-          connection.execute("PRAGMA cipher_default_kdf_iter = 256000;", null, null);
-          connection.execute("PRAGMA cipher_default_page_size = 4096;", null, null);
-        }
-
-        @Override
-        public void postKey(SQLiteConnection connection) {
-          connection.execute("PRAGMA cipher_default_kdf_iter = 256000;", null, null);
-          connection.execute("PRAGMA cipher_default_page_size = 4096;", null, null);
-        }
-      });
+      // Open the newly migrated database (to ensure it works) and set it's version so we don't try
+      // to run any of our custom migrations
+      SQLiteDatabase newDb = SQLCipherOpenHelper.open(newDbPath, databaseSecret, true);
       newDb.setVersion(oldDbVersion);
       newDb.close();
 
-      // TODO: Delete 'CIPHER3_DATABASE_NAME'
-      // TODO: What do we do if the deletion fails??? (The current logic will end up re-migrating...)
+      // TODO: Delete 'CIPHER3_DATABASE_NAME' once enough time has past
+      // Remove the old database file since it will no longer be used
+//      //noinspection ResultOfMethodCallIgnored
 //      oldDbFile.delete();
     }
     catch (Exception e) {
-      // TODO: Communicate the error somehow???
+      Log.e(TAG, "Migration from SQLCipher3 to SQLCipher4 failed", e);
+
+      // Notify the user of the issue so they know they can downgrade until the issue is fixed
+      NotificationManager notificationManager = context.getSystemService(NotificationManager.class);
+      String channelId = context.getString(R.string.NotificationChannel_failures);
+
+      if (NotificationChannels.supported()) {
+        NotificationChannel channel = new NotificationChannel(channelId, channelId, NotificationManager.IMPORTANCE_HIGH);
+        channel.enableVibration(true);
+        notificationManager.createNotificationChannel(channel);
+      }
+
+      NotificationCompat.Builder builder = new NotificationCompat.Builder(context, channelId)
+        .setSmallIcon(R.drawable.ic_notification)
+        .setColor(context.getResources().getColor(R.color.textsecure_primary))
+        .setCategory(NotificationCompat.CATEGORY_ERROR)
+        .setContentTitle(context.getString(R.string.ErrorNotifier_migration))
+        .setContentText(context.getString(R.string.ErrorNotifier_migration_downgrade))
+        .setAutoCancel(true);
+
+      if (!NotificationChannels.supported()) {
+        builder.setPriority(NotificationCompat.PRIORITY_HIGH);
+      }
+
+      notificationManager.notify(5874, builder.build());
+
+      // Throw the error (app will crash but there is nothing else we can do unfortunately)
+      throw e;
     }
   }
 
