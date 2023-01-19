@@ -995,6 +995,23 @@ class MmsDatabase(context: Context, databaseHelper: SQLCipherOpenHelper) : Messa
         return threadDeleted
     }
 
+    override fun deleteMessages(messageIds: LongArray, threadId: Long): Boolean {
+        val attachmentDatabase = get(context).attachmentDatabase()
+        val groupReceiptDatabase = get(context).groupReceiptDatabase()
+
+        queue(Runnable { attachmentDatabase.deleteAttachmentsForMessages(messageIds) })
+        groupReceiptDatabase.deleteRowsForMessages(messageIds)
+
+        val database = databaseHelper.writableDatabase
+        database!!.delete(TABLE_NAME, ID_IN, arrayOf(messageIds.joinToString(",")))
+
+        val threadDeleted = get(context).threadDatabase().update(threadId, false)
+        notifyConversationListeners(threadId)
+        notifyStickerListeners()
+        notifyStickerPackListeners()
+        return threadDeleted
+    }
+
     override fun updateThreadId(fromId: Long, toId: Long) {
         val contentValues = ContentValues(1)
         contentValues.put(THREAD_ID, toId)
