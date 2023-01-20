@@ -383,7 +383,11 @@ object OpenGroupApi {
             }
             return if (request.useOnionRouting) {
                 OnionRequestAPI.sendOnionRequest(requestBuilder.build(), request.server, publicKey).fail { e ->
-                    Log.e("SOGS", "Failed onion request", e)
+                    when (e) {
+                        // No need for the stack trace for HTTP errors
+                        is HTTP.HTTPRequestFailedException -> Log.e("SOGS", "Failed onion request: ${e.message}")
+                        else -> Log.e("SOGS", "Failed onion request", e)
+                    }
                 }
             } else {
                 Promise.ofFail(IllegalStateException("It's currently not allowed to send non onion routed requests."))
