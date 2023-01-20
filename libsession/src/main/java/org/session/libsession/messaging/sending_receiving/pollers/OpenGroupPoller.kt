@@ -117,6 +117,7 @@ class OpenGroupPoller(private val server: String, private val executorService: S
     ) {
         val storage = MessagingModuleConfiguration.shared.storage
         val groupId = "$server.$roomToken"
+        val dbGroupId = GroupUtil.getEncodedOpenGroupID(groupId.toByteArray())
 
         val existingOpenGroup = storage.getOpenGroup(roomToken, server)
         val publicKey = existingOpenGroup?.publicKey ?: return
@@ -157,8 +158,19 @@ class OpenGroupPoller(private val server: String, private val executorService: S
             })
         }
 
-        // Start downloading the room image (if we don't have one or it's been updated)
-        if (pollInfo.details?.imageId != null && pollInfo.details.imageId != existingOpenGroup.imageId) {
+        if (
+            (
+                pollInfo.details != null &&
+                pollInfo.details.imageId != null && (
+                    pollInfo.details.imageId != existingOpenGroup.imageId ||
+                    !storage.hasDownloadedProfilePicture(dbGroupId)
+                )
+            ) || (
+                pollInfo.details == null &&
+                existingOpenGroup.imageId != null &&
+                !storage.hasDownloadedProfilePicture(dbGroupId)
+            )
+        ) {
             JobQueue.shared.add(GroupAvatarDownloadJob(roomToken, server))
         }
     }

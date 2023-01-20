@@ -318,6 +318,19 @@ public class GroupDatabase extends Database implements LokiOpenGroupDatabaseProt
     notifyConversationListListeners();
   }
 
+  public boolean hasDownloadedProfilePicture(String groupId) {
+    try (Cursor cursor = databaseHelper.getReadableDatabase().query(TABLE_NAME, new String[]{AVATAR}, GROUP_ID + " = ?",
+            new String[] {groupId},
+            null, null, null))
+    {
+      if (cursor != null && cursor.moveToNext()) {
+        return !cursor.isNull(0);
+      }
+
+      return false;
+    }
+  }
+
   public void updateMembers(String groupId, List<Address> members) {
     Collections.sort(members);
 
