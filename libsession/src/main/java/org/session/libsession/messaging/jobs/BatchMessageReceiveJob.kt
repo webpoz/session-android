@@ -97,7 +97,6 @@ class BatchMessageReceiveJob(
                     when (e) {
                         is MessageReceiver.Error.DuplicateMessage, MessageReceiver.Error.SelfSend -> {
                             Log.i(TAG, "Couldn't receive message, failed with error: ${e.message}")
-                            failures += messageParameters
                         }
                         is MessageReceiver.Error -> {
                             if (!e.isRetryable) {
