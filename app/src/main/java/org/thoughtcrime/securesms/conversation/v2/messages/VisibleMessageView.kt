@@ -207,10 +207,18 @@ class VisibleMessageView : LinearLayout {
         }
         if (message.isOutgoing) {
             val lastMessageID = mmsSmsDb.getLastMessageID(message.threadId)
-            binding.messageStatusTextView.isVisible =
-                !message.isSent || message.id == lastMessageID
-            binding.messageStatusImageView.isVisible =
-                !message.isSent || message.id == lastMessageID
+            binding.messageStatusTextView.isVisible = (
+                textId != null && (
+                    !message.isSent ||
+                    message.id == lastMessageID
+                )
+            )
+            binding.messageStatusImageView.isVisible = (
+                iconID != null && (
+                    !message.isSent ||
+                    message.id == lastMessageID
+                )
+            )
         } else {
             binding.messageStatusTextView.isVisible = false
             binding.messageStatusImageView.isVisible = false
