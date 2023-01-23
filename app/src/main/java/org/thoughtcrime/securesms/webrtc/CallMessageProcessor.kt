@@ -12,6 +12,7 @@ import org.session.libsession.database.StorageProtocol
 import org.session.libsession.messaging.calls.CallMessageType
 import org.session.libsession.messaging.messages.control.CallMessage
 import org.session.libsession.messaging.utilities.WebRtcUtils
+import org.session.libsession.snode.SnodeAPI
 import org.session.libsession.utilities.Address
 import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.recipients.Recipient
@@ -28,6 +29,10 @@ import org.webrtc.IceCandidate
 
 
 class CallMessageProcessor(private val context: Context, private val textSecurePreferences: TextSecurePreferences, lifecycle: Lifecycle, private val storage: StorageProtocol) {
+
+    companion object {
+        private const val VERY_EXPIRED_TIME = 15 * 60 * 1000L
+    }
 
     init {
         lifecycle.coroutineScope.launch(IO) {
@@ -53,6 +58,13 @@ class CallMessageProcessor(private val context: Context, private val textSecureP
                     }
                     continue
                 }
+
+                val isVeryExpired = (nextMessage.sentTimestamp?:0) + VERY_EXPIRED_TIME < SnodeAPI.nowWithOffset
+                if (isVeryExpired) {
+                    Log.e("Loki", "Dropping very expired call message")
+                    continue
+                }
+
                 when (nextMessage.type) {
                     OFFER -> incomingCall(nextMessage)
                     ANSWER -> incomingAnswer(nextMessage)
