@@ -6,11 +6,14 @@ import androidx.lifecycle.viewModelScope
 import com.goterl.lazysodium.utils.KeyPair
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import org.session.libsession.messaging.open_groups.OpenGroup
+import org.session.libsession.messaging.open_groups.OpenGroupApi
 import org.session.libsession.messaging.utilities.SessionId
 import org.session.libsession.messaging.utilities.SodiumUtilities
 import org.session.libsession.utilities.recipients.Recipient
@@ -41,17 +44,25 @@ class ConversationViewModel(
         get() = openGroup?.let { storage.getServerCapabilities(it.server) } ?: listOf()
 
     val blindedPublicKey: String?
-        get() = if (openGroup == null || edKeyPair == null) null else {
+        get() = if (openGroup == null || edKeyPair == null || !serverCapabilities.contains(OpenGroupApi.Capability.BLIND.name.lowercase())) null else {
             SodiumUtilities.blindedKeyPair(openGroup!!.publicKey, edKeyPair)?.publicKey?.asBytes
                 ?.let { SessionId(IdPrefix.BLINDED, it) }?.hexString
         }
 
     fun saveDraft(text: String) {
-        repository.saveDraft(threadId, text)
+        GlobalScope.launch(Dispatchers.IO) {
+            repository.saveDraft(threadId, text)
+        }
     }
 
     fun getDraft(): String? {
-        return repository.getDraft(threadId)
+        val draft: String? = repository.getDraft(threadId)
+
+        viewModelScope.launch(Dispatchers.IO) {
+            repository.clearDrafts(threadId)
+        }
+
+        return draft
     }
 
     fun inviteContacts(contacts: List<Recipient>) {
@@ -181,7 +192,6 @@ class ConversationViewModel(
 data class UiMessage(val id: Long, val message: String)
 
 data class ConversationUiState(
-    val isOxenHostedOpenGroup: Boolean = false,
     val uiMessages: List<UiMessage> = emptyList(),
     val isMessageRequestAccepted: Boolean? = null
 )

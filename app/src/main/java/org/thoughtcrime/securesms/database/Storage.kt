@@ -7,28 +7,18 @@ import org.session.libsession.database.StorageProtocol
 import org.session.libsession.messaging.BlindedIdMapping
 import org.session.libsession.messaging.calls.CallMessageType
 import org.session.libsession.messaging.contacts.Contact
-import org.session.libsession.messaging.jobs.AttachmentUploadJob
-import org.session.libsession.messaging.jobs.GroupAvatarDownloadJob
-import org.session.libsession.messaging.jobs.Job
-import org.session.libsession.messaging.jobs.JobQueue
-import org.session.libsession.messaging.jobs.MessageReceiveJob
-import org.session.libsession.messaging.jobs.MessageSendJob
+import org.session.libsession.messaging.jobs.*
 import org.session.libsession.messaging.messages.Message
 import org.session.libsession.messaging.messages.control.ConfigurationMessage
 import org.session.libsession.messaging.messages.control.MessageRequestResponse
-import org.session.libsession.messaging.messages.signal.IncomingEncryptedMessage
-import org.session.libsession.messaging.messages.signal.IncomingGroupMessage
-import org.session.libsession.messaging.messages.signal.IncomingMediaMessage
-import org.session.libsession.messaging.messages.signal.IncomingTextMessage
-import org.session.libsession.messaging.messages.signal.OutgoingGroupMediaMessage
-import org.session.libsession.messaging.messages.signal.OutgoingMediaMessage
-import org.session.libsession.messaging.messages.signal.OutgoingTextMessage
+import org.session.libsession.messaging.messages.signal.*
 import org.session.libsession.messaging.messages.visible.Attachment
 import org.session.libsession.messaging.messages.visible.Profile
 import org.session.libsession.messaging.messages.visible.Reaction
 import org.session.libsession.messaging.messages.visible.VisibleMessage
 import org.session.libsession.messaging.open_groups.GroupMember
 import org.session.libsession.messaging.open_groups.OpenGroup
+import org.session.libsession.messaging.open_groups.OpenGroupApi
 import org.session.libsession.messaging.sending_receiving.attachments.AttachmentId
 import org.session.libsession.messaging.sending_receiving.attachments.DatabaseAttachment
 import org.session.libsession.messaging.sending_receiving.data_extraction.DataExtractionNotificationInfoMessage
@@ -38,7 +28,7 @@ import org.session.libsession.messaging.utilities.SessionId
 import org.session.libsession.messaging.utilities.SodiumUtilities
 import org.session.libsession.messaging.utilities.UpdateMessageData
 import org.session.libsession.snode.OnionRequestAPI
-import org.session.libsession.utilities.Address
+import org.session.libsession.utilities.*
 import org.session.libsession.utilities.Address.Companion.fromSerialized
 import org.session.libsession.utilities.GroupRecord
 import org.session.libsession.utilities.GroupUtil
@@ -318,12 +308,8 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
         return getAllOpenGroups().values.firstOrNull { it.server == server && it.room == room }
     }
 
-    override fun clearGroupMemberRoles(groupId: String) {
-        DatabaseComponent.get(context).groupMemberDatabase().clearGroupMemberRoles(groupId)
-    }
-
-    override fun addGroupMemberRole(member: GroupMember) {
-        DatabaseComponent.get(context).groupMemberDatabase().addGroupMember(member)
+    override fun setGroupMemberRoles(members: List<GroupMember>) {
+        DatabaseComponent.get(context).groupMemberDatabase().setGroupMembers(members)
     }
 
     override fun isDuplicateMessage(timestamp: Long): Boolean {
@@ -336,6 +322,10 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
 
     override fun updateProfilePicture(groupID: String, newValue: ByteArray) {
         DatabaseComponent.get(context).groupDatabase().updateProfilePicture(groupID, newValue)
+    }
+
+    override fun hasDownloadedProfilePicture(groupID: String): Boolean {
+        return DatabaseComponent.get(context).groupDatabase().hasDownloadedProfilePicture(groupID)
     }
 
     override fun getReceivedMessageTimestamps(): Set<Long> {
@@ -429,6 +419,11 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
         } else {
             DatabaseComponent.get(context).lokiMessageDatabase().setErrorMessage(messageRecord.getId(), error.javaClass.simpleName)
         }
+    }
+
+    override fun clearErrorMessage(messageID: Long) {
+        val db = DatabaseComponent.get(context).lokiMessageDatabase()
+        db.clearErrorMessage(messageID)
     }
 
     override fun setMessageServerHash(messageID: Long, serverHash: String) {
@@ -565,8 +560,8 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
         return DatabaseComponent.get(context).groupDatabase().allGroups
     }
 
-    override fun addOpenGroup(urlAsString: String) {
-        OpenGroupManager.addOpenGroup(urlAsString, context)
+    override fun addOpenGroup(urlAsString: String): OpenGroupApi.RoomInfo? {
+        return OpenGroupManager.addOpenGroup(urlAsString, context)
     }
 
     override fun onOpenGroupAdded(server: String) {
@@ -673,7 +668,6 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
             val threadId = threadDatabase.getOrCreateThreadIdFor(recipient)
             if (contact.didApproveMe == true) {
                 recipientDatabase.setApprovedMe(recipient, true)
-                threadDatabase.setHasSent(threadId, true)
             }
             if (contact.isApproved == true) {
                 recipientDatabase.setApproved(recipient, true)
@@ -972,6 +966,16 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
 
     override fun deleteReactions(messageId: Long, mms: Boolean) {
         DatabaseComponent.get(context).reactionDatabase().deleteMessageReactions(MessageId(messageId, mms))
+    }
+
+    override fun unblock(toUnblock: List<Recipient>) {
+        val recipientDb = DatabaseComponent.get(context).recipientDatabase()
+        recipientDb.setBlocked(toUnblock, false)
+    }
+
+    override fun blockedContacts(): List<Recipient> {
+        val recipientDb = DatabaseComponent.get(context).recipientDatabase()
+        return recipientDb.blockedContacts
     }
 
 }

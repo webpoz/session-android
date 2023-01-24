@@ -32,12 +32,7 @@ import org.session.libsession.utilities.GroupUtil
 import org.session.libsession.utilities.SSKEnvironment
 import org.session.libsignal.crypto.PushTransportDetails
 import org.session.libsignal.protos.SignalServiceProtos
-import org.session.libsignal.utilities.Base64
-import org.session.libsignal.utilities.IdPrefix
-import org.session.libsignal.utilities.Namespace
-import org.session.libsignal.utilities.defaultRequiresAuth
-import org.session.libsignal.utilities.hasNamespaces
-import org.session.libsignal.utilities.hexEncodedPublicKey
+import org.session.libsignal.utilities.*
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import org.session.libsession.messaging.sending_receiving.attachments.Attachment as SignalAttachment
@@ -326,6 +321,8 @@ object MessageSender {
             message.serverHash?.let {
                 storage.setMessageServerHash(messageID, it)
             }
+            // in case any errors from previous sends
+            storage.clearErrorMessage(messageID)
             // Track the open group server message ID
             if (message.openGroupServerMessageID != null && (destination is Destination.LegacyOpenGroup || destination is Destination.OpenGroup)) {
                 val server: String

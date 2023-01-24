@@ -28,9 +28,10 @@ import androidx.annotation.Nullable;
 
 import com.annimon.stream.Stream;
 
-import net.sqlcipher.database.SQLiteDatabase;
-import net.sqlcipher.database.SQLiteStatement;
+import net.zetetic.database.sqlcipher.SQLiteDatabase;
+import net.zetetic.database.sqlcipher.SQLiteStatement;
 
+import org.apache.commons.lang3.StringUtils;
 import org.session.libsession.messaging.calls.CallMessageType;
 import org.session.libsession.messaging.messages.signal.IncomingGroupMessage;
 import org.session.libsession.messaging.messages.signal.IncomingTextMessage;
@@ -52,6 +53,7 @@ import org.thoughtcrime.securesms.dependencies.DatabaseComponent;
 
 import java.io.IOException;
 import java.security.SecureRandom;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
@@ -591,6 +593,30 @@ public class SmsDatabase extends MessagingDatabase {
     SQLiteDatabase db = databaseHelper.getWritableDatabase();
     long threadId = getThreadIdForMessage(messageId);
     db.delete(TABLE_NAME, ID_WHERE, new String[] {messageId+""});
+    boolean threadDeleted = DatabaseComponent.get(context).threadDatabase().update(threadId, false);
+    notifyConversationListeners(threadId);
+    return threadDeleted;
+  }
+
+  @Override
+  public boolean deleteMessages(long[] messageIds, long threadId) {
+    String[] argsArray = new String[messageIds.length];
+    String[] argValues = new String[messageIds.length];
+    Arrays.fill(argsArray, "?");
+
+    for (int i = 0; i < messageIds.length; i++) {
+      argValues[i] = (messageIds[i] + "");
+    }
+
+    String combinedMessageIdArgss = StringUtils.join(messageIds, ',');
+    String combinedMessageIds = StringUtils.join(messageIds, ',');
+    Log.i("MessageDatabase", "Deleting: " + combinedMessageIds);
+    SQLiteDatabase db = databaseHelper.getWritableDatabase();
+    db.delete(
+      TABLE_NAME,
+      ID + " IN (" + StringUtils.join(argsArray, ',') + ")",
+      argValues
+    );
     boolean threadDeleted = DatabaseComponent.get(context).threadDatabase().update(threadId, false);
     notifyConversationListeners(threadId);
     return threadDeleted;

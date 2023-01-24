@@ -47,6 +47,7 @@ import org.session.libsession.utilities.Util;
 import org.session.libsession.utilities.WindowDebouncer;
 import org.session.libsession.utilities.dynamiclanguage.DynamicLanguageContextWrapper;
 import org.session.libsession.utilities.dynamiclanguage.LocaleParser;
+import org.session.libsignal.utilities.HTTP;
 import org.session.libsignal.utilities.JsonUtil;
 import org.session.libsignal.utilities.Log;
 import org.session.libsignal.utilities.ThreadUtils;
@@ -57,6 +58,7 @@ import org.thoughtcrime.securesms.database.EmojiSearchDatabase;
 import org.thoughtcrime.securesms.database.JobDatabase;
 import org.thoughtcrime.securesms.database.LokiAPIDatabase;
 import org.thoughtcrime.securesms.database.Storage;
+import org.thoughtcrime.securesms.database.helpers.SQLCipherOpenHelper;
 import org.thoughtcrime.securesms.database.model.EmojiSearchData;
 import org.thoughtcrime.securesms.dependencies.DatabaseComponent;
 import org.thoughtcrime.securesms.dependencies.DatabaseModule;
@@ -66,6 +68,7 @@ import org.thoughtcrime.securesms.groups.OpenGroupMigrator;
 import org.thoughtcrime.securesms.home.HomeActivity;
 import org.thoughtcrime.securesms.jobmanager.JobManager;
 import org.thoughtcrime.securesms.jobmanager.impl.JsonDataSerializer;
+import org.thoughtcrime.securesms.jobmanager.impl.NetworkConstraint;
 import org.thoughtcrime.securesms.jobs.FastJobStorage;
 import org.thoughtcrime.securesms.jobs.JobManagerFactories;
 import org.thoughtcrime.securesms.logging.AndroidLogger;
@@ -85,7 +88,6 @@ import org.thoughtcrime.securesms.sskenvironment.ProfileManager;
 import org.thoughtcrime.securesms.sskenvironment.ReadReceiptManager;
 import org.thoughtcrime.securesms.sskenvironment.TypingStatusRepository;
 import org.thoughtcrime.securesms.util.Broadcaster;
-import org.thoughtcrime.securesms.util.UiModeUtilities;
 import org.thoughtcrime.securesms.util.dynamiclanguage.LocaleParseHelper;
 import org.thoughtcrime.securesms.webrtc.CallMessageProcessor;
 import org.webrtc.PeerConnectionFactory;
@@ -165,6 +167,10 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
         return (ApplicationContext) context.getApplicationContext();
     }
 
+    public TextSecurePreferences getPrefs() {
+        return textSecurePreferences;
+    }
+
     public DatabaseComponent getDatabaseComponent() {
         return EntryPoints.get(getApplicationContext(), DatabaseComponent.class);
     }
@@ -220,7 +226,6 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
         if (userPublicKey != null) {
             registerForFCMIfNeeded(false);
         }
-        UiModeUtilities.setupUiModeToUserSelected(this);
         initializeExpiringMessageManager();
         initializeTypingStatusRepository();
         initializeTypingStatusSender();
@@ -234,6 +239,9 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
         resubmitProfilePictureIfNeeded();
         loadEmojiSearchIndexIfNeeded();
         EmojiSource.refresh();
+
+        NetworkConstraint networkConstraint = new NetworkConstraint.Factory(this).create();
+        HTTP.INSTANCE.setConnectedToNetwork(networkConstraint::isMet);
     }
 
     @Override
@@ -241,6 +249,12 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
         isAppVisible = true;
         Log.i(TAG, "App is now visible.");
         KeyCachingService.onAppForegrounded(this);
+
+        // If the user account hasn't been created or onboarding wasn't finished then don't start
+        // the pollers
+        if (TextSecurePreferences.getLocalNumber(this) == null || !TextSecurePreferences.hasSeenWelcomeScreen(this)) {
+            return;
+        }
 
         ThreadUtils.queue(()->{
             if (poller != null) {
@@ -479,6 +493,7 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
         if (now - lastProfilePictureUpload <= 14 * 24 * 60 * 60 * 1000) return;
         ThreadUtils.queue(() -> {
             // Don't generate a new profile key here; we do that when the user changes their profile picture
+            Log.d("Loki-Avatar", "Uploading Avatar Started");
             String encodedProfileKey = TextSecurePreferences.getProfileKey(ApplicationContext.this);
             try {
                 // Read the file into a byte array
@@ -495,6 +510,7 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
                 ProfilePictureUtilities.INSTANCE.upload(profilePicture, encodedProfileKey, ApplicationContext.this).success(unit -> {
                     // Update the last profile picture upload date
                     TextSecurePreferences.setLastProfilePictureUpload(ApplicationContext.this, new Date().getTime());
+                    Log.d("Loki-Avatar", "Uploading Avatar Finished");
                     return Unit.INSTANCE;
                 });
             } catch (Exception exception) {
@@ -533,7 +549,7 @@ public class ApplicationContext extends Application implements DefaultLifecycleO
             TextSecurePreferences.setProfileName(this, displayName);
         }
         getSharedPreferences(PREFERENCES_NAME, 0).edit().clear().commit();
-        if (!deleteDatabase("signal.db")) {
+        if (!deleteDatabase(SQLCipherOpenHelper.DATABASE_NAME)) {
             Log.d("Loki", "Failed to delete database.");
         }
         Util.runOnMain(() -> new Handler().postDelayed(ApplicationContext.this::restartApplication, 200));
