@@ -12,6 +12,7 @@ import org.session.libsession.messaging.messages.Message
 import org.session.libsession.messaging.messages.control.ConfigurationMessage
 import org.session.libsession.messaging.messages.control.MessageRequestResponse
 import org.session.libsession.messaging.messages.visible.Attachment
+import org.session.libsession.messaging.messages.visible.Profile
 import org.session.libsession.messaging.messages.visible.Reaction
 import org.session.libsession.messaging.messages.visible.VisibleMessage
 import org.session.libsession.messaging.open_groups.GroupMember
@@ -35,9 +36,7 @@ interface StorageProtocol {
     // General
     fun getUserPublicKey(): String?
     fun getUserX25519KeyPair(): ECKeyPair
-    fun getUserDisplayName(): String?
-    fun getUserProfileKey(): ByteArray?
-    fun getUserProfilePictureURL(): String?
+    fun getUserProfile(): Profile
     fun setUserProfilePictureURL(newProfilePicture: String)
     // Signal
     fun getOrGenerateRegistrationID(): Int
