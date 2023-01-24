@@ -32,7 +32,7 @@ import androidx.annotation.Nullable;
 
 import com.annimon.stream.Stream;
 
-import net.sqlcipher.database.SQLiteDatabase;
+import net.zetetic.database.sqlcipher.SQLiteDatabase;
 
 import org.jetbrains.annotations.NotNull;
 import org.session.libsession.utilities.Address;
@@ -502,13 +502,21 @@ public class ThreadDatabase extends Database {
     return db.rawQuery(query, null);
   }
 
-  public void setLastSeen(long threadId) {
+  public void setLastSeen(long threadId, long timestamp) {
     SQLiteDatabase db = databaseHelper.getWritableDatabase();
     ContentValues contentValues = new ContentValues(1);
-    contentValues.put(LAST_SEEN, System.currentTimeMillis());
+    if (timestamp == -1) {
+      contentValues.put(LAST_SEEN, System.currentTimeMillis());
+    } else {
+      contentValues.put(LAST_SEEN, timestamp);
+    }
 
     db.update(TABLE_NAME, contentValues, ID_WHERE, new String[] {String.valueOf(threadId)});
     notifyConversationListListeners();
+  }
+
+  public void setLastSeen(long threadId) {
+    setLastSeen(threadId, -1);
   }
 
   public Pair<Long, Boolean> getLastSeenAndHasSent(long threadId) {
