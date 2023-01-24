@@ -352,7 +352,7 @@
         <item name="home_gradient_end">@color/classic_dark_1</item>
         <item name="conversation_pinned_background_color">?colorCellBackground</item>
         <item name="conversation_unread_background_color">@color/classic_dark_2</item>
-        <item name="conversation_pinned_icon_color">@color/classic_dark_4</item>
+        <item name="conversation_pinned_icon_color">?android:textColorSecondary</item>
         <item name="unreadIndicatorBackgroundColor">@color/classic_dark_3</item>
         <item name="unreadIndicatorTextColor">@color/classic_dark_0</item>
         
@@ -437,7 +437,7 @@
         <item name="home_gradient_end">@color/classic_light_5</item>
         <item name="conversation_pinned_background_color">?colorCellBackground</item>
         <item name="conversation_unread_background_color">@color/classic_light_6</item>
-        <item name="conversation_pinned_icon_color">@color/classic_light_2</item>
+        <item name="conversation_pinned_icon_color">?android:textColorSecondary</item>
         <item name="unreadIndicatorBackgroundColor">@color/classic_light_3</item>
         <item name="unreadIndicatorTextColor">@color/classic_light_0</item>
         <!-- New conversation button -->
@@ -517,7 +517,7 @@
         <item name="home_gradient_end">@color/ocean_dark_3</item>
         <item name="conversation_pinned_background_color">?colorCellBackground</item>
         <item name="conversation_unread_background_color">@color/ocean_dark_4</item>
-        <item name="conversation_pinned_icon_color">?colorAccent</item>
+        <item name="conversation_pinned_icon_color">?android:textColorSecondary</item>
         <item name="unreadIndicatorBackgroundColor">?colorAccent</item>
         <item name="unreadIndicatorTextColor">@color/ocean_dark_0</item>
         <item name="conversation_menu_background_color">@color/ocean_dark_3</item>
@@ -639,7 +639,7 @@
         <item name="conversation_unread_count_indicator_background">?colorAccent</item>
         <item name="conversation_pinned_background_color">?colorCellBackground</item>
         <item name="conversation_unread_background_color">@color/ocean_light_5</item>
-        <item name="conversation_pinned_icon_color">?android:textColorPrimary</item>
+        <item name="conversation_pinned_icon_color">?android:textColorSecondary</item>
         <item name="message_selected">@color/ocean_light_5</item>
     </style>
 
