@@ -315,11 +315,24 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
         restoreDraftIfNeeded()
         setUpUiStateObserver()
         binding!!.scrollToBottomButton.setOnClickListener {
-            val layoutManager = binding?.conversationRecyclerView?.layoutManager ?: return@setOnClickListener
+            val layoutManager = (binding?.conversationRecyclerView?.layoutManager as? LinearLayoutManager) ?: return@setOnClickListener
+
             if (layoutManager.isSmoothScrolling) {
                 binding?.conversationRecyclerView?.scrollToPosition(0)
             } else {
-                binding?.conversationRecyclerView?.smoothScrollToPosition(0)
+                // It looks like 'smoothScrollToPosition' will actually load all intermediate items in
+                // order to do the scroll, this can be very slow if there are a lot of messages so
+                // instead we check the current position and if there are more than 10 items to scroll
+                // we jump instantly to the 10th item and scroll from there (this should happen quick
+                // enough to give a similar scroll effect without having to load everything)
+                val position = layoutManager.findFirstVisibleItemPosition()
+                if (position > 10) {
+                    binding?.conversationRecyclerView?.scrollToPosition(10)
+                }
+
+                binding?.conversationRecyclerView?.post {
+                    binding?.conversationRecyclerView?.smoothScrollToPosition(0)
+                }
             }
         }
         unreadCount = mmsSmsDb.getUnreadCount(viewModel.threadId)

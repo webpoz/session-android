@@ -176,12 +176,26 @@ class DatabaseAttachmentProvider(context: Context, helper: SQLCipherOpenHelper) 
         return messageDB.getMessageID(serverId, threadId)
     }
 
+    override fun getMessageIDs(serverIds: List<Long>, threadId: Long): Pair<List<Long>, List<Long>> {
+        val messageDB = DatabaseComponent.get(context).lokiMessageDatabase()
+        return messageDB.getMessageIDs(serverIds, threadId)
+    }
+
     override fun deleteMessage(messageID: Long, isSms: Boolean) {
         val messagingDatabase: MessagingDatabase = if (isSms)  DatabaseComponent.get(context).smsDatabase()
                                                    else DatabaseComponent.get(context).mmsDatabase()
         messagingDatabase.deleteMessage(messageID)
         DatabaseComponent.get(context).lokiMessageDatabase().deleteMessage(messageID, isSms)
         DatabaseComponent.get(context).lokiMessageDatabase().deleteMessageServerHash(messageID)
+    }
+
+    override fun deleteMessages(messageIDs: List<Long>, threadId: Long, isSms: Boolean) {
+        val messagingDatabase: MessagingDatabase = if (isSms)  DatabaseComponent.get(context).smsDatabase()
+                                                   else DatabaseComponent.get(context).mmsDatabase()
+
+        messagingDatabase.deleteMessages(messageIDs.toLongArray(), threadId)
+        DatabaseComponent.get(context).lokiMessageDatabase().deleteMessages(messageIDs)
+        DatabaseComponent.get(context).lokiMessageDatabase().deleteMessageServerHashes(messageIDs)
     }
 
     override fun updateMessageAsDeleted(timestamp: Long, author: String): Long? {
