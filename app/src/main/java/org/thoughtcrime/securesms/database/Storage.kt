@@ -2,6 +2,7 @@ package org.thoughtcrime.securesms.database
 
 import android.content.Context
 import android.net.Uri
+import org.session.libsession.avatars.AvatarHelper
 import org.session.libsession.database.StorageProtocol
 import org.session.libsession.messaging.BlindedIdMapping
 import org.session.libsession.messaging.calls.CallMessageType
@@ -12,6 +13,7 @@ import org.session.libsession.messaging.messages.control.ConfigurationMessage
 import org.session.libsession.messaging.messages.control.MessageRequestResponse
 import org.session.libsession.messaging.messages.signal.*
 import org.session.libsession.messaging.messages.visible.Attachment
+import org.session.libsession.messaging.messages.visible.Profile
 import org.session.libsession.messaging.messages.visible.Reaction
 import org.session.libsession.messaging.messages.visible.VisibleMessage
 import org.session.libsession.messaging.open_groups.GroupMember
@@ -28,6 +30,11 @@ import org.session.libsession.messaging.utilities.UpdateMessageData
 import org.session.libsession.snode.OnionRequestAPI
 import org.session.libsession.utilities.*
 import org.session.libsession.utilities.Address.Companion.fromSerialized
+import org.session.libsession.utilities.GroupRecord
+import org.session.libsession.utilities.GroupUtil
+import org.session.libsession.utilities.ProfileKeyUtil
+import org.session.libsession.utilities.SSKEnvironment
+import org.session.libsession.utilities.TextSecurePreferences
 import org.session.libsession.utilities.recipients.Recipient
 import org.session.libsignal.crypto.ecc.ECKeyPair
 import org.session.libsignal.messages.SignalServiceAttachmentPointer
@@ -44,6 +51,7 @@ import org.thoughtcrime.securesms.groups.OpenGroupManager
 import org.thoughtcrime.securesms.jobs.RetrieveProfileAvatarJob
 import org.thoughtcrime.securesms.mms.PartAuthority
 import org.thoughtcrime.securesms.util.SessionMetaProtocol
+import java.security.MessageDigest
 
 class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context, helper), StorageProtocol {
     
@@ -55,16 +63,11 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
         return DatabaseComponent.get(context).lokiAPIDatabase().getUserX25519KeyPair()
     }
 
-    override fun getUserDisplayName(): String? {
-        return TextSecurePreferences.getProfileName(context)
-    }
-
-    override fun getUserProfileKey(): ByteArray? {
-        return ProfileKeyUtil.getProfileKey(context)
-    }
-
-    override fun getUserProfilePictureURL(): String? {
-        return TextSecurePreferences.getProfilePictureURL(context)
+    override fun getUserProfile(): Profile {
+        val displayName = TextSecurePreferences.getProfileName(context)!!
+        val profileKey = ProfileKeyUtil.getProfileKey(context)
+        val profilePictureUrl = TextSecurePreferences.getProfilePictureURL(context)
+        return Profile(displayName, profileKey, profilePictureUrl)
     }
 
     override fun setUserProfilePictureURL(newValue: String) {
@@ -754,6 +757,25 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
             val smsDb = DatabaseComponent.get(context).smsDatabase()
             val sender = Recipient.from(context, fromSerialized(senderPublicKey), false)
             val threadId = threadDB.getOrCreateThreadIdFor(sender)
+            val profile = response.profile
+            if (profile != null) {
+                val profileManager = SSKEnvironment.shared.profileManager
+                val name = profile.displayName!!
+                if (name.isNotEmpty()) {
+                    profileManager.setName(context, sender, name)
+                }
+                val newProfileKey = profile.profileKey
+
+                val needsProfilePicture = !AvatarHelper.avatarFileExists(context, sender.address)
+                val profileKeyValid = newProfileKey?.isNotEmpty() == true && (newProfileKey.size == 16 || newProfileKey.size == 32) && profile.profilePictureURL?.isNotEmpty() == true
+                val profileKeyChanged = (sender.profileKey == null || !MessageDigest.isEqual(sender.profileKey, newProfileKey))
+
+                if ((profileKeyValid && profileKeyChanged) || (profileKeyValid && needsProfilePicture)) {
+                    profileManager.setProfileKey(context, sender, newProfileKey!!)
+                    profileManager.setUnidentifiedAccessMode(context, sender, Recipient.UnidentifiedAccessMode.UNKNOWN)
+                    profileManager.setProfilePictureURL(context, sender, profile.profilePictureURL!!)
+                }
+            }
             threadDB.setHasSent(threadId, true)
             val mappingDb = DatabaseComponent.get(context).blindedIdMappingDatabase()
             val mappings = mutableMapOf<String, BlindedIdMapping>()
