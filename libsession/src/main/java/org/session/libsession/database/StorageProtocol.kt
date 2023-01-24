@@ -16,6 +16,7 @@ import org.session.libsession.messaging.messages.visible.Reaction
 import org.session.libsession.messaging.messages.visible.VisibleMessage
 import org.session.libsession.messaging.open_groups.GroupMember
 import org.session.libsession.messaging.open_groups.OpenGroup
+import org.session.libsession.messaging.open_groups.OpenGroupApi
 import org.session.libsession.messaging.sending_receiving.attachments.AttachmentId
 import org.session.libsession.messaging.sending_receiving.attachments.DatabaseAttachment
 import org.session.libsession.messaging.sending_receiving.data_extraction.DataExtractionNotificationInfoMessage
@@ -66,7 +67,7 @@ interface StorageProtocol {
     fun getAllOpenGroups(): Map<Long, OpenGroup>
     fun updateOpenGroup(openGroup: OpenGroup)
     fun getOpenGroup(threadId: Long): OpenGroup?
-    fun addOpenGroup(urlAsString: String)
+    fun addOpenGroup(urlAsString: String): OpenGroupApi.RoomInfo?
     fun onOpenGroupAdded(server: String)
     fun hasBackgroundGroupAddJob(groupJoinUrl: String): Boolean
     fun setOpenGroupServerMessageID(messageID: Long, serverID: Long, threadID: Long, isSms: Boolean)
@@ -80,6 +81,7 @@ interface StorageProtocol {
     // Open Group Metadata
     fun updateTitle(groupID: String, newValue: String)
     fun updateProfilePicture(groupID: String, newValue: ByteArray)
+    fun hasDownloadedProfilePicture(groupID: String): Boolean
     fun setUserCount(room: String, server: String, newValue: Int)
 
     // Last Message Server ID

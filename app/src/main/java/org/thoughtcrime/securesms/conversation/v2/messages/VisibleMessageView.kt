@@ -85,7 +85,7 @@ class VisibleMessageView : LinearLayout {
     var onPress: ((event: MotionEvent) -> Unit)? = null
     var onSwipeToReply: (() -> Unit)? = null
     var onLongPress: (() -> Unit)? = null
-    val messageContentView: VisibleMessageContentView by lazy { binding.messageContentView }
+    val messageContentView: VisibleMessageContentView by lazy { binding.messageContentView.root }
 
     companion object {
         const val swipeToReplyThreshold = 64.0f // dp
@@ -108,7 +108,7 @@ class VisibleMessageView : LinearLayout {
         isHapticFeedbackEnabled = true
         setWillNotDraw(false)
         binding.messageInnerContainer.disableClipping()
-        binding.messageContentView.disableClipping()
+        binding.messageContentView.root.disableClipping()
     }
     // endregion
 
@@ -122,6 +122,7 @@ class VisibleMessageView : LinearLayout {
         contact: Contact?,
         senderSessionID: String,
         delegate: VisibleMessageViewDelegate?,
+        onAttachmentNeedsDownload: (Long, Long) -> Unit
     ) {
         val threadID = message.threadId
         val thread = threadDb.getRecipientForThreadId(threadID) ?: return
@@ -190,22 +191,23 @@ class VisibleMessageView : LinearLayout {
         binding.dateBreakTextView.text = if (showDateBreak) DateUtils.getDisplayFormattedTimeSpanString(context, Locale.getDefault(), message.timestamp) else null
         binding.dateBreakTextView.isVisible = showDateBreak
         // Message status indicator
-        val (iconID, iconColor, textId) = getMessageStatusImage(message)
-        if (textId != null) {
-            binding.messageStatusTextView.setText(textId)
-
-            if (iconColor != null) {
-                binding.messageStatusTextView.setTextColor(iconColor)
-            }
-        }
-        if (iconID != null) {
-            val drawable = ContextCompat.getDrawable(context, iconID)?.mutate()
-            if (iconColor != null) {
-                drawable?.setTint(iconColor)
-            }
-            binding.messageStatusImageView.setImageDrawable(drawable)
-        }
         if (message.isOutgoing) {
+            val (iconID, iconColor, textId) = getMessageStatusImage(message)
+            if (textId != null) {
+                binding.messageStatusTextView.setText(textId)
+
+                if (iconColor != null) {
+                    binding.messageStatusTextView.setTextColor(iconColor)
+                }
+            }
+            if (iconID != null) {
+                val drawable = ContextCompat.getDrawable(context, iconID)?.mutate()
+                if (iconColor != null) {
+                    drawable?.setTint(iconColor)
+                }
+                binding.messageStatusImageView.setImageDrawable(drawable)
+            }
+
             val lastMessageID = mmsSmsDb.getLastMessageID(message.threadId)
             binding.messageStatusTextView.isVisible = (
                 textId != null && (
@@ -226,32 +228,37 @@ class VisibleMessageView : LinearLayout {
         // Expiration timer
         updateExpirationTimer(message)
         // Emoji Reactions
-        val emojiLayoutParams = binding.emojiReactionsView.layoutParams as ConstraintLayout.LayoutParams
+        val emojiLayoutParams = binding.emojiReactionsView.root.layoutParams as ConstraintLayout.LayoutParams
         emojiLayoutParams.horizontalBias = if (message.isOutgoing) 1f else 0f
-        binding.emojiReactionsView.layoutParams = emojiLayoutParams
-        val capabilities = lokiThreadDb.getOpenGroupChat(threadID)?.server?.let { lokiApiDb.getServerCapabilities(it) }
-        if (message.reactions.isNotEmpty() &&
-            (capabilities.isNullOrEmpty() || capabilities.contains(OpenGroupApi.Capability.REACTIONS.name.lowercase()))
-        ) {
-            binding.emojiReactionsView.setReactions(message.id, message.reactions, message.isOutgoing, delegate)
-            binding.emojiReactionsView.isVisible = true
-        } else {
-            binding.emojiReactionsView.isVisible = false
+        binding.emojiReactionsView.root.layoutParams = emojiLayoutParams
+
+        if (message.reactions.isNotEmpty()) {
+            val capabilities = lokiThreadDb.getOpenGroupChat(threadID)?.server?.let { lokiApiDb.getServerCapabilities(it) }
+            if (capabilities.isNullOrEmpty() || capabilities.contains(OpenGroupApi.Capability.REACTIONS.name.lowercase())) {
+                binding.emojiReactionsView.root.setReactions(message.id, message.reactions, message.isOutgoing, delegate)
+                binding.emojiReactionsView.root.isVisible = true
+            } else {
+                binding.emojiReactionsView.root.isVisible = false
+            }
+        }
+        else {
+            binding.emojiReactionsView.root.isVisible = false
         }
 
         // Populate content view
-        binding.messageContentView.indexInAdapter = indexInAdapter
-        binding.messageContentView.bind(
+        binding.messageContentView.root.indexInAdapter = indexInAdapter
+        binding.messageContentView.root.bind(
             message,
             isStartOfMessageCluster,
             isEndOfMessageCluster,
             glide,
             thread,
             searchQuery,
-            message.isOutgoing || isGroupThread || (contact?.isTrusted ?: false)
+            message.isOutgoing || isGroupThread || (contact?.isTrusted ?: false),
+            onAttachmentNeedsDownload
         )
-        binding.messageContentView.delegate = delegate
-        onDoubleTap = { binding.messageContentView.onContentDoubleTap?.invoke() }
+        binding.messageContentView.root.delegate = delegate
+        onDoubleTap = { binding.messageContentView.root.onContentDoubleTap?.invoke() }
     }
 
     private fun isStartOfMessageCluster(current: MessageRecord, previous: MessageRecord?, isGroupThread: Boolean): Boolean {
@@ -290,7 +297,7 @@ class VisibleMessageView : LinearLayout {
 
     private fun updateExpirationTimer(message: MessageRecord) {
         val container = binding.messageInnerContainer
-        val content = binding.messageContentView
+        val content = binding.messageContentView.root
         val expiration = binding.expirationTimerView
         val spacing = binding.messageContentSpacing
         container.removeAllViewsInLayout()
@@ -341,7 +348,7 @@ class VisibleMessageView : LinearLayout {
     override fun onDraw(canvas: Canvas) {
         val spacing = context.resources.getDimensionPixelSize(R.dimen.small_spacing)
         val iconSize = toPx(24, context.resources)
-        val left = binding.messageInnerContainer.left + binding.messageContentView.right + spacing
+        val left = binding.messageInnerContainer.left + binding.messageContentView.root.right + spacing
         val top = height - (binding.messageInnerContainer.height / 2) - binding.profilePictureView.root.marginBottom - (iconSize / 2)
         val right = left + iconSize
         val bottom = top + iconSize
@@ -363,7 +370,7 @@ class VisibleMessageView : LinearLayout {
 
     fun recycle() {
         binding.profilePictureView.root.recycle()
-        binding.messageContentView.recycle()
+        binding.messageContentView.root.recycle()
     }
     // endregion
 
@@ -459,7 +466,7 @@ class VisibleMessageView : LinearLayout {
     }
 
     fun onContentClick(event: MotionEvent) {
-        binding.messageContentView.onContentClick.iterator().forEach { clickHandler -> clickHandler.invoke(event) }
+        binding.messageContentView.root.onContentClick.iterator().forEach { clickHandler -> clickHandler.invoke(event) }
     }
 
     private fun onPress(event: MotionEvent) {
@@ -479,7 +486,7 @@ class VisibleMessageView : LinearLayout {
     }
 
     fun playVoiceMessage() {
-        binding.messageContentView.playVoiceMessage()
+        binding.messageContentView.root.playVoiceMessage()
     }
     // endregion
 }

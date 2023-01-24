@@ -95,7 +95,8 @@ dependencies {
     implementation 'com.takisoft.fix:colorpicker:1.0.1'
     implementation 'com.codewaves.stickyheadergrid:stickyheadergrid:0.9.4'
     implementation 'com.github.dmytrodanylyk.circular-progress-button:library:1.1.3-S2'
-    implementation 'org.signal:android-database-sqlcipher:3.5.9-S3'
+    implementation 'androidx.sqlite:sqlite-ktx:2.2.0'
+    implementation 'net.zetetic:sqlcipher-android:4.5.3@aar'
     implementation ('com.googlecode.ez-vcard:ez-vcard:0.9.11') {
         exclude group: 'com.fasterxml.jackson.core'
         exclude group: 'org.freemarker'
@@ -158,7 +159,7 @@ dependencies {
     testImplementation 'org.robolectric:shadows-multidex:4.4'
 }
 
-def canonicalVersionCode = 321
+def canonicalVersionCode = 323
 def canonicalVersionName = "1.16.3"
 
 def postFixSize = 10
