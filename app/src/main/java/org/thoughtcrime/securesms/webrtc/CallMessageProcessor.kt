@@ -90,7 +90,7 @@ class CallMessageProcessor(private val context: Context, private val textSecureP
     private fun incomingHangup(callMessage: CallMessage) {
         val callId = callMessage.callId ?: return
         val hangupIntent = WebRtcCallService.remoteHangupIntent(context, callId)
-        ContextCompat.startForegroundService(context, hangupIntent)
+        context.startService(hangupIntent)
     }
 
     private fun incomingAnswer(callMessage: CallMessage) {
@@ -103,7 +103,7 @@ class CallMessageProcessor(private val context: Context, private val textSecureP
                 sdp = sdp,
                 callId = callId
         )
-        ContextCompat.startForegroundService(context, answerIntent)
+        context.startService(answerIntent)
     }
 
     private fun handleIceCandidates(callMessage: CallMessage) {
@@ -132,7 +132,7 @@ class CallMessageProcessor(private val context: Context, private val textSecureP
                 callId = callId,
                 callTime = callMessage.sentTimestamp!!
         )
-        ContextCompat.startForegroundService(context, incomingIntent)
+        context.startService(incomingIntent)
     }
 
     private fun incomingCall(callMessage: CallMessage) {
@@ -146,8 +146,7 @@ class CallMessageProcessor(private val context: Context, private val textSecureP
                 callId = callId,
                 callTime = callMessage.sentTimestamp!!
         )
-        ContextCompat.startForegroundService(context, incomingIntent)
-
+        context.startService(incomingIntent)
     }
 
     private fun CallMessage.iceCandidates(): List<IceCandidate> {

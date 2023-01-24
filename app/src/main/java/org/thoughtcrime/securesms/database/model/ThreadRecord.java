@@ -50,7 +50,6 @@ public class ThreadRecord extends DisplayRecord {
   private           final long    expiresIn;
   private           final long    lastSeen;
   private           final boolean pinned;
-  private           final int     recipientHash;
 
   public ThreadRecord(@NonNull String body, @Nullable Uri snippetUri,
                       @NonNull Recipient recipient, long date, long count, int unreadCount,
@@ -67,15 +66,10 @@ public class ThreadRecord extends DisplayRecord {
     this.expiresIn        = expiresIn;
     this.lastSeen         = lastSeen;
     this.pinned           = pinned;
-    this.recipientHash    = recipient.hashCode();
   }
 
   public @Nullable Uri getSnippetUri() {
     return snippetUri;
-  }
-
-  public int getRecipientHash() {
-    return recipientHash;
   }
 
   @Override
