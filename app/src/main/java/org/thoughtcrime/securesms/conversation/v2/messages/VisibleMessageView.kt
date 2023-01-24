@@ -158,7 +158,8 @@ class VisibleMessageView : LinearLayout {
                 binding.profilePictureView.root.update(message.individualRecipient)
                 binding.profilePictureView.root.setOnClickListener {
                     if (thread.isOpenGroupRecipient) {
-                        if (IdPrefix.fromValue(senderSessionID) == IdPrefix.BLINDED) {
+                        val openGroup = lokiThreadDb.getOpenGroupChat(threadID)
+                        if (IdPrefix.fromValue(senderSessionID) == IdPrefix.BLINDED && openGroup?.canWrite == true) {
                             val intent = Intent(context, ConversationActivityV2::class.java)
                             intent.putExtra(ConversationActivityV2.FROM_GROUP_THREAD_ID, threadID)
                             intent.putExtra(ConversationActivityV2.ADDRESS, Address.fromSerialized(senderSessionID))

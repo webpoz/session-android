@@ -125,9 +125,10 @@ class OpenGroupPoller(private val server: String, private val executorService: S
             server = server,
             room = pollInfo.token,
             name = if (pollInfo.details != null) { pollInfo.details.name } else { existingOpenGroup.name },
-            infoUpdates = if (pollInfo.details != null) { pollInfo.details.infoUpdates } else { existingOpenGroup.infoUpdates },
             publicKey = publicKey,
-            imageId = if (pollInfo.details != null) { pollInfo.details.imageId } else { existingOpenGroup.imageId }
+            imageId = if (pollInfo.details != null) { pollInfo.details.imageId } else { existingOpenGroup.imageId },
+            canWrite = pollInfo.write,
+            infoUpdates = if (pollInfo.details != null) { pollInfo.details.infoUpdates } else { existingOpenGroup.infoUpdates }
         )
         // - Open Group changes
         storage.updateOpenGroup(openGroup)
