@@ -65,7 +65,7 @@ public class ThreadRecord extends DisplayRecord {
     this.archived         = archived;
     this.expiresIn        = expiresIn;
     this.lastSeen         = lastSeen;
-    this.pinned         = pinned;
+    this.pinned           = pinned;
   }
 
   public @Nullable Uri getSnippetUri() {

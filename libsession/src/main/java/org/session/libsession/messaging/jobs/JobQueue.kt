@@ -26,7 +26,7 @@ class JobQueue : JobDelegate {
     private val jobTimestampMap = ConcurrentHashMap<Long, AtomicInteger>()
     private val rxDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     private val rxMediaDispatcher = Executors.newFixedThreadPool(4).asCoroutineDispatcher()
-    private val openGroupDispatcher = Executors.newCachedThreadPool().asCoroutineDispatcher()
+    private val openGroupDispatcher = Executors.newFixedThreadPool(8).asCoroutineDispatcher()
     private val txDispatcher = Executors.newSingleThreadExecutor().asCoroutineDispatcher()
     private val scope = CoroutineScope(Dispatchers.Default) + SupervisorJob()
     private val queue = Channel<Job>(UNLIMITED)
@@ -56,7 +56,7 @@ class JobQueue : JobDelegate {
                 handleJobFailedPermanently(job, NullPointerException("Open Group ID was null"))
             } else {
                 val groupChannel = if (!openGroupChannels.containsKey(openGroupId)) {
-                    Log.d("OpenGroupDispatcher", "Creating $openGroupId channel")
+                    Log.d("OpenGroupDispatcher", "Creating ${openGroupId.hashCode()} channel")
                     val newGroupChannel = Channel<Job>(UNLIMITED)
                     launch(dispatcher) {
                         for (groupJob in newGroupChannel) {
