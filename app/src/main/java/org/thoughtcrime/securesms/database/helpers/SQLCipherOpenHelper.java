@@ -85,9 +85,10 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
   private static final int lokiV37                          = 58;
   private static final int lokiV38                          = 59;
   private static final int lokiV39                          = 60;
+  private static final int lokiV40                          = 61;
 
   // Loki - onUpgrade(...) must be updated to use Loki version numbers if Signal makes any database changes
-  private static final int    DATABASE_VERSION         = lokiV39;
+  private static final int    DATABASE_VERSION         = lokiV40;
   private static final int    MIN_DATABASE_VERSION     = lokiV7;
   private static final String CIPHER3_DATABASE_NAME    = "signal.db";
   public static final String  DATABASE_NAME            = "signal_v4.db";
@@ -306,6 +307,9 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
     db.execSQL(LokiAPIDatabase.RESET_SEQ_NO); // probably not needed but consistent with all migrations
     db.execSQL(EmojiSearchDatabase.CREATE_EMOJI_SEARCH_TABLE_COMMAND);
     db.execSQL(ReactionDatabase.CREATE_REACTION_TABLE_COMMAND);
+    db.execSQL(ThreadDatabase.getUnreadMentionCountCommand());
+    db.execSQL(SmsDatabase.CREATE_HAS_MENTION_COMMAND);
+    db.execSQL(MmsDatabase.CREATE_HAS_MENTION_COMMAND);
 
     executeStatements(db, SmsDatabase.CREATE_INDEXS);
     executeStatements(db, MmsDatabase.CREATE_INDEXS);
@@ -541,6 +545,12 @@ public class SQLCipherOpenHelper extends SQLiteOpenHelper {
 
       if (oldVersion < lokiV39) {
         executeStatements(db, ReactionDatabase.CREATE_INDEXS);
+      }
+
+      if (oldVersion < lokiV40) {
+        db.execSQL(ThreadDatabase.getUnreadMentionCountCommand());
+        db.execSQL(SmsDatabase.CREATE_HAS_MENTION_COMMAND);
+        db.execSQL(MmsDatabase.CREATE_HAS_MENTION_COMMAND);
       }
 
       db.setTransactionSuccessful();

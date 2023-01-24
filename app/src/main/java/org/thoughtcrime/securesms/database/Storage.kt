@@ -104,9 +104,9 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
         threadDb.setRead(threadId, updateLastSeen)
     }
 
-    override fun incrementUnread(threadId: Long, amount: Int) {
+    override fun incrementUnread(threadId: Long, amount: Int, unreadMentionAmount: Int) {
         val threadDb = DatabaseComponent.get(context).threadDatabase()
-        threadDb.incrementUnread(threadId, amount)
+        threadDb.incrementUnread(threadId, amount, unreadMentionAmount)
     }
 
     override fun updateThread(threadId: Long, unarchive: Boolean) {
@@ -465,7 +465,7 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
 
     override fun insertIncomingInfoMessage(context: Context, senderPublicKey: String, groupID: String, type: SignalServiceGroup.Type, name: String, members: Collection<String>, admins: Collection<String>, sentTimestamp: Long) {
         val group = SignalServiceGroup(type, GroupUtil.getDecodedGroupIDAsData(groupID), SignalServiceGroup.GroupType.SIGNAL, name, members.toList(), null, admins.toList())
-        val m = IncomingTextMessage(fromSerialized(senderPublicKey), 1, sentTimestamp, "", Optional.of(group), 0, true)
+        val m = IncomingTextMessage(fromSerialized(senderPublicKey), 1, sentTimestamp, "", Optional.of(group), 0, true, false)
         val updateData = UpdateMessageData.buildGroupUpdate(type, name, members)?.toJSON()
         val infoMessage = IncomingGroupMessage(m, groupID, updateData, true)
         val smsDB = DatabaseComponent.get(context).smsDatabase()
@@ -728,6 +728,7 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
             false,
             false,
             false,
+            false,
             Optional.absent(),
             Optional.absent(),
             Optional.absent(),
@@ -821,6 +822,7 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
                 false,
                 false,
                 true,
+                false,
                 Optional.absent(),
                 Optional.absent(),
                 Optional.absent(),

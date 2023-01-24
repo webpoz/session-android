@@ -135,7 +135,8 @@ object MockDataGenerator {
                                 Optional.absent(),
                                 0,
                                 false,
-                                -1
+                                -1,
+                                false
                             ),
                             (timestampNow - (index * 5000)),
                             false,
@@ -264,7 +265,8 @@ object MockDataGenerator {
                                 Optional.absent(),
                                 0,
                                 false,
-                                -1
+                                -1,
+                                false
                             ),
                             (timestampNow - (index * 5000)),
                             false,
@@ -389,7 +391,8 @@ object MockDataGenerator {
                                 Optional.absent(),
                                 0,
                                 false,
-                                -1
+                                -1,
+                                false
                             ),
                             (timestampNow - (index * 5000)),
                             false,

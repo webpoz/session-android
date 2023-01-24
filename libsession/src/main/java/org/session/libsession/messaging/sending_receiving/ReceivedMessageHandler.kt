@@ -189,22 +189,24 @@ private fun handleConfigurationMessage(message: ConfigurationMessage) {
     storage.addContacts(message.contacts)
 }
 
-fun MessageReceiver.handleUnsendRequest(message: UnsendRequest) {
+fun MessageReceiver.handleUnsendRequest(message: UnsendRequest): Long? {
     val userPublicKey = MessagingModuleConfiguration.shared.storage.getUserPublicKey()
-    if (message.sender != message.author && (message.sender != userPublicKey && userPublicKey != null)) { return }
+    if (message.sender != message.author && (message.sender != userPublicKey && userPublicKey != null)) { return null }
     val context = MessagingModuleConfiguration.shared.context
     val storage = MessagingModuleConfiguration.shared.storage
     val messageDataProvider = MessagingModuleConfiguration.shared.messageDataProvider
-    val timestamp = message.timestamp ?: return
-    val author = message.author ?: return
-    val messageIdToDelete = storage.getMessageIdInDatabase(timestamp, author) ?: return
+    val timestamp = message.timestamp ?: return null
+    val author = message.author ?: return null
+    val messageIdToDelete = storage.getMessageIdInDatabase(timestamp, author) ?: return null
     messageDataProvider.getServerHashForMessage(messageIdToDelete)?.let { serverHash ->
         SnodeAPI.deleteMessage(author, listOf(serverHash))
     }
-    messageDataProvider.updateMessageAsDeleted(timestamp, author)
+    val deletedMessageId = messageDataProvider.updateMessageAsDeleted(timestamp, author)
     if (!messageDataProvider.isOutgoingMessage(messageIdToDelete)) {
         SSKEnvironment.shared.notificationManager.updateNotification(context)
     }
+
+    return deletedMessageId
 }
 
 fun handleMessageRequestResponse(message: MessageRequestResponse) {
@@ -264,6 +266,7 @@ fun MessageReceiver.handleVisibleMessage(message: VisibleMessage,
     }
     // Parse quote if needed
     var quoteModel: QuoteModel? = null
+    var quoteMessageBody: String? = null
     if (message.quote != null && proto.dataMessage.hasQuote()) {
         val quote = proto.dataMessage.quote
 
@@ -275,6 +278,7 @@ fun MessageReceiver.handleVisibleMessage(message: VisibleMessage,
 
         val messageDataProvider = MessagingModuleConfiguration.shared.messageDataProvider
         val messageInfo = messageDataProvider.getMessageForQuote(quote.id, author)
+        quoteMessageBody = messageInfo?.third
         quoteModel = if (messageInfo != null) {
             val attachments = if (messageInfo.second) messageDataProvider.getAttachmentsAndLinkPreviewFor(messageInfo.first) else ArrayList()
             QuoteModel(quote.id, author,null,false, attachments)
@@ -321,6 +325,20 @@ fun MessageReceiver.handleVisibleMessage(message: VisibleMessage,
             storage.removeReaction(reaction.emoji!!, reaction.timestamp!!, reaction.publicKey!!, threadIsGroup)
         }
     } ?: run {
+        // A user is mentioned if their public key is in the body of a message or one of their messages
+        // was quoted
+        val messageText = message.text
+        message.hasMention = listOf(userPublicKey, userBlindedKey)
+            .filterNotNull()
+            .any { key ->
+                return@any (
+                    messageText != null &&
+                    messageText.contains("@$key")
+                ) || (
+                    (quoteModel?.author?.serialize() ?: "") == key
+                )
+            }
+
         // Persist the message
         message.threadID = threadID
         val messageID =
