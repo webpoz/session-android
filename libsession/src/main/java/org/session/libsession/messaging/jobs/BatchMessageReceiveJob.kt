@@ -167,10 +167,15 @@ class BatchMessageReceiveJob(
                         // increment unreads, notify, and update thread
                         val unreadFromMine = messageIds.map { it.value.first }.indexOfLast { it }
                         var trueUnreadCount = messageIds.filter { !it.value.first }.size
-                        val trueUnreadMentionCount = messageIds.filter { !it.value.first && it.value.second }.size
+                        var trueUnreadMentionCount = messageIds.filter { !it.value.first && it.value.second }.size
                         if (unreadFromMine >= 0) {
-                            trueUnreadCount -= (unreadFromMine + 1)
                             storage.markConversationAsRead(threadId, false)
+
+                            val trueUnreadIds = messageIds.keys.toList().subList(unreadFromMine + 1, messageIds.keys.count())
+                            trueUnreadCount = trueUnreadIds.size
+                            trueUnreadMentionCount = messageIds
+                                    .filter { trueUnreadIds.contains(it.key) && !it.value.first && it.value.second }
+                                    .size
                         }
                         if (trueUnreadCount > 0) {
                             storage.incrementUnread(threadId, trueUnreadCount, trueUnreadMentionCount)
