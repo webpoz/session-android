@@ -370,6 +370,7 @@
         <item name="message_received_text_color">@color/classic_dark_6</item>
         <item name="message_sent_background_color">?colorAccent</item>
         <item name="message_sent_text_color">@color/classic_dark_0</item>
+        <item name="message_status_color">@color/classic_dark_5</item>
         <item name="input_bar_background">@color/classic_dark_1</item>
         <item name="input_bar_text_hint">@color/classic_dark_5</item>
         <item name="input_bar_text_user">@color/classic_dark_6</item>
@@ -454,6 +455,7 @@
         <item name="message_received_text_color">@color/classic_light_0</item>
         <item name="message_sent_background_color">?colorAccent</item>
         <item name="message_sent_text_color">@color/classic_light_0</item>
+        <item name="message_status_color">@color/classic_light_1</item>
         <item name="input_bar_background">@color/classic_light_6</item>
         <item name="input_bar_text_hint">@color/classic_light_1</item>
         <item name="input_bar_text_user">@color/classic_light_0</item>
@@ -535,6 +537,7 @@
         <item name="message_received_text_color">@color/ocean_dark_7</item>
         <item name="message_sent_background_color">?colorAccent</item>
         <item name="message_sent_text_color">@color/ocean_dark_0</item>
+        <item name="message_status_color">@color/ocean_dark_5</item>
         <item name="input_bar_background">@color/ocean_dark_1</item>
         <item name="input_bar_text_hint">@color/ocean_dark_5</item>
         <item name="input_bar_text_user">@color/ocean_dark_7</item>
@@ -618,6 +621,7 @@
         <item name="message_received_text_color">@color/ocean_light_1</item>
         <item name="message_sent_background_color">?colorAccent</item>
         <item name="message_sent_text_color">@color/ocean_light_1</item>
+        <item name="message_status_color">@color/ocean_light_2</item>
         <item name="input_bar_background">@color/ocean_light_7</item>
         <item name="input_bar_text_hint">@color/ocean_light_2</item>
         <item name="input_bar_text_user">@color/ocean_light_1</item>
