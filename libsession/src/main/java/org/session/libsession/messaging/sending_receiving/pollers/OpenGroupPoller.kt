@@ -165,14 +165,16 @@ class OpenGroupPoller(private val server: String, private val executorService: S
                 pollInfo.details.imageId != null && (
                     pollInfo.details.imageId != existingOpenGroup.imageId ||
                     !storage.hasDownloadedProfilePicture(dbGroupId)
-                )
+                ) &&
+                storage.getGroupAvatarDownloadJob(openGroup.server, openGroup.room, pollInfo.details.imageId) == null
             ) || (
                 pollInfo.details == null &&
                 existingOpenGroup.imageId != null &&
-                !storage.hasDownloadedProfilePicture(dbGroupId)
+                !storage.hasDownloadedProfilePicture(dbGroupId) &&
+                storage.getGroupAvatarDownloadJob(openGroup.server, openGroup.room, existingOpenGroup.imageId) == null
             )
         ) {
-            JobQueue.shared.add(GroupAvatarDownloadJob(roomToken, server))
+            JobQueue.shared.add(GroupAvatarDownloadJob(roomToken, server, existingOpenGroup.imageId))
         }
     }
 

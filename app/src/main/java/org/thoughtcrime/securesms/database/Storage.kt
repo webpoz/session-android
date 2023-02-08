@@ -226,8 +226,8 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
         return DatabaseComponent.get(context).sessionJobDatabase().getMessageReceiveJob(messageReceiveJobID)
     }
 
-    override fun getGroupAvatarDownloadJob(server: String, room: String): GroupAvatarDownloadJob? {
-        return DatabaseComponent.get(context).sessionJobDatabase().getGroupAvatarDownloadJob(server, room)
+    override fun getGroupAvatarDownloadJob(server: String, room: String, imageId: String?): GroupAvatarDownloadJob? {
+        return DatabaseComponent.get(context).sessionJobDatabase().getGroupAvatarDownloadJob(server, room, imageId)
     }
 
     override fun resumeMessageSendJobIfNeeded(messageSendJobID: String) {
