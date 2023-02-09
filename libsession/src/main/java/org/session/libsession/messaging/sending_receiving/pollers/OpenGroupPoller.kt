@@ -159,6 +159,7 @@ class OpenGroupPoller(private val server: String, private val executorService: S
             })
         }
 
+        // Update the group avatar
         if (
             (
                 pollInfo.details != null &&
@@ -174,7 +175,14 @@ class OpenGroupPoller(private val server: String, private val executorService: S
                 storage.getGroupAvatarDownloadJob(openGroup.server, openGroup.room, existingOpenGroup.imageId) == null
             )
         ) {
-            JobQueue.shared.add(GroupAvatarDownloadJob(roomToken, server, existingOpenGroup.imageId))
+            JobQueue.shared.add(GroupAvatarDownloadJob(server, roomToken, existingOpenGroup.imageId))
+        }
+        else if (
+            pollInfo.details != null &&
+            pollInfo.details.imageId == null &&
+            existingOpenGroup.imageId != null
+        ) {
+            storage.removeProfilePicture(dbGroupId)
         }
     }
 

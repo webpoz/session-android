@@ -68,8 +68,8 @@ class GroupAvatarDownloadJob(val server: String, val room: String, val imageId: 
 
         override fun create(data: Data): GroupAvatarDownloadJob {
             return GroupAvatarDownloadJob(
-                data.getString(ROOM),
                 data.getString(SERVER),
+                data.getString(ROOM),
                 if (data.hasString(IMAGE_ID)) { data.getString(IMAGE_ID) } else { null }
             )
         }

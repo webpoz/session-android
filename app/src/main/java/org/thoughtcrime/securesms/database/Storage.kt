@@ -324,6 +324,10 @@ class Storage(context: Context, helper: SQLCipherOpenHelper) : Database(context,
         DatabaseComponent.get(context).groupDatabase().updateProfilePicture(groupID, newValue)
     }
 
+    override fun removeProfilePicture(groupID: String) {
+        DatabaseComponent.get(context).groupDatabase().removeProfilePicture(groupID)
+    }
+
     override fun hasDownloadedProfilePicture(groupID: String): Boolean {
         return DatabaseComponent.get(context).groupDatabase().hasDownloadedProfilePicture(groupID)
     }
