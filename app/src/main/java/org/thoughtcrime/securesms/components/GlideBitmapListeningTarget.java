@@ -30,8 +30,10 @@ public class GlideBitmapListeningTarget extends BitmapImageViewTarget {
     super.setResource(resource);
     loaded.set(true);
 
-    if (loadingView.get() != null) {
-      loadingView.get().setVisibility(View.GONE);
+    View loadingViewInstance = loadingView.get();
+
+    if (loadingViewInstance != null) {
+      loadingViewInstance.setVisibility(View.GONE);
     }
   }
 
@@ -40,8 +42,10 @@ public class GlideBitmapListeningTarget extends BitmapImageViewTarget {
     super.onLoadFailed(errorDrawable);
     loaded.set(true);
 
-    if (loadingView.get() != null) {
-      loadingView.get().setVisibility(View.GONE);
+    View loadingViewInstance = loadingView.get();
+
+    if (loadingViewInstance != null) {
+      loadingViewInstance.setVisibility(View.GONE);
     }
   }
 }
