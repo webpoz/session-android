@@ -43,7 +43,6 @@ class NewConversationHomeFragment : Fragment() {
         binding.closeButton.setOnClickListener { delegate.onDialogClosePressed() }
         binding.createPrivateChatButton.setOnClickListener { delegate.onNewMessageSelected() }
         binding.createClosedGroupButton.setOnClickListener { delegate.onCreateGroupSelected() }
-        binding.joinCommunityButton.setOnClickListener { delegate.onJoinCommunitySelected() }
         val adapter = ContactListAdapter(requireContext(), GlideApp.with(requireContext())) {
             delegate.onContactSelected(it.address.serialize())
         }
