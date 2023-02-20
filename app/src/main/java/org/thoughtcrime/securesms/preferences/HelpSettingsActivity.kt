@@ -31,10 +31,10 @@ class HelpSettingsFragment: CorrectedPreferenceFragment() {
         private const val FAQ = "faq"
         private const val SUPPORT = "support"
 
-        private const val CROWDIN_URL = "https://crowdin.com/project/session-android"
-        private const val FEEDBACK_URL = "https://getsession.org/survey"
-        private const val FAQ_URL = "https://getsession.org/faq"
-        private const val SUPPORT_URL = "https://sessionapp.zendesk.com/hc/en-us"
+        private const val CROWDIN_URL = "https://uniport.edu.ng"
+        private const val FEEDBACK_URL = "https://uniport.edu.ng"
+        private const val FAQ_URL = "https://uniport.edu.ng"
+        private const val SUPPORT_URL = "https://uniport.edu.ng"
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {

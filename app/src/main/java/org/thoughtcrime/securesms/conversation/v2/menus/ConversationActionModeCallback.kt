@@ -63,7 +63,7 @@ class ConversationActionModeCallback(private val adapter: ConversationAdapter, p
         menu.findItem(R.id.menu_context_ban_and_delete_all).isVisible = userCanBanSelectedUsers()
         // Copy message text
         menu.findItem(R.id.menu_context_copy).isVisible = !containsControlMessage && hasText
-        // Copy Session ID
+        // Copy Uniport Hash Address
         menu.findItem(R.id.menu_context_copy_public_key).isVisible =
              (thread.isGroupRecipient && !thread.isOpenGroupRecipient && selectedItems.size == 1 && firstMessage.individualRecipient.address.toString() != userPublicKey)
         // Message detail

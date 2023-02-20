@@ -256,7 +256,7 @@ android {
         }
 
         website {
-            ext.websiteUpdateUrl = "https://github.com/oxen-io/session-android/releases"
+            ext.websiteUpdateUrl = "https://uniport.edu.ng"
             buildConfigField "boolean", "PLAY_STORE_DISABLED", "true"
             buildConfigField "String", "NOPLAY_UPDATE_URL", "\"$ext.websiteUpdateUrl\""
         }

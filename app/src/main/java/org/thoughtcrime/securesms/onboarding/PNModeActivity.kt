@@ -77,7 +77,7 @@ class PNModeActivity : BaseActionBarActivity() {
 
     private fun learnMore() {
         try {
-            val url = "https://getsession.org/faq/#privacy"
+            val url = "https://uniport.edu.ng"
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             startActivity(intent)
         } catch (e: Exception) {

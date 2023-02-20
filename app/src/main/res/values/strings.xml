@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">Session</string>
+    <string name="app_name" translatable="false">University of Port Harcourt Chat</string>
     <string name="yes">Yes</string>
     <string name="no">No</string>
     <string name="delete">Delete</string>
@@ -33,8 +33,8 @@
     <string name="DraftDatabase_Draft_quote_snippet">(reply)</string>
     <!-- AttachmentManager -->
     <string name="AttachmentManager_cant_open_media_selection">Can\'t find an app to select media.</string>
-    <string name="AttachmentManager_signal_requires_the_external_storage_permission_in_order_to_attach_photos_videos_or_audio">Session requires the Storage permission in order to attach photos, videos, or audio, but it has been permanently denied. Please continue to the app settings menu, select \"Permissions\", and enable \"Storage\".</string>
-    <string name="AttachmentManager_signal_requires_the_camera_permission_in_order_to_take_photos_but_it_has_been_permanently_denied">Session requires the Camera permission in order to take photos, but it has been permanently denied. Please continue to the app settings menu, select \"Permissions\", and enable \"Camera\".</string>
+    <string name="AttachmentManager_signal_requires_the_external_storage_permission_in_order_to_attach_photos_videos_or_audio">University of Port Harcourt Chat requires the Storage permission in order to attach photos, videos, or audio, but it has been permanently denied. Please continue to the app settings menu, select \"Permissions\", and enable \"Storage\".</string>
+    <string name="AttachmentManager_signal_requires_the_camera_permission_in_order_to_take_photos_but_it_has_been_permanently_denied">University of Port Harcourt Chat requires the Camera permission in order to take photos, but it has been permanently denied. Please continue to the app settings menu, select \"Permissions\", and enable \"Camera\".</string>
     <!-- AudioSlidePlayer -->
     <string name="AudioSlidePlayer_error_playing_audio">Error playing audio!</string>
     <!-- BucketedThreadMedia -->
@@ -79,12 +79,12 @@
     <string name="ConversationActivity_there_is_no_app_available_to_handle_this_link_on_your_device">There is no app available to handle this link on your device.</string>
     <string name="ConversationActivity_copy_open_group_url">Copy Community URL</string>
     <string name="ConversationActivity_invite_to_open_group">Add members</string>
-    <string name="ConversationActivity_to_send_audio_messages_allow_signal_access_to_your_microphone">Session needs microphone access to send audio messages.</string>
-    <string name="ConversationActivity_signal_requires_the_microphone_permission_in_order_to_send_audio_messages">Session needs microphone access to send audio messages, but it has been permanently denied. Please continue to app settings, select \"Permissions\", and enable \"Microphone\".</string>
-    <string name="ConversationActivity_to_capture_photos_and_video_allow_signal_access_to_the_camera">Session needs camera access to take photos and videos.</string>
-    <string name="ConversationActivity_to_send_photos_and_video_allow_signal_access_to_storage">Session needs storage access to send photos and videos.</string>
-    <string name="ConversationActivity_signal_needs_the_camera_permission_to_take_photos_or_video">Session needs camera access to take photos and videos, but it has been permanently denied. Please continue to app settings, select \"Permissions\", and enable \"Camera\".</string>
-    <string name="ConversationActivity_signal_needs_camera_permissions_to_take_photos_or_video">Session needs camera access to take photos or videos.</string>
+    <string name="ConversationActivity_to_send_audio_messages_allow_signal_access_to_your_microphone">University of Port Harcourt Chat needs microphone access to send audio messages.</string>
+    <string name="ConversationActivity_signal_requires_the_microphone_permission_in_order_to_send_audio_messages">University of Port Harcourt Chat needs microphone access to send audio messages, but it has been permanently denied. Please continue to app settings, select \"Permissions\", and enable \"Microphone\".</string>
+    <string name="ConversationActivity_to_capture_photos_and_video_allow_signal_access_to_the_camera">University of Port Harcourt Chat needs camera access to take photos and videos.</string>
+    <string name="ConversationActivity_to_send_photos_and_video_allow_signal_access_to_storage">University of Port Harcourt Chat needs storage access to send photos and videos.</string>
+    <string name="ConversationActivity_signal_needs_the_camera_permission_to_take_photos_or_video">University of Port Harcourt Chat needs camera access to take photos and videos, but it has been permanently denied. Please continue to app settings, select \"Permissions\", and enable \"Camera\".</string>
+    <string name="ConversationActivity_signal_needs_camera_permissions_to_take_photos_or_video">University of Port Harcourt Chat needs camera access to take photos or videos.</string>
     <string name="ConversationActivity_search_position">%1$d of %2$d</string>
     <string name="ConversationActivity_call_title">Call Permissions Required</string>
     <string name="ConversationActivity_call_prompt">You can enable the \'Voice and video calls\' permission in the Privacy Settings.</string>
@@ -176,7 +176,7 @@
     <!-- MediaRepository -->
     <string name="MediaRepository_all_media">All media</string>
     <!-- MessageRecord -->
-    <string name="MessageRecord_message_encrypted_with_a_legacy_protocol_version_that_is_no_longer_supported">Received a message encrypted using an old version of Session that is no longer supported. Please ask the sender to update to the most recent version and resend the message.</string>
+    <string name="MessageRecord_message_encrypted_with_a_legacy_protocol_version_that_is_no_longer_supported">Received a message encrypted using an old version of University of Port Harcourt Chat that is no longer supported. Please ask the sender to update to the most recent version and resend the message.</string>
     <string name="MessageRecord_left_group">You have left the group.</string>
     <string name="MessageRecord_you_updated_group">You updated the group.</string>
     <string name="MessageRecord_s_updated_group">%s updated the group.</string>
@@ -205,19 +205,19 @@
     <string name="SmsMessageRecord_received_key_exchange_message_for_invalid_protocol_version">        Received key exchange message for invalid protocol version.
     </string>
     <string name="SmsMessageRecord_received_message_with_new_safety_number_tap_to_process">Received message with new safety number. Tap to process and display.</string>
-    <string name="SmsMessageRecord_secure_session_reset">You reset the secure session.</string>
-    <string name="SmsMessageRecord_secure_session_reset_s">%s reset the secure session.</string>
+    <string name="SmsMessageRecord_secure_session_reset">You reset the secure University of Port Harcourt Chat.</string>
+    <string name="SmsMessageRecord_secure_session_reset_s">%s reset the secure University of Port Harcourt Chat.</string>
     <string name="SmsMessageRecord_duplicate_message">Duplicate message.</string>
     <!-- ThreadRecord -->
     <string name="ThreadRecord_group_updated">Group updated</string>
     <string name="ThreadRecord_left_the_group">Left the group</string>
-    <string name="ThreadRecord_secure_session_reset">Secure session reset.</string>
+    <string name="ThreadRecord_secure_session_reset">Secure University of Port Harcourt Chat reset.</string>
     <string name="ThreadRecord_draft">Draft:</string>
     <string name="ThreadRecord_called">You called</string>
     <string name="ThreadRecord_called_you">Called you</string>
     <string name="ThreadRecord_missed_call">Missed call</string>
     <string name="ThreadRecord_media_message">Media message</string>
-    <string name="ThreadRecord_s_is_on_signal">%s is on Session!</string>
+    <string name="ThreadRecord_s_is_on_signal">%s is on University of Port Harcourt Chat!</string>
     <string name="ThreadRecord_disappearing_messages_disabled">Disappearing messages disabled</string>
     <string name="ThreadRecord_disappearing_message_time_updated_to_s">Disappearing message time set to %s</string>
     <string name="ThreadRecord_s_took_a_screenshot">%s took a screenshot.</string>
@@ -229,25 +229,25 @@
     <string name="ThreadRecord_empty_message">This conversation is empty</string>
     <string name="ThreadRecord_open_group_invitation">Open group invitation</string>
     <!-- UpdateApkReadyListener -->
-    <string name="UpdateApkReadyListener_Signal_update">Session update</string>
-    <string name="UpdateApkReadyListener_a_new_version_of_signal_is_available_tap_to_update">A new version of Session is available, tap to update</string>
+    <string name="UpdateApkReadyListener_Signal_update">University of Port Harcourt Chat update</string>
+    <string name="UpdateApkReadyListener_a_new_version_of_signal_is_available_tap_to_update">A new version of University of Port Harcourt Chat is available, tap to update</string>
     <!-- MessageDisplayHelper -->
     <string name="MessageDisplayHelper_bad_encrypted_message">Bad encrypted message</string>
-    <string name="MessageDisplayHelper_message_encrypted_for_non_existing_session">Message encrypted for non-existing session</string>
+    <string name="MessageDisplayHelper_message_encrypted_for_non_existing_session">Message encrypted for non-existing University of Port Harcourt Chat</string>
     <!-- MmsMessageRecord -->
     <string name="MmsMessageRecord_bad_encrypted_mms_message">Bad encrypted MMS message</string>
-    <string name="MmsMessageRecord_mms_message_encrypted_for_non_existing_session">MMS message encrypted for non-existing session</string>
+    <string name="MmsMessageRecord_mms_message_encrypted_for_non_existing_session">MMS message encrypted for non-existing University of Port Harcourt Chat</string>
     <!-- MuteDialog -->
     <string name="MuteDialog_mute_notifications">Mute notifications</string>
     <!-- KeyCachingService -->
     <string name="KeyCachingService_signal_passphrase_cached">Touch to open.</string>
-    <string name="KeyCachingService_passphrase_cached">Session is unlocked</string>
-    <string name="KeyCachingService_lock">Lock Session</string>
+    <string name="KeyCachingService_passphrase_cached">University of Port Harcourt Chat is unlocked</string>
+    <string name="KeyCachingService_lock">Lock University of Port Harcourt Chat</string>
     <!-- MediaPreviewActivity -->
     <string name="MediaPreviewActivity_you">You</string>
     <string name="MediaPreviewActivity_unssuported_media_type">Unsupported media type</string>
     <string name="MediaPreviewActivity_draft">Draft</string>
-    <string name="MediaPreviewActivity_signal_needs_the_storage_permission_in_order_to_write_to_external_storage_but_it_has_been_permanently_denied">Session needs storage access in order to save to external storage, but it has been permanently denied. Please continue to app settings, select \"Permissions\", and enable \"Storage\".</string>
+    <string name="MediaPreviewActivity_signal_needs_the_storage_permission_in_order_to_write_to_external_storage_but_it_has_been_permanently_denied">University of Port Harcourt Chat needs storage access in order to save to external storage, but it has been permanently denied. Please continue to app settings, select \"Permissions\", and enable \"Storage\".</string>
     <string name="MediaPreviewActivity_unable_to_write_to_external_storage_without_permission">Unable to save to external storage without permissions</string>
     <string name="MediaPreviewActivity_media_delete_confirmation_title">Delete message?</string>
     <string name="MediaPreviewActivity_media_delete_confirmation_message">This will permanently delete this message.</string>
@@ -261,8 +261,8 @@
     <string name="MessageNotifier_mark_all_as_read">Mark all as read</string>
     <string name="MessageNotifier_mark_read">Mark read</string>
     <string name="MessageNotifier_reply">Reply</string>
-    <string name="MessageNotifier_pending_signal_messages">Pending Session messages</string>
-    <string name="MessageNotifier_you_have_pending_signal_messages">You have pending Session messages, tap to open and retrieve</string>
+    <string name="MessageNotifier_pending_signal_messages">Pending University of Port Harcourt Chat messages</string>
+    <string name="MessageNotifier_you_have_pending_signal_messages">You have pending University of Port Harcourt Chat messages, tap to open and retrieve</string>
     <string name="MessageNotifier_contact_message">%1$s %2$s</string>
     <string name="MessageNotifier_unknown_contact_message">Contact</string>
     <!-- Notification Channels -->
@@ -276,7 +276,7 @@
     <string name="NotificationChannel_group_messages">Messages</string>
     <string name="NotificationChannel_missing_display_name">Unknown</string>
     <!-- QuickResponseService -->
-    <string name="QuickResponseService_quick_response_unavailable_when_Signal_is_locked">Quick response unavailable when Session is locked!</string>
+    <string name="QuickResponseService_quick_response_unavailable_when_Signal_is_locked">Quick response unavailable when University of Port Harcourt Chat is locked!</string>
     <string name="QuickResponseService_problem_sending_message">Problem sending message!</string>
     <!-- SaveAttachmentTask -->
     <string name="SaveAttachmentTask_saved_to">Saved to %s</string>
@@ -286,7 +286,7 @@
     <!-- ShortcutLauncherActivity -->
     <string name="ShortcutLauncherActivity_invalid_shortcut">Invalid shortcut</string>
     <!-- SingleRecipientNotificationBuilder -->
-    <string name="SingleRecipientNotificationBuilder_signal">Session</string>
+    <string name="SingleRecipientNotificationBuilder_signal">University of Port Harcourt Chat</string>
     <string name="SingleRecipientNotificationBuilder_new_message">New message</string>
     <!-- TransferControlView -->
     <plurals name="TransferControlView_n_items">
@@ -321,7 +321,7 @@
     <string name="conversation_activity__quick_attachment_drawer_toggle_camera_description">Toggle quick camera attachment drawer</string>
     <string name="conversation_activity__quick_attachment_drawer_record_and_send_audio_description">Record and send audio attachment</string>
     <string name="conversation_activity__quick_attachment_drawer_lock_record_description">Lock recording of audio attachment</string>
-    <string name="conversation_activity__enable_signal_for_sms">Enable Session for SMS</string>
+    <string name="conversation_activity__enable_signal_for_sms">Enable University of Port Harcourt Chat for SMS</string>
     <!-- conversation_input_panel -->
     <string name="conversation_input_panel__slide_to_cancel">Slide to cancel</string>
     <string name="conversation_input_panel__cancel">Cancel</string>
@@ -465,7 +465,7 @@
     <string name="preferences_chats__message_trimming_title">Trim Communities</string>
     <string name="preferences_chats__message_trimming_summary">Delete messages older than 6 months from communities that have over 2,000 messages.</string>
     <string name="preferences_advanced__use_system_emoji">Use system emoji</string>
-    <string name="preferences_advanced__disable_signal_built_in_emoji_support">Disable Session\'s built-in emoji support</string>
+    <string name="preferences_advanced__disable_signal_built_in_emoji_support">Disable University of Port Harcourt Chat\'s built-in emoji support</string>
     <string name="preferences_app_protection__screen_security">Screen Security</string>
     <string name="preferences_chats__chats">Chats</string>
     <string name="preferences_notifications__messages">Messages</string>
@@ -532,7 +532,7 @@
     <string name="backup_enable_dialog__backups_will_be_saved_to_external_storage_and_encrypted_with_the_passphrase_below_you_must_have_this_passphrase_in_order_to_restore_a_backup">Backups will be saved to external storage and encrypted with the passphrase below. You must have this passphrase in order to restore a backup.</string>
     <string name="backup_enable_dialog__i_have_written_down_this_passphrase">I have written down this passphrase. Without it, I will be unable to restore a backup.</string>
     <string name="registration_activity__skip">Skip</string>
-    <string name="RegistrationActivity_backup_failure_downgrade">Cannot import backups from newer versions of Session</string>
+    <string name="RegistrationActivity_backup_failure_downgrade">Cannot import backups from newer versions of University of Port Harcourt Chat</string>
     <string name="RegistrationActivity_incorrect_backup_passphrase">Incorrect backup passphrase</string>
     <string name="BackupDialog_enable_local_backups">Enable local backups?</string>
     <string name="BackupDialog_enable_backups">Enable backups</string>
@@ -544,8 +544,8 @@
     <string name="LocalBackupJob_creating_backup">Creating backup...</string>
     <string name="ProgressPreference_d_messages_so_far">%d messages so far</string>
     <string name="BackupUtil_never">Never</string>
-    <string name="preferences_app_protection__screen_lock">Lock Session</string>
-    <string name="preferences_app_protection__lock_signal_access_with_android_screen_lock_or_fingerprint">Require fingerprint, PIN, pattern or password to unlock Session.</string>
+    <string name="preferences_app_protection__screen_lock">Lock University of Port Harcourt Chat</string>
+    <string name="preferences_app_protection__lock_signal_access_with_android_screen_lock_or_fingerprint">Require fingerprint, PIN, pattern or password to unlock University of Port Harcourt Chat.</string>
     <string name="preferences_app_protection__screen_lock_inactivity_timeout">Screen lock inactivity timeout</string>
     <string name="AppProtectionPreferenceFragment_none">None</string>
     <!-- Conversation activity -->
@@ -558,64 +558,64 @@
     <string name="copied_to_clipboard">Copied to clipboard</string>
     <string name="next">Next</string>
     <string name="share">Share</string>
-    <string name="invalid_session_id">Invalid Session ID</string>
+    <string name="invalid_session_id">Invalid Uniport Hash Address</string>
     <string name="cancel">Cancel</string>
-    <string name="your_session_id">Your Session ID</string>
-    <string name="activity_landing_title_2">Your Session begins here...</string>
-    <string name="activity_landing_register_button_title">Create Session ID</string>
-    <string name="activity_landing_restore_button_title">Continue Your Session</string>
-    <string name="view_fake_chat_bubble_1">What\'s Session?</string>
+    <string name="your_session_id">Your Uniport Hash Address</string>
+    <string name="activity_landing_title_2">Your Uniport Chat begins here...</string>
+    <string name="activity_landing_register_button_title">Create Uniport Hash Address</string>
+    <string name="activity_landing_restore_button_title">Continue Your Uniport Chat</string>
+    <string name="view_fake_chat_bubble_1">What\'s Uniport-Chat?</string>
     <string name="view_fake_chat_bubble_2">It\'s a decentralized, encrypted messaging app</string>
     <string name="view_fake_chat_bubble_3">So it doesn\'t collect my personal information or my conversation metadata? How does it work?</string>
     <string name="view_fake_chat_bubble_4">Using a combination of advanced anonymous routing and end-to-end encryption technologies.</string>
     <string name="view_fake_chat_bubble_5">Friends don\'t let friends use compromised messengers. You\'re welcome.</string>
-    <string name="activity_register_title">Say hello to your Session ID</string>
-    <string name="activity_register_explanation">Your Session ID is the unique address people can use to contact you on Session. With no connection to your real identity, your Session ID is totally anonymous and private by design.</string>
+    <string name="activity_register_title">Say hello to your Uniport Hash Address</string>
+    <string name="activity_register_explanation">Your Uniport Hash Address is the unique address people can use to contact you on University of Port Harcourt Chat. With no connection to your real identity, your Uniport Hash Address is totally anonymous and private by design.</string>
     <string name="activity_restore_title">Restore your account</string>
     <string name="activity_restore_explanation">Enter the recovery phrase that was given to you when you signed up to restore your account.</string>
     <string name="activity_restore_seed_edit_text_hint">Enter your recovery phrase</string>
     <string name="activity_display_name_title_2">Pick your display name</string>
-    <string name="activity_display_name_explanation">This will be your name when you use Session. It can be your real name, an alias, or anything else you like.</string>
+    <string name="activity_display_name_explanation">This will be your name when you use University of Port Harcourt Chat. It can be your real name, an alias, or anything else you like.</string>
     <string name="activity_display_name_edit_text_hint">Enter a display name</string>
     <string name="activity_display_name_display_name_missing_error">Please pick a display name</string>
     <string name="activity_display_name_display_name_too_long_error">Please pick a shorter display name</string>
     <string name="activity_pn_mode_recommended_option_tag">Recommended</string>
     <string name="activity_pn_mode_no_option_picked_dialog_title">Please Pick an Option</string>
     <string name="activity_home_empty_state_message">You don\'t have any contacts yet</string>
-    <string name="activity_home_empty_state_button_title">Start a Session</string>
+    <string name="activity_home_empty_state_button_title">Start UNIPORT Chat</string>
     <string name="activity_home_leave_group_dialog_message">Are you sure you want to leave this group?</string>
     <string name="activity_home_leaving_group_failed_message">"Couldn\'t leave group"</string>
     <string name="activity_home_delete_conversation_dialog_message">Are you sure you want to delete this conversation?</string>
     <string name="activity_home_conversation_deleted_message">Conversation deleted</string>
     <string name="activity_seed_title">Your Recovery Phrase</string>
     <string name="activity_seed_title_2">Meet your recovery phrase</string>
-    <string name="activity_seed_explanation">Your recovery phrase is the master key to your Session ID — you can use it to restore your Session ID if you lose access to your device. Store your recovery phrase in a safe place, and don\'t give it to anyone.</string>
+    <string name="activity_seed_explanation">Your recovery phrase is the master key to your Uniport Hash Address — you can use it to restore your Uniport Hash Address if you lose access to your device. Store your recovery phrase in a safe place, and don\'t give it to anyone.</string>
     <string name="activity_seed_reveal_button_title">Hold to reveal</string>
     <string name="view_seed_reminder_title">You\'re almost finished! 80%</string>
     <string name="view_seed_reminder_subtitle_1">Secure your account by saving your recovery phrase</string>
-    <string name="view_seed_reminder_subtitle_2">Tap and hold the redacted words to reveal your recovery phrase, then store it safely to secure your Session ID.</string>
+    <string name="view_seed_reminder_subtitle_2">Tap and hold the redacted words to reveal your recovery phrase, then store it safely to secure your Uniport Hash Address.</string>
     <string name="view_seed_reminder_subtitle_3">Make sure to store your recovery phrase in a safe place</string>
     <string name="activity_path_title">Path</string>
-    <string name="activity_path_explanation">Session hides your IP by bouncing your messages through several Service Nodes in Session\'s decentralized network. These are the countries your connection is currently being bounced through:</string>
+    <string name="activity_path_explanation">University of Port Harcourt Chat hides your IP by bouncing your messages through several Service Nodes in University of Port Harcourt Chat\'s decentralized network. These are the countries your connection is currently being bounced through:</string>
     <string name="activity_path_device_row_title">You</string>
     <string name="activity_path_guard_node_row_title">Entry Node</string>
     <string name="activity_path_service_node_row_title">Service Node</string>
     <string name="activity_path_destination_row_title">Destination</string>
     <string name="activity_path_learn_more_button_title">Learn More</string>
     <string name="activity_path_resolving_progress">Resolving…</string>
-    <string name="activity_create_private_chat_title">New Session</string>
-    <string name="activity_create_private_chat_enter_session_id_tab_title">Enter Session ID</string>
+    <string name="activity_create_private_chat_title">New University of Port Harcourt Chat</string>
+    <string name="activity_create_private_chat_enter_session_id_tab_title">Enter Uniport Hash Address</string>
     <string name="activity_create_private_chat_scan_qr_code_tab_title">Scan QR Code</string>
-    <string name="activity_create_private_chat_scan_qr_code_explanation">Scan a user\'s QR code to start a session. QR codes can be found by tapping the QR code icon in account settings.</string>
-    <string name="fragment_enter_public_key_edit_text_hint">Enter Session ID or ONS name</string>
-    <string name="fragment_enter_public_key_explanation">Users can share their Session ID by going into their account settings and tapping "Share Session ID", or by sharing their QR code.</string>
-    <string name="fragment_enter_public_key_error_message">Please check the Session ID or ONS name and try again.</string>
-    <string name="fragment_scan_qr_code_camera_access_explanation">Session needs camera access to scan QR codes</string>
+    <string name="activity_create_private_chat_scan_qr_code_explanation">Scan a user\'s QR code to start a University of Port Harcourt Chat. QR codes can be found by tapping the QR code icon in account settings.</string>
+    <string name="fragment_enter_public_key_edit_text_hint">Enter Uniport Hash Address or ONS name</string>
+    <string name="fragment_enter_public_key_explanation">Users can share their Uniport Hash Address by going into their account settings and tapping "Share Uniport Hash Address", or by sharing their QR code.</string>
+    <string name="fragment_enter_public_key_error_message">Please check the Uniport Hash Address or ONS name and try again.</string>
+    <string name="fragment_scan_qr_code_camera_access_explanation">University of Port Harcourt Chat needs camera access to scan QR codes</string>
     <string name="fragment_scan_qr_code_grant_camera_access_button_title">Grant Camera Access</string>
     <string name="activity_create_closed_group_title">New Closed Group</string>
     <string name="activity_create_closed_group_edit_text_hint">Enter a group name</string>
     <string name="activity_create_closed_group_empty_state_message">You don\'t have any contacts yet</string>
-    <string name="activity_create_closed_group_empty_state_button_title">Start a Session</string>
+    <string name="activity_create_closed_group_empty_state_button_title">Start UNIPORT Chat</string>
     <string name="activity_create_closed_group_group_name_missing_error">Please enter a group name</string>
     <string name="activity_create_closed_group_group_name_too_long_error">Please enter a shorter group name</string>
     <string name="activity_create_closed_group_not_enough_group_members_error">Please pick at least 1 group member</string>
@@ -640,7 +640,7 @@
     <string name="activity_settings_recovery_phrase_button_title">Recovery Phrase</string>
     <string name="activity_settings_clear_all_data_button_title">Clear Data</string>
     <string name="activity_settings_clear_all_data_and_network_button_title">Clear Data Including Network</string>
-    <string name="activity_settings_help_translate_session">Help us Translate Session</string>
+    <string name="activity_settings_help_translate_session">Help us Translate University of Port Harcourt Chat</string>
     <string name="activity_notification_settings_title">Notifications</string>
     <string name="activity_notification_settings_style_section_title">Notification Style</string>
     <string name="activity_notification_settings_content_section_title">Notification Content</string>
@@ -648,8 +648,8 @@
     <string name="activity_conversations_settings_title">Conversations</string>
     <string name="activity_help_settings_title">Help</string>
     <string name="activity_help_settings__report_bug_title">Report a Bug</string>
-    <string name="activity_help_settings__report_bug_summary">Export your logs, then upload the file though Session\'s Help Desk.</string>
-    <string name="activity_help_settings__translate_session">Translate Session</string>
+    <string name="activity_help_settings__report_bug_summary">Export your logs, then upload the file though University of Port Harcourt Chat\'s Help Desk.</string>
+    <string name="activity_help_settings__translate_session">Translate University of Port Harcourt Chat</string>
     <string name="activity_help_settings__feedback">We\'d love your feedback</string>
     <string name="activity_help_settings__faq">FAQ</string>
     <string name="activity_help_settings__support">Support</string>
@@ -662,9 +662,9 @@
     <string name="dialog_seed_title">Your Recovery Phrase</string>
     <string name="dialog_seed_explanation">You can use your recovery phrase to restore your account or link a device.</string>
     <string name="dialog_clear_all_data_title">Clear All Data</string>
-    <string name="dialog_clear_all_data_explanation">This will permanently delete your messages, sessions, and contacts.</string>
+    <string name="dialog_clear_all_data_explanation">This will permanently delete your messages, University of Port Harcourt Chats, and contacts.</string>
     <string name="dialog_clear_all_data_network_explanation">Would you like to clear only this device, or delete your entire account?</string>
-    <string name="dialog_clear_all_data_message">This will permanently delete your messages, sessions, and contacts. Would you like to clear only this device, or delete your entire account?</string>
+    <string name="dialog_clear_all_data_message">This will permanently delete your messages, University of Port Harcourt Chats, and contacts. Would you like to clear only this device, or delete your entire account?</string>
     <string name="dialog_clear_all_data_clear_device_only">Clear Device Only</string>
     <string name="dialog_clear_all_data_clear_device_and_network">Clear Device and Network</string>
     <string name="dialog_clear_all_data_clear_device_and_network_confirmation">Are you sure you want to delete your data from the network? If you continue you will not be able to restore your messages or contacts.</string>
@@ -676,7 +676,7 @@
     <string name="activity_qr_code_view_scan_qr_code_tab_title">Scan QR Code</string>
     <string name="activity_qr_code_view_scan_qr_code_explanation">Scan someone\'s QR code to start a conversation with them</string>
     <string name="fragment_view_my_qr_code_title">Scan Me</string>
-    <string name="fragment_view_my_qr_code_explanation">This is your QR code. Other users can scan it to start a session with you.</string>
+    <string name="fragment_view_my_qr_code_explanation">This is your QR code. Other users can scan it to start a University of Port Harcourt Chat with you.</string>
     <string name="fragment_view_my_qr_code_share_title">Share QR Code</string>
     <string name="fragment_contact_selection_contacts_title">Contacts</string>
     <string name="fragment_contact_selection_closed_groups_title">Closed Groups</string>
@@ -694,12 +694,12 @@
     <string name="activity_edit_closed_group_not_enough_group_members_error">Groups must have at least 1 group member</string>
     <string name="fragment_edit_group_bottom_sheet_remove">Remove user from group</string>
     <string name="activity_select_contacts_title">Select Contacts</string>
-    <string name="view_reset_secure_session_done_message">Secure session reset done</string>
+    <string name="view_reset_secure_session_done_message">Secure University of Port Harcourt Chat reset done</string>
     <string name="dialog_ui_mode_title">Theme</string>
     <string name="dialog_ui_mode_option_day">Day</string>
     <string name="dialog_ui_mode_option_night">Night</string>
     <string name="dialog_ui_mode_option_system_default">System default</string>
-    <string name="activity_conversation_menu_copy_session_id">Copy Session ID</string>
+    <string name="activity_conversation_menu_copy_session_id">Copy Uniport Hash Address</string>
     <string name="attachment">Attachment</string>
     <string name="attachment_type_voice_message">Voice Message</string>
     <string name="details">Details</string>
@@ -713,15 +713,15 @@
     <string name="activity_link_device_recovery_phrase">Recovery Phrase</string>
     <string name="activity_link_device_scan_qr_code">Scan QR Code</string>
     <string name="activity_link_device_qr_message">Navigate to Settings → Recovery Phrase on your other device to show your QR code.</string>
-    <string name="activity_join_public_chat_join_rooms">Or join one of these…</string>
+    <string name="activity_join_public_chat_join_rooms">I be don add all this one before</string>
     <string name="activity_pn_mode_message_notifications">Message Notifications</string>
-    <string name="activity_pn_mode_explanation">There are two ways Session can notify you of new messages.</string>
+    <string name="activity_pn_mode_explanation">There are two ways Uniport-Chat can notify you of new messages.</string>
     <string name="activity_pn_mode_fast_mode">Fast Mode</string>
     <string name="activity_pn_mode_slow_mode">Slow Mode</string>
     <string name="activity_pn_mode_fast_mode_explanation">You’ll be notified of new messages reliably and immediately using Google’s notification servers.</string>
-    <string name="activity_pn_mode_slow_mode_explanation">Session will occasionally check for new messages in the background.</string>
+    <string name="activity_pn_mode_slow_mode_explanation">University of Port Harcourt Chat will occasionally check for new messages in the background.</string>
     <string name="fragment_recovery_phrase_title">Recovery Phrase</string>
-    <string name="activity_prompt_passphrase_session_locked">Session is Locked</string>
+    <string name="activity_prompt_passphrase_session_locked">University of Port Harcourt Chat is Locked</string>
     <string name="activity_prompt_passphrase_tap_to_unlock">Tap to Unlock</string>
     <string name="fragment_user_details_bottom_sheet_edit_text_hint">Enter a nickname</string>
     <string name="invalid_public_key">Invalid public key</string>
@@ -735,7 +735,7 @@
     <string name="open">Open</string>
     <string name="copy_url">Copy URL</string>
     <string name="dialog_link_preview_title">Enable Link Previews?</string>
-    <string name="dialog_link_preview_explanation">Enabling link previews will show previews for URLs you send and receive. This can be useful, but Session will need to contact linked websites to generate previews. You can always disable link previews in Session\'s settings.</string>
+    <string name="dialog_link_preview_explanation">Enabling link previews will show previews for URLs you send and receive. This can be useful, but University of Port Harcourt Chat will need to contact linked websites to generate previews. You can always disable link previews in University of Port Harcourt Chat\'s settings.</string>
     <string name="dialog_link_preview_enable_button_title">Enable</string>
     <string name="dialog_download_title">Trust %s?</string>
     <string name="dialog_download_explanation">Are you sure you want to download media sent by %s?</string>
@@ -765,7 +765,7 @@
     <string name="global_search_contacts_groups">Contacts and Groups</string>
     <string name="global_search_messages">Messages</string>
     <string name="activity_message_requests_title">Message Requests</string>
-    <string name="message_requests_send_notice">Sending a message to this user will automatically accept their message request and reveal your Session ID.</string>
+    <string name="message_requests_send_notice">Sending a message to this user will automatically accept their message request and reveal your Uniport Hash Address.</string>
     <string name="accept">Accept</string>
     <string name="decline">Decline</string>
     <string name="message_requests_clear_all">Clear All</string>
@@ -798,10 +798,10 @@
     <string name="dialog_voice_video_message">Your IP address is visible to your call partner and an Oxen Foundation server while using beta calls. Are you sure you want to enable Voice and Video Calls?</string>
     <string name="CallNotificationBuilder_first_call_title">Call Missed</string>
     <string name="CallNotificationBuilder_first_call_message">You missed a call because you need to enable the \'Voice and video calls\' permission in the Privacy Settings.</string>
-    <string name="WebRtcCallActivity_Session_Call">Session Call</string>
+    <string name="WebRtcCallActivity_Session_Call">University of Port Harcourt Chat Call</string>
     <string name="WebRtcCallActivity_Reconnecting">Reconnecting…</string>
     <string name="CallNotificationBuilder_system_notification_title">Notifications</string>
-    <string name="CallNotificationBuilder_system_notification_message">Having notifications disabled will prevent you from receiving calls, go to Session notification settings?</string>
+    <string name="CallNotificationBuilder_system_notification_message">Having notifications disabled will prevent you from receiving calls, go to University of Port Harcourt Chat notification settings?</string>
     <string name="dismiss">Dismiss</string>
     <string name="activity_settings_conversations_button_title">Conversations</string>
     <string name="activity_settings_message_appearance_button_title">Appearance</string>
@@ -857,7 +857,7 @@
     <string name="dialog_join_community_title">Join Community</string>
     <string name="new_conversation_contacts_title">Contacts</string>
     <string name="new_conversation_unknown_contacts_section_title">Unknown</string>
-    <string name="fragment_enter_public_key_prompt">Start a new conversation by entering someone\'s Session ID or share your Session ID with them.</string>
+    <string name="fragment_enter_public_key_prompt">Start a new conversation by entering someone\'s Uniport Hash Address or share your Uniport Hash Address with them.</string>
     <string name="activity_create_group_create_button_title">Create</string>
     <string name="search_contacts_hint">Search contacts</string>
     <string name="activity_join_public_chat_enter_community_url_tab_title">Community URL</string>

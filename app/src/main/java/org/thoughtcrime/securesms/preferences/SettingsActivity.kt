@@ -266,7 +266,7 @@ class SettingsActivity : PassphraseRequiredActionBarActivity() {
 
     private fun copyPublicKey() {
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("Session ID", hexEncodedPublicKey)
+        val clip = ClipData.newPlainText("Uniport Hash Address", hexEncodedPublicKey)
         clipboard.setPrimaryClip(clip)
         Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
     }
@@ -308,7 +308,7 @@ class SettingsActivity : PassphraseRequiredActionBarActivity() {
     private fun sendInvitation() {
         val intent = Intent()
         intent.action = Intent.ACTION_SEND
-        val invitation = "Hey, I've been using Session to chat with complete privacy and security. Come join me! Download it at https://getsession.org/. My Session ID is $hexEncodedPublicKey !"
+        val invitation = "Hey, I've been using Session to chat with complete privacy and security. Come join me! Download it at https://uniport.edu.ng/. My Uniport Hash Address is $hexEncodedPublicKey !"
         intent.putExtra(Intent.EXTRA_TEXT, invitation)
         intent.type = "text/plain"
         val chooser = Intent.createChooser(intent, getString(R.string.activity_settings_invite_button_title))

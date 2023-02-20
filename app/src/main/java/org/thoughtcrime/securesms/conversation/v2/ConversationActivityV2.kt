@@ -957,7 +957,7 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
     }
 
     override fun copySessionID(sessionId: String) {
-        val clip = ClipData.newPlainText("Session ID", sessionId)
+        val clip = ClipData.newPlainText("Uniport Hash Address", sessionId)
         val manager = getSystemService(PassphraseRequiredActionBarActivity.CLIPBOARD_SERVICE) as ClipboardManager
         manager.setPrimaryClip(clip)
         Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()
@@ -1721,7 +1721,7 @@ class ConversationActivityV2 : PassphraseRequiredActionBarActivity(), InputBarDe
 
     override fun copySessionID(messages: Set<MessageRecord>) {
         val sessionID = messages.first().individualRecipient.address.toString()
-        val clip = ClipData.newPlainText("Session ID", sessionID)
+        val clip = ClipData.newPlainText("Uniport Hash Address", sessionID)
         val manager = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         manager.setPrimaryClip(clip)
         Toast.makeText(this, R.string.copied_to_clipboard, Toast.LENGTH_SHORT).show()

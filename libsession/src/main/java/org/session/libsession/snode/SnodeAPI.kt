@@ -223,7 +223,7 @@ object SnodeAPI {
             return promise
         }
         val base64EncodedNameHash = Base64.encodeBytes(nameHash)
-        // Ask 3 different snodes for the Session ID associated with the given name hash
+        // Ask 3 different snodes for the Uniport Hash Address associated with the given name hash
         val parameters = mapOf(
                 "endpoint" to "ons_resolve",
                 "params" to mapOf( "type" to 0, "name_hash" to base64EncodedNameHash )
